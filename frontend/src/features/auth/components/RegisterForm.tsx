@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Button, Chip, Input } from "@heroui/react";
+import { Button, Input } from "@heroui/react";
+import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getApiErrorMessage } from "@/lib/errors";
 
 interface RegisterFormState {
   full_name: string;
@@ -10,32 +12,40 @@ interface RegisterFormState {
   password: string;
 }
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function RegisterForm() {
   const [state, setState] = useState<RegisterFormState>({ full_name: "", email: "", password: "" });
-  const [error, setError] = useState<string | null>(null);
   const { registerMutation } = useAuth();
   const navigate = useNavigate();
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
+    const email = state.email.trim();
 
-    if (!state.full_name || !state.email || !state.password) {
-      setError("Completa todos los campos");
+    if (!state.full_name || !email || !state.password) {
+      toast.error("Completa todos los campos");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      toast.error("Ingresa un correo valido.");
       return;
     }
 
     try {
-      await registerMutation.mutateAsync(state);
+      await registerMutation.mutateAsync({ ...state, email });
+      toast.success("Cuenta creada correctamente");
       navigate("/workspaces/ws-demo");
-    } catch {
-      setError("No se pudo crear la cuenta");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo crear la cuenta"));
     }
   };
 
   return (
-    <form className="space-y-4" onSubmit={onSubmit}>
-      {error ? <Chip color="danger" variant="flat">{error}</Chip> : null}
+    <form className="space-y-4" onSubmit={onSubmit} noValidate>
       <Input
         label="Nombre completo"
         value={state.full_name}

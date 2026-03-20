@@ -1,17 +1,22 @@
 import { useState } from "react";
-import { Button, Chip, Input } from "@heroui/react";
+import { Button, Input } from "@heroui/react";
+import toast from "react-hot-toast";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
+import { getApiErrorMessage } from "@/lib/errors";
 
 interface LoginFormState {
   email: string;
   password: string;
 }
 
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 export function LoginForm() {
   const [state, setState] = useState<LoginFormState>({ email: "", password: "" });
-  const [error, setError] = useState<string | null>(null);
   const { loginMutation } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,24 +24,29 @@ export function LoginForm() {
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError(null);
+    const email = state.email.trim();
 
-    if (!state.email || !state.password) {
-      setError("Completa email y contraseña");
+    if (!email || !state.password) {
+      toast.error("Completa email y contraseña");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      toast.error("Ingresa un correo valido.");
       return;
     }
 
     try {
-      await loginMutation.mutateAsync(state);
+      await loginMutation.mutateAsync({ ...state, email });
+      toast.success("Sesión iniciada");
       navigate(from);
-    } catch {
-      setError("No se pudo iniciar sesión");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo iniciar sesión"));
     }
   };
 
   return (
-    <form className="space-y-4" onSubmit={onSubmit}>
-      {error ? <Chip color="danger" variant="flat">{error}</Chip> : null}
+    <form className="space-y-4" onSubmit={onSubmit} noValidate>
       <Input
         label="Email"
         type="email"

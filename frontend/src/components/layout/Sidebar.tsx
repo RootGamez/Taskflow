@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, KanbanSquare, LayoutDashboard, Settings, Use
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProjects } from "@/features/projects/hooks/useProjects";
 import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
@@ -14,7 +15,7 @@ export function Sidebar() {
   const { workspaceSlug = "ws-demo" } = useParams();
   const { data: projects = [] } = useProjects(workspaceSlug);
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
+  const { logoutMutation } = useAuth();
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const setTheme = useUIStore((state) => state.setTheme);
@@ -85,8 +86,8 @@ export function Sidebar() {
 
       <button
         type="button"
-        onClick={() => {
-          logout();
+        onClick={async () => {
+          await logoutMutation.mutateAsync();
           navigate("/login");
         }}
         className="mt-auto flex items-center gap-2 border-t border-zinc-200 px-3 py-4 text-left text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-300"

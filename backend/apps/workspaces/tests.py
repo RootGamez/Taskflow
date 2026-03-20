@@ -1,3 +1,87 @@
-from django.test import TestCase
+from __future__ import annotations
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from rest_framework import status
+from rest_framework.test import APITestCase
+
+from apps.workspaces.models import Workspace, WorkspaceMember
+
+User = get_user_model()
+
+
+class WorkspaceFlowTests(APITestCase):
+	def setUp(self) -> None:
+		self.user = User.objects.create_user(
+			email="owner@example.com",
+			full_name="Owner",
+			password="Passw0rd!123",
+		)
+		login_response = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "owner@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+	def test_create_workspace_and_list_for_user(self) -> None:
+		create_response = self.client.post(
+			"/api/v1/workspaces/",
+			{"name": "Mi Workspace"},
+			format="json",
+		)
+		self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(create_response.data["name"], "Mi Workspace")
+		self.assertEqual(create_response.data["role"], "owner")
+		self.assertTrue(create_response.data["is_active"])
+
+		list_response = self.client.get("/api/v1/workspaces/")
+		self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(list_response.data), 1)
+		self.assertEqual(list_response.data[0]["name"], "Mi Workspace")
+
+	def test_select_active_workspace(self) -> None:
+		workspace_1 = Workspace.objects.create(name="Workspace Uno", owner=self.user)
+		workspace_2 = Workspace.objects.create(name="Workspace Dos", owner=self.user)
+
+		member_1 = WorkspaceMember.objects.create(
+			workspace=workspace_1,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		member_2 = WorkspaceMember.objects.create(
+			workspace=workspace_2,
+			user=self.user,
+			role=WorkspaceMember.Role.ADMIN,
+			is_active=False,
+		)
+
+		response = self.client.post(
+			"/api/v1/workspaces/select-active/",
+			{"workspace_id": str(workspace_2.id)},
+			format="json",
+		)
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["id"], str(workspace_2.id))
+		self.assertTrue(response.data["is_active"])
+
+		member_1.refresh_from_db()
+		member_2.refresh_from_db()
+		self.assertFalse(member_1.is_active)
+		self.assertTrue(member_2.is_active)
+
+	def test_select_active_workspace_requires_membership(self) -> None:
+		outsider = User.objects.create_user(
+			email="outsider@example.com",
+			full_name="Outsider",
+			password="Passw0rd!123",
+		)
+		private_workspace = Workspace.objects.create(name="Privado", owner=outsider)
+
+		response = self.client.post(
+			"/api/v1/workspaces/select-active/",
+			{"workspace_id": str(private_workspace.id)},
+			format="json",
+		)
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertEqual(str(response.data["detail"]), "No tienes acceso a este workspace.")

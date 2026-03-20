@@ -6,4 +6,5 @@ export interface Workspace {
   owner_id: string;
   created_at: string;
   role: "owner" | "admin" | "member" | "viewer";
+  is_active: boolean;
 }

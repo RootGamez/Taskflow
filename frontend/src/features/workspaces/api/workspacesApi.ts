@@ -1,27 +1,25 @@
 import type { Workspace } from "@/features/workspaces/types/workspace.types";
+import { apiClient } from "@/lib/axios";
 
-const MOCK_WORKSPACES: Workspace[] = [
-  {
-    id: "ws-1",
-    name: "TaskFlow Studio",
-    slug: "ws-demo",
-    logo_url: null,
-    owner_id: "u-1",
-    created_at: new Date().toISOString(),
-    role: "owner",
-  },
-  {
-    id: "ws-2",
-    name: "Marketing Ops",
-    slug: "marketing-ops",
-    logo_url: null,
-    owner_id: "u-2",
-    created_at: new Date().toISOString(),
-    role: "member",
-  },
-];
+interface CreateWorkspacePayload {
+  name: string;
+  slug?: string;
+  logo_url?: string;
+}
 
 export async function getWorkspaces(): Promise<Workspace[]> {
-  await new Promise((resolve) => setTimeout(resolve, 250));
-  return MOCK_WORKSPACES;
+  const { data } = await apiClient.get<Workspace[]>("/workspaces/");
+  return data;
+}
+
+export async function createWorkspace(payload: CreateWorkspacePayload): Promise<Workspace> {
+  const { data } = await apiClient.post<Workspace>("/workspaces/", payload);
+  return data;
+}
+
+export async function selectActiveWorkspace(workspaceId: string): Promise<Workspace> {
+  const { data } = await apiClient.post<Workspace>("/workspaces/select-active/", {
+    workspace_id: workspaceId,
+  });
+  return data;
 }

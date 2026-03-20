@@ -1,4 +1,4 @@
-import { Card, CardBody, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
+import { Button, Card, CardBody, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { MoreHorizontal } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -25,10 +25,10 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h3>
           </div>
           <Dropdown>
-            <DropdownTrigger>
-              <button className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800" type="button">
+            <DropdownTrigger asChild>
+              <Button isIconOnly variant="light" size="sm" className="text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                 <MoreHorizontal className="h-4 w-4" />
-              </button>
+              </Button>
             </DropdownTrigger>
             <DropdownMenu aria-label="Opciones proyecto">
               <DropdownItem key="edit">Editar</DropdownItem>

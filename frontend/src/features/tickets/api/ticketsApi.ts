@@ -1,46 +1,45 @@
 import type { Ticket } from "@/features/tickets/types/ticket.types";
+import { apiClient } from "@/lib/axios";
 
-const now = new Date();
+interface CreateTicketPayload {
+  title: string;
+  priority?: Ticket["priority"];
+  due_date?: string | null;
+  column_id?: string;
+  order?: number;
+}
 
-const MOCK_TICKETS: Ticket[] = [
-  {
-    id: "t-1",
-    project_id: "p-1",
-    column_id: "c-backlog",
-    created_by: "u-1",
-    title: "Definir arquitectura de notificaciones",
-    description: null,
-    priority: "high",
-    order: 1,
-    due_date: new Date(now.getTime() + 86400000).toISOString(),
-    created_at: now.toISOString(),
-    updated_at: now.toISOString(),
-    assignees: [],
-    labels: [{ id: "l-1", project_id: "p-1", name: "Backend", color: "#9333EA" }],
-  },
-  {
-    id: "t-2",
-    project_id: "p-1",
-    column_id: "c-progress",
-    created_by: "u-1",
-    title: "Diseñar estado del sidebar colapsable",
-    description: null,
-    priority: "medium",
-    order: 2,
-    due_date: new Date(now.getTime() - 86400000).toISOString(),
-    created_at: now.toISOString(),
-    updated_at: now.toISOString(),
-    assignees: [],
-    labels: [{ id: "l-2", project_id: "p-1", name: "Frontend", color: "#2563EB" }],
-  },
-];
+interface UpdateTicketPayload {
+  title?: string;
+  priority?: Ticket["priority"];
+  due_date?: string | null;
+  column_id?: string;
+  order?: number;
+}
 
-export async function getTicketsByProject(_projectId: string): Promise<Ticket[]> {
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return MOCK_TICKETS;
+export async function getTicketsByProject(projectId: string): Promise<Ticket[]> {
+  const { data } = await apiClient.get<Ticket[]>(`/projects/${projectId}/tickets/`);
+  return data;
 }
 
 export async function getTicketById(ticketId: string): Promise<Ticket | null> {
-  await new Promise((resolve) => setTimeout(resolve, 180));
-  return MOCK_TICKETS.find((ticket) => ticket.id === ticketId) ?? null;
+  const { data } = await apiClient.get<Ticket>(`/tickets/${ticketId}/`);
+  return data;
+}
+
+export async function createTicket(projectId: string, payload: CreateTicketPayload): Promise<Ticket> {
+  const { data } = await apiClient.post<Ticket>(`/projects/${projectId}/tickets/`, payload);
+  return data;
+}
+
+export async function updateTicket(
+  projectId: string,
+  ticketId: string,
+  payload: UpdateTicketPayload,
+): Promise<Ticket> {
+  const { data } = await apiClient.patch<Ticket>(
+    `/projects/${projectId}/tickets/${ticketId}/`,
+    payload,
+  );
+  return data;
 }

@@ -13,7 +13,7 @@ export interface Ticket {
   id: string;
   project_id: string;
   column_id: string;
-  created_by: string;
+  created_by: string | null;
   title: string;
   description: Record<string, unknown> | null;
   priority: Priority;

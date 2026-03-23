@@ -6,6 +6,8 @@ export interface Project {
   color: string;
   is_archived: boolean;
   created_at: string;
+  updated_at: string;
+  columns: Column[];
 }
 
 export interface Column {

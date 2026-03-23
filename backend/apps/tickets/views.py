@@ -1,3 +1,111 @@
-from django.shortcuts import render
+from __future__ import annotations
 
-# Create your views here.
+from django.db import transaction
+from django.db.models import F
+from rest_framework import status
+from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from apps.projects.models import Project
+from apps.tickets.models import Ticket
+from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
+
+
+class ProjectAccessMixin:
+	def get_project_for_user(self, request: Request, project_id: str) -> Project:
+		project = (
+			Project.objects.filter(id=project_id, workspace__memberships__user=request.user)
+			.distinct()
+			.first()
+		)
+		if project is None:
+			raise NotFound("Proyecto no encontrado.")
+		return project
+
+
+class TicketListCreateView(ProjectAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request, project_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		tickets = project.tickets.select_related("column", "created_by").order_by("column__order", "order", "created_at")
+		return Response(TicketSerializer(tickets, many=True).data, status=status.HTTP_200_OK)
+
+	def post(self, request: Request, project_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		serializer = TicketCreateSerializer(
+			data=request.data,
+			context={"project": project, "request": request},
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo crear el ticket."
+			raise ValidationError({"detail": message})
+
+		ticket = serializer.save()
+		return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
+
+
+class TicketDetailView(ProjectAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	def patch(self, request: Request, project_id: str, ticket_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		ticket = project.tickets.select_related("column", "created_by").filter(id=ticket_id).first()
+		if ticket is None:
+			raise NotFound("Ticket no encontrado.")
+
+		serializer = TicketUpdateSerializer(
+			ticket,
+			data=request.data,
+			partial=True,
+			context={"project": project},
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo actualizar el ticket."
+			raise ValidationError({"detail": message})
+
+		updated_ticket = serializer.save()
+		return Response(TicketSerializer(updated_ticket).data, status=status.HTTP_200_OK)
+
+	def delete(self, request: Request, project_id: str, ticket_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		ticket = project.tickets.filter(id=ticket_id).first()
+		if ticket is None:
+			raise NotFound("Ticket no encontrado.")
+
+		with transaction.atomic():
+			column_id = ticket.column_id
+			deleted_order = ticket.order
+			ticket.delete()
+			project.tickets.filter(column_id=column_id, order__gt=deleted_order).update(order=F("order") - 1)
+
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TicketSingleView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request, ticket_id: str) -> Response:
+		ticket = (
+			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
+			.distinct()
+			.first()
+		)
+		if ticket is None:
+			raise NotFound("Ticket no encontrado.")
+
+		return Response(TicketSerializer(ticket).data, status=status.HTTP_200_OK)

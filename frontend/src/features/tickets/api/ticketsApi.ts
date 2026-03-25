@@ -3,6 +3,8 @@ import { apiClient } from "@/lib/axios";
 
 interface CreateTicketPayload {
   title: string;
+  description?: string;
+  progress_notes?: string;
   priority?: Ticket["priority"];
   due_date?: string | null;
   column_id?: string;
@@ -11,6 +13,8 @@ interface CreateTicketPayload {
 
 interface UpdateTicketPayload {
   title?: string;
+  description?: string;
+  progress_notes?: string;
   priority?: Ticket["priority"];
   due_date?: string | null;
   column_id?: string;

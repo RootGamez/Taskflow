@@ -73,7 +73,6 @@ export function NotificationList() {
           const invitationStatus = notification.data.invitation_status;
           const isPendingInvitation = isInvitation && invitationStatus === "pending";
           const workspaceName = notification.data.workspace_name;
-          const workspaceSlug = notification.data.workspace_slug;
 
           return (
             <article

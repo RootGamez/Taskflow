@@ -1,16 +1,210 @@
 import { Tab, Tabs } from "@heroui/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useProject } from "@/features/projects/hooks/useProjects";
 import { ListView } from "@/features/tickets/components/ListView";
-import { useTickets } from "@/features/tickets/hooks/useTickets";
+import { TicketDetail } from "@/features/tickets/components/TicketDetail";
+import { useTickets, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import type { Ticket } from "@/features/tickets/types/ticket.types";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { getApiErrorMessage } from "@/lib/errors";
+import { useAuthStore } from "@/store/authStore";
+import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
+import { useWorkspaceStore } from "@/store/workspaceStore";
+
+type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes";
 
 export default function ListPage() {
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { workspaceSlug = "ws-demo", projectId = "p-1" } = useParams();
   const { data: project, isLoading: isLoadingProject } = useProject(workspaceSlug, projectId);
   const { data: tickets = [] } = useTickets(projectId);
+  const updateTicketMutation = useUpdateTicket(projectId);
+  const currentUserId = useAuthStore((state) => state.user?.id ?? null);
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
+  const canMutate = canMutateWorkspace(activeWorkspace?.role);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [fieldLocks, setFieldLocks] = useState<{
+    title: { userId: string; userName: string } | null;
+    priority: { userId: string; userName: string } | null;
+    due_date: { userId: string; userName: string } | null;
+    column_id: { userId: string; userName: string } | null;
+    description: { userId: string; userName: string } | null;
+    progress_notes: { userId: string; userName: string } | null;
+  }>({
+    title: null,
+    priority: null,
+    due_date: null,
+    column_id: null,
+    description: null,
+    progress_notes: null,
+  });
+  const [remoteLiveValues, setRemoteLiveValues] = useState<{
+    title?: string;
+    priority?: "urgent" | "high" | "medium" | "low" | "none";
+    due_date?: string | null;
+    column_id?: string;
+    description?: string;
+    progress_notes?: string;
+  }>({});
+
+  const selectedTicket = useMemo(
+    () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
+    [selectedTicketId, tickets],
+  );
+
+  const projectColumns = useMemo(
+    () => [...(project?.columns ?? [])].sort((a, b) => a.order - b.order),
+    [project?.columns],
+  );
+
+  useEffect(() => {
+    setFieldLocks({
+      title: null,
+      priority: null,
+      due_date: null,
+      column_id: null,
+      description: null,
+      progress_notes: null,
+    });
+    setRemoteLiveValues({});
+  }, [selectedTicketId]);
+
+  const upsertTicketInCache = useCallback((incomingTicket: Ticket) => {
+    queryClient.setQueryData<Ticket[]>(["tickets", projectId], (previous) => {
+      const previousTickets = previous ?? [];
+      const exists = previousTickets.some((ticket) => ticket.id === incomingTicket.id);
+      if (!exists) {
+        return [...previousTickets, incomingTicket];
+      }
+
+      return previousTickets.map((ticket) =>
+        ticket.id === incomingTicket.id ? incomingTicket : ticket,
+      );
+    });
+
+    queryClient.setQueryData(["ticket", incomingTicket.id], incomingTicket);
+  }, [projectId, queryClient]);
+
+  const handleTicketSocketMessage = useCallback((event: MessageEvent<string>) => {
+    try {
+      const data = JSON.parse(event.data) as {
+        type?: string;
+        ticket?: Ticket;
+        detail?: string;
+        source?: string;
+        field?: CollaborativeField;
+        user_id?: string;
+        user_name?: string;
+        value?: string;
+      };
+
+      if (data.type === "field.locked" && data.field && data.user_id && data.user_name) {
+        const field = data.field;
+        setFieldLocks((prev) => ({
+          ...prev,
+          [field]: {
+            userId: data.user_id,
+            userName: data.user_name,
+          },
+        }));
+        return;
+      }
+
+      if (data.type === "field.released" && data.field) {
+        const field = data.field;
+        setFieldLocks((prev) => ({
+          ...prev,
+          [field]: null,
+        }));
+        return;
+      }
+
+      if (data.type === "field.typing" && data.field && typeof data.value === "string") {
+        const field = data.field;
+        if (!currentUserId || data.user_id !== currentUserId) {
+          setRemoteLiveValues((prev) => ({
+            ...prev,
+            [field]: data.value,
+          }));
+        }
+        return;
+      }
+
+      if (data.type === "field.lock_denied") {
+        toast.error(`${data.user_name ?? "Otro usuario"} esta editando, por favor espera.`);
+        return;
+      }
+
+      if (data.type === "ticket.updated" && data.ticket) {
+        upsertTicketInCache(data.ticket);
+        return;
+      }
+
+      if (data.type === "error") {
+        toast.error(data.detail ?? "No se pudo sincronizar el ticket");
+      }
+    } catch {
+      toast.error("No se pudo procesar una actualizacion en vivo del ticket");
+    }
+  }, [currentUserId, upsertTicketInCache]);
+
+  const ticketSocketRef = useWebSocket(
+    selectedTicketId && accessToken
+      ? `/tickets/${selectedTicketId}/?token=${encodeURIComponent(accessToken)}`
+      : "",
+    {
+      enabled: Boolean(selectedTicketId && accessToken),
+      onMessage: handleTicketSocketMessage,
+    },
+  );
+
+  const sendSocketMessage = useCallback((payload: Record<string, unknown>) => {
+    const socket = ticketSocketRef.current;
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(payload));
+    }
+  }, [ticketSocketRef]);
+
+  const handlePatchSelectedTicket = async (payload: {
+    title?: string;
+    description?: string;
+    progress_notes?: string;
+    priority?: "urgent" | "high" | "medium" | "low" | "none";
+    due_date?: string | null;
+    column_id?: string;
+  }) => {
+    if (!canMutate || !selectedTicketId) {
+      return;
+    }
+
+    try {
+      await updateTicketMutation.mutateAsync({
+        ticketId: selectedTicketId,
+        payload,
+      });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo actualizar el ticket"));
+    }
+  };
+
+  const handleLockField = useCallback((field: CollaborativeField) => {
+    sendSocketMessage({ action: "lock_field", field });
+  }, [sendSocketMessage]);
+
+  const handleUnlockField = useCallback((field: CollaborativeField) => {
+    sendSocketMessage({ action: "unlock_field", field });
+  }, [sendSocketMessage]);
+
+  const handleTypingField = useCallback((field: CollaborativeField, value: string) => {
+    sendSocketMessage({ action: "typing", field, value });
+  }, [sendSocketMessage]);
 
   if (isLoadingProject) {
     return <LoadingSpinner />;
@@ -29,7 +223,21 @@ export default function ListPage() {
           <Tab key="list" title="Lista" />
         </Tabs>
       </div>
-      <ListView tickets={tickets} />
+      <ListView tickets={tickets} onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)} />
+      <TicketDetail
+        ticket={selectedTicket}
+        isOpen={Boolean(selectedTicket)}
+        canEdit={canMutate}
+        columns={projectColumns}
+        onPatch={handlePatchSelectedTicket}
+        currentUserId={currentUserId}
+        fieldLocks={fieldLocks}
+        remoteLiveValues={remoteLiveValues}
+        onLockField={handleLockField}
+        onUnlockField={handleUnlockField}
+        onTypingField={handleTypingField}
+        onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
+      />
     </div>
   );
 }

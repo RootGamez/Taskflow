@@ -1,18 +1,5 @@
-import { useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Minus,
-  MessageSquare,
-  Sparkles,
-  Tag,
-  Trash2,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Check, Minus, User2 } from "lucide-react";
 
 import { Button } from "@/components/ui/shadcn/button";
 import {
@@ -25,118 +12,88 @@ import {
 import { Input } from "@/components/ui/shadcn/input";
 import { Label } from "@/components/ui/shadcn/label";
 import { Textarea } from "@/components/ui/shadcn/textarea";
+import { useDebounce } from "@/hooks/useDebounce";
+import type { Column } from "@/features/projects/types/project.types";
 import type { Priority, Ticket } from "@/features/tickets/types/ticket.types";
 
-const PRIORITY_OPTIONS: Array<{
-  value: Priority;
-  label: string;
-  icon: any;
-  style: string;
-  badgeStyle: string;
-}> = [
-  {
-    value: "urgent",
-    label: "Urgente",
-    icon: AlertTriangle,
-    style: "text-red-600 border-red-200 bg-red-50 dark:bg-red-950/30 dark:border-red-900",
-    badgeStyle: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
-  },
-  {
-    value: "high",
-    label: "Alta",
-    icon: ArrowUp,
-    style: "text-orange-600 border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-900",
-    badgeStyle: "bg-orange-100 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
-  },
-  {
-    value: "medium",
-    label: "Media",
-    icon: Minus,
-    style: "text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-900",
-    badgeStyle: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-  },
-  {
-    value: "low",
-    label: "Baja",
-    icon: ArrowDown,
-    style: "text-blue-600 border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-900",
-    badgeStyle: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
-  },
-  {
-    value: "none",
-    label: "Sin prioridad",
-    icon: Minus,
-    style: "text-zinc-600 border-zinc-200 bg-zinc-50 dark:bg-zinc-900/50 dark:border-zinc-700",
-    badgeStyle: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300",
-  },
+const PRIORITY_OPTIONS: Array<{ value: Priority; label: string; icon: typeof Minus }> = [
+  { value: "urgent", label: "Urgente", icon: AlertTriangle },
+  { value: "high", label: "Alta", icon: ArrowUp },
+  { value: "medium", label: "Media", icon: Minus },
+  { value: "low", label: "Baja", icon: ArrowDown },
+  { value: "none", label: "Sin prioridad", icon: Minus },
 ];
 
-const DEMO_COLUMNS = [
-  { id: "1", name: "Backlog" },
-  { id: "2", name: "En progreso" },
-  { id: "3", name: "Hecho" },
-];
-
-const DEMO_LABELS = [
-  { id: "1", name: "Bug", color: "#dc2626" },
-  { id: "2", name: "Feature", color: "#2563eb" },
-  { id: "3", name: "Enhancement", color: "#7c3aed" },
-  { id: "4", name: "Documentation", color: "#059669" },
-  { id: "5", name: "Performance", color: "#f59e0b" },
-];
-
-const DEMO_ASSIGNEES = [
-  { id: "1", name: "Tu", initials: "TU" },
-  { id: "2", name: "Juan", initials: "JD" },
-  { id: "3", name: "María", initials: "MS" },
-  { id: "4", name: "Carlos", initials: "CP" },
-];
-
-const DEMO_ACTIVITY = [
-  {
-    id: "1",
-    user: "Demo User",
-    action: "movió el ticket a",
-    target: "En progreso",
-    time: "hace 2 horas",
-  },
-  {
-    id: "2",
-    user: "Demo User",
-    action: "cambió la prioridad a",
-    target: "Alta",
-    time: "hace 5 horas",
-  },
-  {
-    id: "3",
-    user: "Demo User",
-    action: "creó el ticket",
-    target: "",
-    time: "hace 1 día",
-  },
-];
-
-function formatDueDate(value: string | null): string {
-  if (!value) return "Sin fecha límite";
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "Sin fecha límite";
-
-  return new Intl.DateTimeFormat("es-ES", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(parsed);
+interface TicketDraft {
+  title: string;
+  priority: Priority;
+  due_date: string | null;
+  column_id: string;
+  description: string;
+  progress_notes: string;
 }
+
+type EditableField = keyof TicketDraft;
+type FieldLockMap = Record<EditableField, { userId: string; userName: string } | null>;
+type RemoteLiveMap = Partial<Pick<TicketDraft, "title" | "description" | "progress_notes">>;
 
 interface TicketDetailProps {
   ticket: Ticket | null;
   isOpen: boolean;
   isLoading?: boolean;
   canEdit?: boolean;
+  columns?: Column[];
+  currentUserId?: string | null;
+  fieldLocks?: FieldLockMap;
+  remoteLiveValues?: RemoteLiveMap;
   onOpenChange: (open: boolean) => void;
-  onUpdate?: (data: Partial<Ticket>) => Promise<void>;
+  onPatch?: (payload: Partial<TicketDraft>) => Promise<void>;
+  onLockField?: (field: EditableField) => void;
+  onUnlockField?: (field: EditableField) => void;
+  onTypingField?: (field: EditableField, value: string) => void;
   onDelete?: () => Promise<void>;
+}
+
+function toDateInput(isoDate: string | null): string {
+  if (!isoDate) return "";
+  const parsed = new Date(isoDate);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const year = parsed.getUTCFullYear();
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function toApiDate(dateInput: string): string | null {
+  if (!dateInput) return null;
+  const parsed = new Date(`${dateInput}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+function buildDraft(ticket: Ticket): TicketDraft {
+  return {
+    title: ticket.title,
+    priority: ticket.priority,
+    due_date: ticket.due_date,
+    column_id: ticket.column_id,
+    description: ticket.description ?? "",
+    progress_notes: ticket.progress_notes ?? "",
+  };
+}
+
+function getDiff(prev: TicketDraft, next: TicketDraft): Partial<TicketDraft> {
+  const payload: Partial<TicketDraft> = {};
+
+  if (prev.title !== next.title && next.title.trim().length > 0) payload.title = next.title.trim();
+  if (prev.priority !== next.priority) payload.priority = next.priority;
+  if (prev.due_date !== next.due_date) payload.due_date = next.due_date;
+  if (prev.column_id !== next.column_id && next.column_id) payload.column_id = next.column_id;
+  if (prev.description !== next.description) payload.description = next.description;
+  if (prev.progress_notes !== next.progress_notes) payload.progress_notes = next.progress_notes;
+
+  return payload;
 }
 
 export function TicketDetail({
@@ -144,452 +101,483 @@ export function TicketDetail({
   isOpen,
   isLoading = false,
   canEdit = true,
+  columns = [],
+  currentUserId = null,
+  fieldLocks = {
+    title: null,
+    priority: null,
+    due_date: null,
+    column_id: null,
+    description: null,
+    progress_notes: null,
+  },
+  remoteLiveValues,
   onOpenChange,
-  onUpdate,
+  onPatch,
+  onLockField,
+  onUnlockField,
+  onTypingField,
   onDelete,
 }: TicketDetailProps) {
-  const [editMode, setEditMode] = useState(false);
-  const [title, setTitle] = useState(ticket?.title ?? "");
-  const [description, setDescription] = useState(
-    typeof ticket?.description === "string" ? ticket.description : ""
-  );
-  const [priority, setPriority] = useState<Priority>(ticket?.priority ?? "none");
-  const [dueDate, setDueDate] = useState(ticket?.due_date ?? "");
-  const [selectedColumn, setSelectedColumn] = useState(ticket?.column_id ?? "");
-  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  const [comment, setComment] = useState("");
+  const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState<Priority>("none");
+  const [dueDateInput, setDueDateInput] = useState("");
+  const [columnId, setColumnId] = useState("");
+  const [description, setDescription] = useState("");
+  const [progressNotes, setProgressNotes] = useState("");
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  const [immediateSaveNonce, setImmediateSaveNonce] = useState(0);
+
+  const hydratedTicketIdRef = useRef<string | null>(null);
+  const activeFieldRef = useRef<EditableField | null>(null);
+  const skipNextAutosaveRef = useRef(false);
+  const pendingFieldsRef = useRef<Set<EditableField>>(new Set());
+  const lastSyncedRef = useRef<TicketDraft | null>(null);
+  const flushInFlightRef = useRef(false);
+  const queuedDraftRef = useRef<TicketDraft | null>(null);
+
+  const markFieldPending = (field: EditableField) => {
+    pendingFieldsRef.current.add(field);
+  };
+
+  const markLocalChange = (field: EditableField) => {
+    markFieldPending(field);
+    setHasLocalChanges(true);
+  };
+
+  const clearPendingIfSynced = (serverDraft: TicketDraft) => {
+    const pending = pendingFieldsRef.current;
+
+    if (pending.has("title") && serverDraft.title === title.trim()) {
+      pending.delete("title");
+    }
+
+    if (pending.has("priority") && serverDraft.priority === priority) {
+      pending.delete("priority");
+    }
+
+    if (pending.has("column_id") && serverDraft.column_id === columnId) {
+      pending.delete("column_id");
+    }
+
+    if (pending.has("due_date") && toDateInput(serverDraft.due_date) === dueDateInput) {
+      pending.delete("due_date");
+    }
+
+    if (pending.has("description") && serverDraft.description === description) {
+      pending.delete("description");
+    }
+
+    if (pending.has("progress_notes") && serverDraft.progress_notes === progressNotes) {
+      pending.delete("progress_notes");
+    }
+  };
+
+  const handleFieldFocus = (field: EditableField) => {
+    activeFieldRef.current = field;
+    onLockField?.(field);
+  };
+
+  const handleFieldBlur = (field?: EditableField) => {
+    activeFieldRef.current = null;
+
+    if (field) {
+      onUnlockField?.(field);
+    }
+  };
+
+  const isLockedByOther = (field: EditableField) =>
+    Boolean(fieldLocks[field] && fieldLocks[field]?.userId !== currentUserId);
 
   useEffect(() => {
-    if (ticket && isOpen) {
-      setTitle(ticket.title);
-      setDescription(typeof ticket.description === "string" ? ticket.description : "");
-      setPriority(ticket.priority);
-      setDueDate(ticket.due_date ?? "");
-      setSelectedColumn(ticket.column_id);
-      setEditMode(false);
+    if (!remoteLiveValues || !isOpen) {
+      return;
     }
-  }, [ticket, isOpen]);
 
-  const handleSave = async () => {
-    if (!ticket || !onUpdate) return;
-    await onUpdate({
-      ...ticket,
-      title,
-      description: description ? { content: description } : null,
+    if (
+      typeof remoteLiveValues.title === "string" &&
+      activeFieldRef.current !== "title" &&
+      remoteLiveValues.title !== title
+    ) {
+      skipNextAutosaveRef.current = true;
+      setTitle(remoteLiveValues.title);
+    }
+
+    if (
+      typeof remoteLiveValues.description === "string" &&
+      activeFieldRef.current !== "description" &&
+      remoteLiveValues.description !== description
+    ) {
+      skipNextAutosaveRef.current = true;
+      setDescription(remoteLiveValues.description);
+    }
+
+    if (
+      typeof remoteLiveValues.progress_notes === "string" &&
+      activeFieldRef.current !== "progress_notes" &&
+      remoteLiveValues.progress_notes !== progressNotes
+    ) {
+      skipNextAutosaveRef.current = true;
+      setProgressNotes(remoteLiveValues.progress_notes);
+    }
+  }, [description, isOpen, progressNotes, remoteLiveValues, title]);
+
+  useEffect(() => {
+    if (!ticket || !isOpen) {
+      setIsHydrated(false);
+      setHasLocalChanges(false);
+      hydratedTicketIdRef.current = null;
+      const activeField = activeFieldRef.current;
+      if (activeField) {
+        onUnlockField?.(activeField);
+      }
+      activeFieldRef.current = null;
+      return;
+    }
+
+    const draft = buildDraft(ticket);
+    clearPendingIfSynced(draft);
+
+    const isSameTicket = hydratedTicketIdRef.current === ticket.id;
+    const activeField = activeFieldRef.current;
+    const isEditingTextField = activeField === "description" || activeField === "progress_notes";
+
+    const canSyncField = (field: EditableField) => {
+      if (!isSameTicket) return true;
+      if (pendingFieldsRef.current.has(field)) return false;
+      if (isEditingTextField && ["title", "priority", "due_date", "column_id"].includes(field)) {
+        return false;
+      }
+      return activeField !== field;
+    };
+
+    if (canSyncField("title")) {
+      setTitle(draft.title);
+    }
+    if (canSyncField("priority")) {
+      setPriority(draft.priority);
+    }
+    if (canSyncField("due_date")) {
+      setDueDateInput(toDateInput(draft.due_date));
+    }
+    if (canSyncField("column_id")) {
+      setColumnId(draft.column_id);
+    }
+    if (canSyncField("description")) {
+      setDescription(draft.description);
+    }
+    if (canSyncField("progress_notes")) {
+      setProgressNotes(draft.progress_notes);
+    }
+
+    lastSyncedRef.current = draft;
+
+    if (!isSameTicket) {
+      queuedDraftRef.current = null;
+      flushInFlightRef.current = false;
+      pendingFieldsRef.current.clear();
+      skipNextAutosaveRef.current = true;
+      setHasLocalChanges(false);
+    }
+
+    setIsHydrated(true);
+    hydratedTicketIdRef.current = ticket.id;
+  }, [isOpen, onUnlockField, ticket]);
+
+  const draft = useMemo<TicketDraft>(
+    () => ({
+      title: title.trim(),
       priority,
-      due_date: dueDate ? new Date(dueDate).toISOString() : null,
-    });
-    setEditMode(false);
+      due_date: toApiDate(dueDateInput),
+      column_id: columnId,
+      description,
+      progress_notes: progressNotes,
+    }),
+    [title, priority, dueDateInput, columnId, description, progressNotes],
+  );
+
+  const debouncedDraft = useDebounce(draft, 450);
+
+  const scheduleImmediateSave = () => {
+    setImmediateSaveNonce((value) => value + 1);
   };
 
-  const toggleLabel = (labelId: string) => {
-    setSelectedLabels((prev) =>
-      prev.includes(labelId) ? prev.filter((id) => id !== labelId) : [...prev, labelId]
-    );
-  };
+  const flushDraft = useCallback(async () => {
+    if (!ticket || !onPatch || !canEdit || !isOpen) {
+      return;
+    }
 
-  const toggleAssignee = (assigneeId: string) => {
-    setSelectedAssignees((prev) =>
-      prev.includes(assigneeId) ? prev.filter((id) => id !== assigneeId) : [...prev, assigneeId]
-    );
-  };
+    if (flushInFlightRef.current) {
+      return;
+    }
 
-  const priorityOption = PRIORITY_OPTIONS.find((opt) => opt.value === priority);
-  const selectedLabel = DEMO_LABELS.filter((l) => selectedLabels.includes(l.id));
-  const selectedAssignee = DEMO_ASSIGNEES.filter((a) => selectedAssignees.includes(a.id));
+    flushInFlightRef.current = true;
+
+    while (queuedDraftRef.current) {
+      const candidate = queuedDraftRef.current;
+      queuedDraftRef.current = null;
+
+      const baseline = lastSyncedRef.current;
+      if (!baseline) {
+        continue;
+      }
+
+      const payload = getDiff(baseline, candidate);
+      if (Object.keys(payload).length === 0) {
+        continue;
+      }
+
+      try {
+        await onPatch(payload);
+        for (const key of Object.keys(payload)) {
+          pendingFieldsRef.current.delete(key as EditableField);
+        }
+        lastSyncedRef.current = {
+          ...baseline,
+          ...payload,
+        };
+      } catch {
+      }
+    }
+
+    if (!queuedDraftRef.current) {
+      setHasLocalChanges(false);
+    }
+
+    flushInFlightRef.current = false;
+  }, [canEdit, isOpen, onPatch, ticket]);
+
+  useEffect(() => {
+    if (!ticket || !canEdit || !onPatch || !isOpen || !isHydrated || !hasLocalChanges) {
+      return;
+    }
+
+    if (skipNextAutosaveRef.current) {
+      skipNextAutosaveRef.current = false;
+      return;
+    }
+
+    queuedDraftRef.current = debouncedDraft;
+    void flushDraft();
+  }, [canEdit, debouncedDraft, flushDraft, hasLocalChanges, isHydrated, isOpen, onPatch, ticket]);
+
+  useEffect(() => {
+    if (!ticket || !canEdit || !onPatch || !isOpen || !isHydrated || !hasLocalChanges) {
+      return;
+    }
+
+    if (immediateSaveNonce === 0) {
+      return;
+    }
+
+    queuedDraftRef.current = draft;
+    void flushDraft();
+  }, [canEdit, draft, flushDraft, hasLocalChanges, immediateSaveNonce, isHydrated, isOpen, onPatch, ticket]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
-        {/* Header */}
-        <DialogHeader className="space-y-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 space-y-2">
-              <DialogTitle className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 dark:from-cyan-950/40 dark:to-blue-950/40 dark:text-cyan-300">
-                  <CheckCircle2 className="h-4 w-4" />
-                </div>
-                <span className="text-lg">
-                  {editMode ? (
-                    <Input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Título del ticket"
-                      className="border-cyan-200 bg-white/50"
-                      disabled={isLoading}
-                    />
-                  ) : (
-                    title
-                  )}
-                </span>
-              </DialogTitle>
-              <DialogDescription className="ml-11 flex items-center gap-2 text-xs">
-                <span className="rounded-full bg-zinc-100 px-2.5 py-1 font-mono text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400">
-                  #{ticket?.id?.slice(0, 8) || "---"}
-                </span>
-                <span>Creado {ticket?.created_at ? "hace un tiempo" : "recientemente"}</span>
-              </DialogDescription>
-            </div>
-            <div className="flex gap-2">
-              {editMode && canEdit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditMode(false)}
-                  disabled={isLoading}
-                >
-                  Cancelar
-                </Button>
-              )}
-              {canEdit ? (
-                <Button
-                  size="sm"
-                  className={editMode ? "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700" : ""}
-                  onClick={editMode ? handleSave : () => setEditMode(true)}
-                  disabled={isLoading || !title.trim()}
-                >
-                  {editMode ? "Guardar cambios" : "✏️ Editar"}
-                </Button>
-              ) : null}
-            </div>
-          </div>
+      <DialogContent className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-l border-zinc-200 p-0 data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800">
+        <DialogHeader className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
+          <DialogTitle className="text-base">Ticket</DialogTitle>
+          <DialogDescription className="flex items-center gap-2 text-xs">
+            <span className="rounded-full bg-zinc-100 px-2 py-1 font-mono text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+              #{ticket?.id?.slice(0, 8) ?? "---"}
+            </span>
+          </DialogDescription>
         </DialogHeader>
 
-        {/* Main content */}
-        <div className="grid gap-6 py-4 md:grid-cols-[1fr_320px]">
-          {/* Form */}
-          <div className="space-y-6">
-            {/* Descripción */}
-            <div className="space-y-2.5">
-              <Label className="flex items-center gap-2 text-sm font-semibold">
-                <FileText className="h-4 w-4 text-zinc-500" />
-                Descripción
-              </Label>
-              {editMode ? (
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Agrega detalles y contexto..."
-                  disabled={isLoading}
-                  className="border-zinc-200 bg-white/50 dark:border-zinc-700 dark:bg-zinc-950/50"
-                />
-              ) : (
-                <div className="rounded-lg border border-zinc-200 bg-white/50 p-3 dark:border-zinc-700 dark:bg-zinc-950/50">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {description || (
-                      <span className="text-zinc-400 dark:text-zinc-600">Sin descripción añadida</span>
-                    )}
-                  </p>
-                </div>
-              )}
+        <div className="flex h-[calc(100dvh-88px)] flex-col overflow-hidden">
+          <section className="space-y-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
+            <div className="space-y-2">
+              <Label htmlFor="ticket-title">Nombre</Label>
+              {isLockedByOther("title") ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {fieldLocks.title?.userName} esta editando, por favor espera.
+                </p>
+              ) : null}
+              <Input
+                id="ticket-title"
+                value={title}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  markLocalChange("title");
+                  setTitle(next);
+                  onTypingField?.("title", next);
+                }}
+                onFocus={() => handleFieldFocus("title")}
+                onBlur={() => handleFieldBlur("title")}
+                placeholder="Escribe un titulo claro"
+                disabled={isLoading || !canEdit || isLockedByOther("title")}
+              />
             </div>
 
-            {/* Configuración - 3 columnas */}
-            <div className="grid gap-4 md:grid-cols-3">
-              {/* Estado */}
-              <div className="space-y-2.5">
-                <Label htmlFor="ticket-column" className="flex items-center gap-2 text-sm font-semibold">
-                  📍 Estado
-                </Label>
-                {editMode ? (
-                  <select
-                    id="ticket-column"
-                    value={selectedColumn}
-                    onChange={(e) => setSelectedColumn(e.target.value)}
-                    disabled={isLoading}
-                    className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950"
-                  >
-                    <option value="">Seleccionar columna</option>
-                    {DEMO_COLUMNS.map((col) => (
-                      <option key={col.id} value={col.id}>
-                        {col.name}
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="ticket-priority">Prioridad</Label>
+                {isLockedByOther("priority") ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {fieldLocks.priority?.userName} esta editando, por favor espera.
+                  </p>
+                ) : null}
+                <select
+                  id="ticket-priority"
+                  value={priority}
+                  onChange={(event) => {
+                    markLocalChange("priority");
+                    setPriority(event.target.value as Priority);
+                    scheduleImmediateSave();
+                  }}
+                  onFocus={() => handleFieldFocus("priority")}
+                  onBlur={() => handleFieldBlur("priority")}
+                  className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  disabled={isLoading || !canEdit || isLockedByOther("priority")}
+                >
+                  {PRIORITY_OPTIONS.map((option) => {
+                    return (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
-                    ))}
-                  </select>
-                ) : (
-                  <div className="rounded-lg border border-zinc-200 bg-white/50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950/50">
-                    {DEMO_COLUMNS.find((c) => c.id === selectedColumn)?.name || "Sin estado"}
-                  </div>
-                )}
+                    );
+                  })}
+                </select>
               </div>
 
-              {/* Fecha límite */}
-              <div className="space-y-2.5">
-                <Label htmlFor="ticket-due-date" className="flex items-center gap-2 text-sm font-semibold">
-                  <Calendar className="h-4 w-4 text-zinc-500" />
-                  Fecha límite
-                </Label>
-                {editMode ? (
+              <div className="space-y-2">
+                <Label htmlFor="ticket-column">Estado</Label>
+                {isLockedByOther("column_id") ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {fieldLocks.column_id?.userName} esta editando, por favor espera.
+                  </p>
+                ) : null}
+                <select
+                  id="ticket-column"
+                  value={columnId}
+                  onChange={(event) => {
+                    markLocalChange("column_id");
+                    setColumnId(event.target.value);
+                    scheduleImmediateSave();
+                  }}
+                  onFocus={() => handleFieldFocus("column_id")}
+                  onBlur={() => handleFieldBlur("column_id")}
+                  className="h-10 w-full rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                  disabled={isLoading || !canEdit || isLockedByOther("column_id")}
+                >
+                  {columns.length === 0 ? <option value="">Sin columnas</option> : null}
+                  {columns.map((column) => (
+                    <option key={column.id} value={column.id}>
+                      {column.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ticket-due-date">Fecha limite</Label>
+                {isLockedByOther("due_date") ? (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {fieldLocks.due_date?.userName} esta editando, por favor espera.
+                  </p>
+                ) : null}
+                <div className="relative">
+                  <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
                   <Input
                     id="ticket-due-date"
                     type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    disabled={isLoading}
-                    className="border-zinc-200 bg-white/50 dark:border-zinc-700 dark:bg-zinc-950/50"
+                    value={dueDateInput}
+                    onChange={(event) => {
+                      markLocalChange("due_date");
+                      setDueDateInput(event.target.value);
+                      scheduleImmediateSave();
+                    }}
+                    onFocus={() => handleFieldFocus("due_date")}
+                    onBlur={() => handleFieldBlur("due_date")}
+                    className="pl-9"
+                    disabled={isLoading || !canEdit || isLockedByOther("due_date")}
                   />
-                ) : (
-                  <div className="rounded-lg border border-zinc-200 bg-white/50 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-950/50">
-                    {formatDueDate(dueDate)}
-                  </div>
-                )}
-              </div>
-
-              {/* Prioridad */}
-              <div className="space-y-2.5">
-                <Label className="flex items-center gap-2 text-sm font-semibold">
-                  <AlertTriangle className="h-4 w-4 text-zinc-500" />
-                  Prioridad
-                </Label>
-                {editMode ? (
-                  <div className="flex gap-1.5">
-                    {PRIORITY_OPTIONS.map((option) => {
-                      const Icon = option.icon;
-                      const isActive = priority === option.value;
-                      return (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => setPriority(option.value)}
-                          className={`group relative flex-1 rounded-lg border p-2 text-center text-xs font-medium transition ${
-                            option.style
-                          } ${
-                            isActive
-                              ? "ring-2 ring-offset-2 ring-zinc-300 dark:ring-offset-zinc-950 dark:ring-zinc-700"
-                              : "hover:border-current"
-                          }`}
-                          disabled={isLoading}
-                          title={option.label}
-                        >
-                          <Icon className="mx-auto h-4 w-4" />
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className={`rounded-lg border p-3 text-center text-xs font-medium ${priorityOption?.style}`}>
-                    {priorityOption?.label || "Sin prioridad"}
-                  </div>
-                )}
+                </div>
               </div>
             </div>
 
-            {/* Asignados */}
-            {editMode && (
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2 text-sm font-semibold">
-                  <Tag className="h-4 w-4 text-zinc-500" />
-                  Asignar a
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {DEMO_ASSIGNEES.map((assignee) => {
-                    const isSelected = selectedAssignees.includes(assignee.id);
-                    return (
-                      <button
-                        key={assignee.id}
-                        type="button"
-                        onClick={() => toggleAssignee(assignee.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                          isSelected
-                            ? "bg-cyan-100 text-cyan-700 ring-1 ring-cyan-300 dark:bg-cyan-950/50 dark:text-cyan-300 dark:ring-cyan-700"
-                            : "border border-zinc-200 text-zinc-600 hover:border-cyan-200 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-cyan-700"
-                        }`}
-                        disabled={isLoading}
-                      >
-                        {assignee.name}
-                      </button>
-                    );
-                  })}
-                </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+              <div className="flex items-center gap-2">
+                <User2 className="h-4 w-4" />
+                <span>
+                  Responsable: {ticket?.assignees?.[0]?.full_name || ticket?.assignees?.[0]?.email || "Sin asignar"}
+                </span>
               </div>
-            )}
-
-            {/* Etiquetas */}
-            {editMode && (
-              <div className="space-y-3">
-                <Label className="flex items-center gap-2 text-sm font-semibold">
-                  <Tag className="h-4 w-4 text-zinc-500" />
-                  Etiquetas
-                </Label>
-                <div className="flex flex-wrap gap-2">
-                  {DEMO_LABELS.map((label) => {
-                    const isSelected = selectedLabels.includes(label.id);
-                    return (
-                      <button
-                        key={label.id}
-                        type="button"
-                        onClick={() => toggleLabel(label.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                          isSelected ? "ring-2 ring-offset-1 dark:ring-offset-zinc-950" : "border hover:border-current"
-                        }`}
-                        style={{
-                          borderColor: isSelected ? label.color : undefined,
-                          backgroundColor: isSelected ? `${label.color}20` : undefined,
-                          color: label.color,
-                        }}
-                        disabled={isLoading}
-                      >
-                        {label.name}
-                      </button>
-                    );
-                  })}
-                </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                <span>Actualizacion en tiempo real</span>
               </div>
-            )}
-
-            {/* Actividad y comentarios */}
-            <div className="space-y-3 rounded-lg border border-zinc-200 bg-white/50 p-4 dark:border-zinc-700 dark:bg-zinc-950/50">
-              <Label className="flex items-center gap-2 text-sm font-semibold">
-                <MessageSquare className="h-4 w-4 text-zinc-500" />
-                Actividad
-              </Label>
-              <div className="space-y-3 max-h-48 overflow-y-auto">
-                {DEMO_ACTIVITY.map((activity) => (
-                  <div key={activity.id} className="flex gap-3 border-l-2 border-zinc-200 pl-3 dark:border-zinc-700">
-                    <div className="h-8 w-8 rounded-full bg-zinc-200 flex-shrink-0 dark:bg-zinc-700" />
-                    <div className="flex-1 text-xs">
-                      <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {activity.user} <span className="text-zinc-600 dark:text-zinc-400">{activity.action}</span>
-                      </p>
-                      {activity.target && (
-                        <p className="mt-1 text-zinc-600 dark:text-zinc-400">"{activity.target}"</p>
-                      )}
-                      <p className="mt-1 text-zinc-500 dark:text-zinc-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Comment input */}
-              {canEdit ? (
-                <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
-                  <Textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Añade un comentario..."
-                    disabled={isLoading}
-                    className="border-zinc-200 bg-white/50 text-xs dark:border-zinc-700 dark:bg-zinc-900/50"
-                  />
-                  <Button
-                    size="sm"
-                    className="mt-2 w-full"
-                    onClick={() => setComment("")}
-                    disabled={!comment.trim() || isLoading}
-                  >
-                    Comentar
-                  </Button>
-                </div>
-              ) : null}
             </div>
-          </div>
+          </section>
 
-          {/* Info Sidebar */}
-          <aside className="space-y-3">
-            <div className="rounded-xl border border-gradient-to-br from-cyan-200 to-blue-200 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-4 dark:border-zinc-700 dark:from-cyan-950/20 dark:via-zinc-900/80 dark:to-blue-950/20">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="h-4 w-4 text-cyan-600 dark:text-cyan-300" />
-                <p className="text-xs font-bold uppercase tracking-wider text-zinc-700 dark:text-zinc-300">
-                  Resumen
+          <section className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            <div className="space-y-2">
+              <Label htmlFor="ticket-description">Detalles del ticket</Label>
+              {isLockedByOther("description") ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {fieldLocks.description?.userName} esta editando, por favor espera.
                 </p>
-              </div>
-
-              <div className="space-y-3 text-xs">
-                {/* Estado */}
-                <div>
-                  <p className="font-semibold text-zinc-700 dark:text-zinc-300">📍 Estado</p>
-                  <p className="mt-1 rounded bg-white/50 px-2 py-1.5 text-zinc-600 dark:bg-zinc-950/50 dark:text-zinc-400">
-                    {DEMO_COLUMNS.find((c) => c.id === selectedColumn)?.name || "Sin estado"}
-                  </p>
-                </div>
-
-                {/* Prioridad */}
-                <div>
-                  <p className="font-semibold text-zinc-700 dark:text-zinc-300">🎯 Prioridad</p>
-                  {priority !== "none" && (
-                    <span className={`mt-1.5 inline-block rounded-full px-2.5 py-1 font-semibold ${priorityOption?.badgeStyle}`}>
-                      {priorityOption?.label}
-                    </span>
-                  )}
-                </div>
-
-                {/* Fecha */}
-                {dueDate && (
-                  <div>
-                    <p className="font-semibold text-zinc-700 dark:text-zinc-300">📅 Fecha</p>
-                    <p className="mt-1 rounded bg-white/50 px-2 py-1.5 text-zinc-600 dark:bg-zinc-950/50 dark:text-zinc-400">
-                      {formatDueDate(dueDate)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Asignados */}
-                {selectedAssignee.length > 0 && (
-                  <div>
-                    <p className="font-semibold text-zinc-700 dark:text-zinc-300">👥 Asignados</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {selectedAssignee.map((a) => (
-                        <span
-                          key={a.id}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-cyan-100 text-xs font-bold text-cyan-700 dark:bg-cyan-950/50 dark:text-cyan-300"
-                        >
-                          {a.initials}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Etiquetas */}
-                {selectedLabel.length > 0 && (
-                  <div>
-                    <p className="font-semibold text-zinc-700 dark:text-zinc-300">🏷️ Etiquetas</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {selectedLabel.map((l) => (
-                        <span
-                          key={l.id}
-                          className="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                          style={{
-                            backgroundColor: `${l.color}30`,
-                            color: l.color,
-                          }}
-                        >
-                          {l.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Creado */}
-                <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
-                  <p className="flex items-center gap-1 font-semibold text-zinc-700 dark:text-zinc-300">
-                    <Clock className="h-3 w-3" />
-                    Creado
-                  </p>
-                  <p className="mt-1 text-zinc-600 dark:text-zinc-400">hace 1 día</p>
-                </div>
-              </div>
+              ) : null}
+              <Textarea
+                id="ticket-description"
+                value={description}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  markLocalChange("description");
+                  setDescription(next);
+                  onTypingField?.("description", next);
+                }}
+                onFocus={() => handleFieldFocus("description")}
+                onBlur={() => handleFieldBlur("description")}
+                placeholder="Contexto, criterios de aceptacion, links y notas del problema"
+                className="min-h-40"
+                disabled={isLoading || !canEdit || isLockedByOther("description")}
+              />
             </div>
 
-            {/* Peligro */}
-            {canEdit && editMode && onDelete && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="w-full"
-                onClick={async () => {
-                  if (window.confirm("¿Estás seguro? Esta acción no se puede deshacer.")) {
-                    await onDelete();
-                  }
+            <div className="space-y-2">
+              <Label htmlFor="ticket-progress">Avance y actualizaciones</Label>
+              {isLockedByOther("progress_notes") ? (
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {fieldLocks.progress_notes?.userName} esta editando, por favor espera.
+                </p>
+              ) : null}
+              <Textarea
+                id="ticket-progress"
+                value={progressNotes}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  markLocalChange("progress_notes");
+                  setProgressNotes(next);
+                  onTypingField?.("progress_notes", next);
                 }}
-                disabled={isLoading}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar ticket
-              </Button>
-            )}
-          </aside>
+                onFocus={() => handleFieldFocus("progress_notes")}
+                onBlur={() => handleFieldBlur("progress_notes")}
+                placeholder="Registra avances del ticket, bloqueos y decisiones"
+                className="min-h-40"
+                disabled={isLoading || !canEdit || isLockedByOther("progress_notes")}
+              />
+            </div>
+
+            {canEdit && onDelete ? (
+              <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    if (window.confirm("Estas seguro? Esta accion no se puede deshacer.")) {
+                      await onDelete();
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  Eliminar ticket
+                </Button>
+              </div>
+            ) : null}
+          </section>
         </div>
       </DialogContent>
     </Dialog>

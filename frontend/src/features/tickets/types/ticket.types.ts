@@ -15,7 +15,8 @@ export interface Ticket {
   column_id: string;
   created_by: string | null;
   title: string;
-  description: Record<string, unknown> | null;
+  description: string;
+  progress_notes: string;
   priority: Priority;
   order: number;
   due_date: string | null;

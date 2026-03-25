@@ -85,3 +85,118 @@ class WorkspaceFlowTests(APITestCase):
 		)
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 		self.assertEqual(str(response.data["detail"]), "No tienes acceso a este workspace.")
+
+	def test_owner_can_invite_member_with_role(self) -> None:
+		workspace = Workspace.objects.create(name="Equipo", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		invited = User.objects.create_user(
+			email="nuevo@example.com",
+			full_name="Nuevo Usuario",
+			password="Passw0rd!123",
+		)
+
+		response = self.client.post(
+			f"/api/v1/workspaces/{workspace.slug}/members/",
+			{"email": invited.email, "role": WorkspaceMember.Role.VIEWER},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(response.data["email"], invited.email)
+		self.assertEqual(response.data["role"], WorkspaceMember.Role.VIEWER)
+
+	def test_admin_can_update_member_role(self) -> None:
+		owner = self.user
+		workspace = Workspace.objects.create(name="Producto", owner=owner)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=owner,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=False,
+		)
+
+		admin = User.objects.create_user(
+			email="admin@example.com",
+			full_name="Admin",
+			password="Passw0rd!123",
+		)
+		target = User.objects.create_user(
+			email="target@example.com",
+			full_name="Target",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=admin,
+			role=WorkspaceMember.Role.ADMIN,
+			is_active=True,
+		)
+		target_membership = WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=target,
+			role=WorkspaceMember.Role.VIEWER,
+			is_active=False,
+		)
+
+		admin_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": admin.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_login.data['access']}")
+
+		response = self.client.patch(
+			f"/api/v1/workspaces/{workspace.slug}/members/{target_membership.id}/",
+			{"role": WorkspaceMember.Role.MEMBER},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["role"], WorkspaceMember.Role.MEMBER)
+
+	def test_member_cannot_invite_people(self) -> None:
+		owner = self.user
+		workspace = Workspace.objects.create(name="Producto", owner=owner)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=owner,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=False,
+		)
+
+		member = User.objects.create_user(
+			email="member@example.com",
+			full_name="Member",
+			password="Passw0rd!123",
+		)
+		invited = User.objects.create_user(
+			email="invitado@example.com",
+			full_name="Invitado",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=member,
+			role=WorkspaceMember.Role.MEMBER,
+			is_active=True,
+		)
+
+		member_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": member.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {member_login.data['access']}")
+
+		response = self.client.post(
+			f"/api/v1/workspaces/{workspace.slug}/members/",
+			{"email": invited.email, "role": WorkspaceMember.Role.VIEWER},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

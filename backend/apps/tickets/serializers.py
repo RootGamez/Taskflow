@@ -48,7 +48,6 @@ class TicketSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
     column_id = serializers.UUIDField(source="column.id", read_only=True)
     created_by = serializers.SerializerMethodField()
-    description = serializers.SerializerMethodField()
     assignees = serializers.SerializerMethodField()
     labels = serializers.SerializerMethodField()
 
@@ -61,6 +60,7 @@ class TicketSerializer(serializers.ModelSerializer):
             "created_by",
             "title",
             "description",
+            "progress_notes",
             "priority",
             "order",
             "due_date",
@@ -72,9 +72,6 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_created_by(self, obj: Ticket):
         return str(obj.created_by_id) if obj.created_by_id else None
-
-    def get_description(self, _obj: Ticket):
-        return None
 
     def get_assignees(self, _obj: Ticket):
         return []
@@ -91,6 +88,8 @@ class TicketCreateSerializer(serializers.Serializer):
             "blank": "El titulo del ticket es obligatorio.",
         },
     )
+    description = serializers.CharField(required=False, allow_blank=True)
+    progress_notes = serializers.CharField(required=False, allow_blank=True)
     priority = serializers.ChoiceField(choices=Ticket.Priority.choices, required=False)
     due_date = serializers.DateTimeField(required=False, allow_null=True)
     column_id = serializers.UUIDField(required=False)
@@ -128,6 +127,8 @@ class TicketCreateSerializer(serializers.Serializer):
                 column=column,
                 created_by=request_user,
                 title=validated_data["title"],
+                description=validated_data.get("description", ""),
+                progress_notes=validated_data.get("progress_notes", ""),
                 priority=validated_data.get("priority", Ticket.Priority.NONE),
                 due_date=validated_data.get("due_date"),
                 order=target_order,
@@ -136,6 +137,8 @@ class TicketCreateSerializer(serializers.Serializer):
 
 class TicketUpdateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    progress_notes = serializers.CharField(required=False, allow_blank=True)
     priority = serializers.ChoiceField(choices=Ticket.Priority.choices, required=False)
     due_date = serializers.DateTimeField(required=False, allow_null=True)
     column_id = serializers.UUIDField(required=False)
@@ -150,7 +153,7 @@ class TicketUpdateSerializer(serializers.Serializer):
         return value
 
     def update(self, instance: Ticket, validated_data: dict) -> Ticket:
-        for field in ("title", "priority", "due_date"):
+        for field in ("title", "description", "progress_notes", "priority", "due_date"):
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
 
@@ -158,7 +161,16 @@ class TicketUpdateSerializer(serializers.Serializer):
         target_column = self.context.get("target_column", instance.column)
 
         with transaction.atomic():
-            instance.save(update_fields=["title", "priority", "due_date", "updated_at"])
+            instance.save(
+                update_fields=[
+                    "title",
+                    "description",
+                    "progress_notes",
+                    "priority",
+                    "due_date",
+                    "updated_at",
+                ]
+            )
 
             if requested_order is not None or target_column.id != instance.column_id:
                 normalize_ticket_positions(instance, target_column, requested_order)

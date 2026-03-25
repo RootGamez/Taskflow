@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db import transaction
 from django.db.models import F
 from rest_framework import status
@@ -69,6 +71,18 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 			raise ValidationError({"detail": message})
 
 		updated_ticket = serializer.save()
+
+		channel_layer = get_channel_layer()
+		if channel_layer is not None:
+			async_to_sync(channel_layer.group_send)(
+				f"ticket_{updated_ticket.id}",
+				{
+					"type": "ticket.updated",
+					"ticket": TicketSerializer(updated_ticket).data,
+					"source": str(request.user.id),
+				},
+			)
+
 		return Response(TicketSerializer(updated_ticket).data, status=status.HTTP_200_OK)
 
 	def delete(self, request: Request, project_id: str, ticket_id: str) -> Response:

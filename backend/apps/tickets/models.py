@@ -32,6 +32,8 @@ class Ticket(models.Model):
 		related_name="created_tickets",
 	)
 	title = models.CharField(max_length=255)
+	description = models.TextField(blank=True)
+	progress_notes = models.TextField(blank=True)
 	priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.NONE)
 	due_date = models.DateTimeField(null=True, blank=True)
 	order = models.PositiveIntegerField(default=1)

@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.projects.models import Project
+from apps.tickets.consumers import TicketConsumer
 from apps.tickets.models import Ticket
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
 from apps.workspaces.access import WorkspaceRoleAccessMixin
@@ -54,6 +55,13 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 		ticket = project.tickets.select_related("column", "created_by").filter(id=ticket_id).first()
 		if ticket is None:
 			raise NotFound("Ticket no encontrado.")
+
+		request_fields = set(request.data.keys())
+		for field in TicketConsumer.EDITABLE_FIELDS.intersection(request_fields):
+			lock = TicketConsumer.get_active_lock(str(ticket.id), field)
+			if lock and lock.get("user_id") != str(request.user.id):
+				owner = lock.get("user_name", "Otro usuario")
+				raise ValidationError({"detail": f"{owner} esta editando este campo, por favor espera."})
 
 		serializer = TicketUpdateSerializer(
 			ticket,

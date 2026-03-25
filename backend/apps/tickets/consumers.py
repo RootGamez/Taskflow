@@ -25,6 +25,20 @@ class TicketConsumer(AsyncJsonWebsocketConsumer):
     LOCK_TTL_SECONDS = 15
     FIELD_LOCKS: dict[str, dict[str, str | float]] = {}
 
+    @classmethod
+    def get_active_lock(cls, ticket_id: str, field: str):
+        key = f"{ticket_id}:{field}"
+        lock = cls.FIELD_LOCKS.get(key)
+        if not lock:
+            return None
+
+        expires_at = float(lock.get("expires_at", 0))
+        if expires_at <= time.time():
+            cls.FIELD_LOCKS.pop(key, None)
+            return None
+
+        return lock
+
     async def connect(self):
         self.ticket_id = self.scope["url_route"]["kwargs"]["ticket_id"]
         self.group_name = f"ticket_{self.ticket_id}"
@@ -224,16 +238,7 @@ class TicketConsumer(AsyncJsonWebsocketConsumer):
         return f"{self.ticket_id}:{field}"
 
     def _get_lock(self, field: str):
-        key = self._lock_key(field)
-        lock = self.FIELD_LOCKS.get(key)
-        if not lock:
-            return None
-
-        expires_at = float(lock.get("expires_at", 0))
-        if expires_at <= time.time():
-            self.FIELD_LOCKS.pop(key, None)
-            return None
-        return lock
+        return self.get_active_lock(self.ticket_id, field)
 
     def _set_lock(self, field: str):
         self.FIELD_LOCKS[self._lock_key(field)] = {

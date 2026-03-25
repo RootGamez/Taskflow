@@ -1,33 +1,47 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { User } from "@/features/auth/types/auth.types";
+import {
+  getWorkspaceMembers,
+  inviteWorkspaceMember,
+  updateWorkspaceMemberRole,
+} from "@/features/members/api/membersApi";
+import type {
+  InviteWorkspaceMemberPayload,
+  UpdateWorkspaceMemberRolePayload,
+} from "@/features/members/types/member.types";
 
-const MOCK_MEMBERS: User[] = [
-  {
-    id: "u-1",
-    email: "demo@taskflow.app",
-    full_name: "Demo User",
-    avatar_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "u-2",
-    email: "ana@taskflow.app",
-    full_name: "Ana Rivera",
-    avatar_url: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-];
-
-export function useMembers() {
+export function useMembers(workspaceSlug: string) {
   return useQuery({
-    queryKey: ["members"],
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      return MOCK_MEMBERS;
+    queryKey: ["workspace-members", workspaceSlug],
+    queryFn: () => getWorkspaceMembers(workspaceSlug),
+    enabled: Boolean(workspaceSlug),
+  });
+}
+
+export function useInviteWorkspaceMember(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: InviteWorkspaceMemberPayload) => inviteWorkspaceMember(workspaceSlug, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members", workspaceSlug] });
     },
-    initialData: MOCK_MEMBERS,
+  });
+}
+
+export function useUpdateWorkspaceMemberRole(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      memberId,
+      payload,
+    }: {
+      memberId: string;
+      payload: UpdateWorkspaceMemberRolePayload;
+    }) => updateWorkspaceMemberRole(workspaceSlug, memberId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members", workspaceSlug] });
+    },
   });
 }

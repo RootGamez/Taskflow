@@ -5,6 +5,7 @@ import { useAuthStore } from "@/store/authStore";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import WorkspaceDashboardPage from "@/pages/workspace/WorkspaceDashboardPage";
+import WorkspaceMembersPage from "@/pages/workspace/WorkspaceMembersPage";
 import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
 import KanbanPage from "@/pages/project/KanbanPage";
 import ListPage from "@/pages/project/ListPage";
@@ -49,6 +50,10 @@ export const router = createBrowserRouter([
       {
         path: "/workspaces/:workspaceSlug/settings",
         element: <WorkspaceSettingsPage />,
+      },
+      {
+        path: "/workspaces/:workspaceSlug/members",
+        element: <WorkspaceMembersPage />,
       },
       {
         path: "/workspaces/:workspaceSlug/projects/:projectId/board",

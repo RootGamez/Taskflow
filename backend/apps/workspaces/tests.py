@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.notifications.models import Notification
 from apps.workspaces.models import Workspace, WorkspaceMember
 
 User = get_user_model()
@@ -107,8 +108,11 @@ class WorkspaceFlowTests(APITestCase):
 		)
 
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-		self.assertEqual(response.data["email"], invited.email)
+		self.assertEqual(response.data["invited_user_email"], invited.email)
+		self.assertEqual(response.data["status"], "pending")
 		self.assertEqual(response.data["role"], WorkspaceMember.Role.VIEWER)
+		self.assertFalse(WorkspaceMember.objects.filter(workspace=workspace, user=invited).exists())
+		self.assertTrue(Notification.objects.filter(recipient=invited).exists())
 
 	def test_admin_can_update_member_role(self) -> None:
 		owner = self.user

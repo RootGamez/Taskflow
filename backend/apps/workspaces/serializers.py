@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 from rest_framework import serializers
 
-from apps.workspaces.models import Workspace, WorkspaceMember
+from apps.notifications.models import Notification
+from apps.workspaces.models import Workspace, WorkspaceInvitation, WorkspaceMember
 
 User = get_user_model()
 
@@ -144,20 +145,53 @@ class WorkspaceMemberInviteSerializer(serializers.Serializer):
 
     def validate(self, attrs: dict) -> dict:
         workspace: Workspace = self.context["workspace"]
+        request_user = self.context["request"].user
         target_user = self.context["target_user"]
+        if target_user == request_user:
+            raise serializers.ValidationError("No puedes invitarte a ti mismo.")
         if WorkspaceMember.objects.filter(workspace=workspace, user=target_user).exists():
             raise serializers.ValidationError("La persona ya es miembro del workspace.")
+        if WorkspaceInvitation.objects.filter(
+            workspace=workspace,
+            invited_user=target_user,
+            status=WorkspaceInvitation.Status.PENDING,
+        ).exists():
+            raise serializers.ValidationError("Ya existe una invitacion pendiente para esa persona.")
         return attrs
 
-    def create(self, validated_data: dict) -> WorkspaceMember:
+    def create(self, validated_data: dict) -> WorkspaceInvitation:
         workspace: Workspace = self.context["workspace"]
         target_user = self.context["target_user"]
-        return WorkspaceMember.objects.create(
-            workspace=workspace,
-            user=target_user,
-            role=validated_data["role"],
-            is_active=False,
-        )
+        request_user = self.context["request"].user
+
+        with transaction.atomic():
+            invitation = WorkspaceInvitation.objects.create(
+                workspace=workspace,
+                invited_user=target_user,
+                invited_by=request_user,
+                role=validated_data["role"],
+                status=WorkspaceInvitation.Status.PENDING,
+            )
+
+            notification = Notification.objects.create(
+                recipient=target_user,
+                actor=request_user,
+                notification_type=Notification.Type.WORKSPACE_INVITATION,
+                title=f"Nueva invitacion a workspace \"{workspace.name}\"",
+                message=f"{request_user.full_name} te invito como {validated_data['role']}.",
+                data={
+                    "workspace_id": str(workspace.id),
+                    "workspace_slug": workspace.slug,
+                    "workspace_name": workspace.name,
+                    "role": validated_data["role"],
+                    "invitation_id": str(invitation.id),
+                    "invitation_status": WorkspaceInvitation.Status.PENDING,
+                },
+            )
+            invitation.notification = notification
+            invitation.save(update_fields=["notification"])
+
+        return invitation
 
 
 class WorkspaceMemberRoleUpdateSerializer(serializers.Serializer):
@@ -174,3 +208,21 @@ class WorkspaceMemberRoleUpdateSerializer(serializers.Serializer):
         membership.role = self.validated_data["role"]
         membership.save(update_fields=["role"])
         return membership
+
+
+class WorkspaceInvitationSerializer(serializers.ModelSerializer):
+    invited_user_id = serializers.UUIDField(source="invited_user.id", read_only=True)
+    invited_user_email = serializers.EmailField(source="invited_user.email", read_only=True)
+
+    class Meta:
+        model = WorkspaceInvitation
+        fields = (
+            "id",
+            "workspace_id",
+            "invited_user_id",
+            "invited_user_email",
+            "role",
+            "status",
+            "created_at",
+        )
+        read_only_fields = fields

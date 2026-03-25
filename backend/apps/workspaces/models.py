@@ -4,6 +4,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
 
@@ -67,3 +68,51 @@ class WorkspaceMember(models.Model):
 
 	def __str__(self):
 		return f"{self.user} - {self.workspace} ({self.role})"
+
+
+class WorkspaceInvitation(models.Model):
+	class Status(models.TextChoices):
+		PENDING = "pending", "Pending"
+		ACCEPTED = "accepted", "Accepted"
+		REJECTED = "rejected", "Rejected"
+
+	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+	workspace = models.ForeignKey(
+		Workspace,
+		on_delete=models.CASCADE,
+		related_name="invitations",
+	)
+	invited_user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="workspace_invitations",
+	)
+	invited_by = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="sent_workspace_invitations",
+	)
+	role = models.CharField(max_length=20, choices=WorkspaceMember.Role.choices, default=WorkspaceMember.Role.MEMBER)
+	status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+	notification = models.OneToOneField(
+		"notifications.Notification",
+		on_delete=models.SET_NULL,
+		related_name="workspace_invitation",
+		null=True,
+		blank=True,
+	)
+	created_at = models.DateTimeField(default=timezone.now)
+	responded_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		ordering = ["-created_at"]
+		constraints = [
+			models.UniqueConstraint(
+				fields=["workspace", "invited_user"],
+				condition=Q(status="pending"),
+				name="unique_pending_workspace_invitation",
+			)
+		]
+
+	def __str__(self):
+		return f"Invite {self.invited_user} to {self.workspace} ({self.status})"

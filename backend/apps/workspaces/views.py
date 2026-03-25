@@ -11,6 +11,7 @@ from apps.workspaces.access import WorkspaceRoleAccessMixin
 from apps.workspaces.models import WorkspaceMember
 from apps.workspaces.serializers import (
 	WorkspaceCreateSerializer,
+	WorkspaceInvitationSerializer,
 	WorkspaceMemberInviteSerializer,
 	WorkspaceMemberRoleUpdateSerializer,
 	WorkspaceMemberSerializer,
@@ -120,7 +121,7 @@ class WorkspaceMemberListInviteView(WorkspaceMembersManageMixin, APIView):
 		requester_membership = self.assert_workspace_member_management_access(request, workspace_slug)
 		serializer = WorkspaceMemberInviteSerializer(
 			data=request.data,
-			context={"workspace": requester_membership.workspace},
+			context={"workspace": requester_membership.workspace, "request": request},
 		)
 		if not serializer.is_valid():
 			errors = serializer.errors
@@ -131,8 +132,8 @@ class WorkspaceMemberListInviteView(WorkspaceMembersManageMixin, APIView):
 				message = "No se pudo invitar al miembro."
 			raise ValidationError({"detail": message})
 
-		membership = serializer.save()
-		return Response(WorkspaceMemberSerializer(membership).data, status=status.HTTP_201_CREATED)
+		invitation = serializer.save()
+		return Response(WorkspaceInvitationSerializer(invitation).data, status=status.HTTP_201_CREATED)
 
 
 class WorkspaceMemberDetailView(WorkspaceMembersManageMixin, APIView):

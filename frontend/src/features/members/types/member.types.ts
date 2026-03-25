@@ -20,3 +20,13 @@ export interface InviteWorkspaceMemberPayload {
 export interface UpdateWorkspaceMemberRolePayload {
   role: Exclude<WorkspaceRole, "owner">;
 }
+
+export interface WorkspaceInvitationSummary {
+  id: string;
+  workspace_id: string;
+  invited_user_id: string;
+  invited_user_email: string;
+  role: Exclude<WorkspaceRole, "owner">;
+  status: "pending" | "accepted" | "rejected";
+  created_at: string;
+}

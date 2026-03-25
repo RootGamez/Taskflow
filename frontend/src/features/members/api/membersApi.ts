@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/axios";
 import type {
   InviteWorkspaceMemberPayload,
   UpdateWorkspaceMemberRolePayload,
+  WorkspaceInvitationSummary,
   WorkspaceMember,
 } from "@/features/members/types/member.types";
 
@@ -13,8 +14,8 @@ export async function getWorkspaceMembers(workspaceSlug: string): Promise<Worksp
 export async function inviteWorkspaceMember(
   workspaceSlug: string,
   payload: InviteWorkspaceMemberPayload,
-): Promise<WorkspaceMember> {
-  const { data } = await apiClient.post<WorkspaceMember>(`/workspaces/${workspaceSlug}/members/`, payload);
+): Promise<WorkspaceInvitationSummary> {
+  const { data } = await apiClient.post<WorkspaceInvitationSummary>(`/workspaces/${workspaceSlug}/members/`, payload);
   return data;
 }
 

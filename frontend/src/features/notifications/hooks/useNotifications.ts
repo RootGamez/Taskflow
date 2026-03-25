@@ -1,34 +1,56 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-interface NotificationItem {
-  id: string;
-  text: string;
-  created_at: string;
-  is_read: boolean;
-}
-
-const MOCK_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "n-1",
-    text: "Te asignaron en Definir arquitectura de notificaciones",
-    created_at: new Date(Date.now() - 1000 * 60 * 8).toISOString(),
-    is_read: false,
-  },
-  {
-    id: "n-2",
-    text: "Ana comentó en ticket de login",
-    created_at: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
-    is_read: true,
-  },
-];
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  notificationAction,
+} from "@/features/notifications/api/notificationsApi";
+import type { NotificationAction } from "@/features/notifications/types/notification.types";
 
 export function useNotifications() {
   return useQuery({
     queryKey: ["notifications"],
-    queryFn: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      return MOCK_NOTIFICATIONS;
+    queryFn: getNotifications,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
-    initialData: MOCK_NOTIFICATIONS,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (notificationId: string) => markNotificationRead(notificationId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+}
+
+export function useNotificationAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      notificationId,
+      action,
+    }: {
+      notificationId: string;
+      action: NotificationAction;
+    }) => notificationAction(notificationId, action),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members"] });
+    },
   });
 }

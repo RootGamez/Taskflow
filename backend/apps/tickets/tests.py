@@ -87,3 +87,66 @@ class TicketFlowTests(APITestCase):
 		self.assertEqual(len(progress_tickets), 1)
 		self.assertEqual(progress_tickets[0]["title"], "Primer ticket")
 		self.assertEqual(progress_tickets[0]["order"], 1)
+
+	def test_viewer_cannot_update_ticket(self) -> None:
+		create_response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{"title": "Ticket base", "column_id": str(self.backlog.id)},
+			format="json",
+		)
+		self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+
+		viewer = User.objects.create_user(
+			email="viewer@example.com",
+			full_name="Viewer",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=viewer,
+			role=WorkspaceMember.Role.VIEWER,
+			is_active=False,
+		)
+
+		viewer_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "viewer@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {viewer_login.data['access']}")
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{create_response.data['id']}/",
+			{"priority": "urgent"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_admin_can_create_ticket(self) -> None:
+		admin = User.objects.create_user(
+			email="admin@example.com",
+			full_name="Admin",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=admin,
+			role=WorkspaceMember.Role.ADMIN,
+			is_active=False,
+		)
+
+		admin_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "admin@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_login.data['access']}")
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{"title": "Ticket admin", "column_id": str(self.backlog.id)},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)

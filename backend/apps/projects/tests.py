@@ -61,3 +61,61 @@ class ProjectFlowTests(APITestCase):
 		last_column_delete = self.client.delete(f"/api/v1/projects/{project_id}/columns/{columns[0]['id']}/")
 		self.assertEqual(last_column_delete.status_code, status.HTTP_400_BAD_REQUEST)
 		self.assertEqual(str(last_column_delete.data["detail"]), "El proyecto debe tener al menos una columna.")
+
+	def test_viewer_cannot_create_project(self) -> None:
+		viewer = User.objects.create_user(
+			email="viewer@example.com",
+			full_name="Viewer",
+			password="Passw0rd!123",
+		)
+		workspace = Workspace.objects.create(name="Viewer Workspace", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=viewer,
+			role=WorkspaceMember.Role.VIEWER,
+			is_active=True,
+		)
+
+		viewer_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "viewer@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {viewer_login.data['access']}")
+
+		response = self.client.post(
+			f"/api/v1/workspaces/{workspace.slug}/projects/",
+			{"name": "No permitido"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_admin_can_create_project(self) -> None:
+		admin = User.objects.create_user(
+			email="admin@example.com",
+			full_name="Admin",
+			password="Passw0rd!123",
+		)
+		workspace = Workspace.objects.create(name="Admin Workspace", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=admin,
+			role=WorkspaceMember.Role.ADMIN,
+			is_active=True,
+		)
+
+		admin_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "admin@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_login.data['access']}")
+
+		response = self.client.post(
+			f"/api/v1/workspaces/{workspace.slug}/projects/",
+			{"name": "Permitido"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)

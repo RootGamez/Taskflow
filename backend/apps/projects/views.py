@@ -18,34 +18,11 @@ from apps.projects.serializers import (
 	ProjectSerializer,
 	ProjectUpdateSerializer,
 )
-from apps.workspaces.models import Workspace, WorkspaceMember
+from apps.workspaces.access import WorkspaceRoleAccessMixin
+from apps.workspaces.models import Workspace
 
 
-class WorkspaceAccessMixin:
-	def get_workspace_for_user(self, request: Request, workspace_slug: str) -> Workspace:
-		membership = (
-			WorkspaceMember.objects.select_related("workspace")
-			.filter(user=request.user, workspace__slug=workspace_slug)
-			.first()
-		)
-		if membership is None:
-			raise NotFound("Workspace no encontrado.")
-		return membership.workspace
-
-	def get_project_for_user(self, request: Request, project_id: str) -> Project:
-		project = (
-			Project.objects.select_related("workspace")
-			.prefetch_related("columns")
-			.filter(id=project_id, workspace__memberships__user=request.user)
-			.distinct()
-			.first()
-		)
-		if project is None:
-			raise NotFound("Proyecto no encontrado.")
-		return project
-
-
-class ProjectListCreateView(WorkspaceAccessMixin, APIView):
+class ProjectListCreateView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, workspace_slug: str) -> Response:
@@ -55,7 +32,7 @@ class ProjectListCreateView(WorkspaceAccessMixin, APIView):
 		return Response(serializer.data, status=status.HTTP_200_OK)
 
 	def post(self, request: Request, workspace_slug: str) -> Response:
-		workspace = self.get_workspace_for_user(request, workspace_slug)
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
 		serializer = ProjectCreateSerializer(
 			data=request.data,
 			context={"workspace": workspace},
@@ -74,7 +51,7 @@ class ProjectListCreateView(WorkspaceAccessMixin, APIView):
 		return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
 
-class ProjectDetailView(WorkspaceAccessMixin, APIView):
+class ProjectDetailView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, workspace_slug: str, project_id: str) -> Response:
@@ -90,7 +67,7 @@ class ProjectDetailView(WorkspaceAccessMixin, APIView):
 		return Response(serializer.data, status=status.HTTP_200_OK)
 
 	def patch(self, request: Request, workspace_slug: str, project_id: str) -> Response:
-		workspace = self.get_workspace_for_user(request, workspace_slug)
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
 		project = Project.objects.filter(id=project_id, workspace=workspace).first()
 		if project is None:
 			raise NotFound("Proyecto no encontrado.")
@@ -109,7 +86,7 @@ class ProjectDetailView(WorkspaceAccessMixin, APIView):
 		return Response(ProjectSerializer(project).data, status=status.HTTP_200_OK)
 
 	def delete(self, request: Request, workspace_slug: str, project_id: str) -> Response:
-		workspace = self.get_workspace_for_user(request, workspace_slug)
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
 		project = Project.objects.filter(id=project_id, workspace=workspace).first()
 		if project is None:
 			raise NotFound("Proyecto no encontrado.")
@@ -118,7 +95,7 @@ class ProjectDetailView(WorkspaceAccessMixin, APIView):
 		return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class ProjectColumnListCreateView(WorkspaceAccessMixin, APIView):
+class ProjectColumnListCreateView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, project_id: str) -> Response:
@@ -128,6 +105,7 @@ class ProjectColumnListCreateView(WorkspaceAccessMixin, APIView):
 
 	def post(self, request: Request, project_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		serializer = ProjectColumnCreateSerializer(
 			data=request.data,
 			context={"project": project},
@@ -145,11 +123,12 @@ class ProjectColumnListCreateView(WorkspaceAccessMixin, APIView):
 		return Response(ProjectColumnSerializer(column).data, status=status.HTTP_201_CREATED)
 
 
-class ProjectColumnDetailView(WorkspaceAccessMixin, APIView):
+class ProjectColumnDetailView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def patch(self, request: Request, project_id: str, column_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		column = project.columns.filter(id=column_id).first()
 		if column is None:
 			raise NotFound("Columna no encontrada.")
@@ -169,6 +148,7 @@ class ProjectColumnDetailView(WorkspaceAccessMixin, APIView):
 
 	def delete(self, request: Request, project_id: str, column_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		column = project.columns.filter(id=column_id).first()
 		if column is None:
 			raise NotFound("Columna no encontrada.")

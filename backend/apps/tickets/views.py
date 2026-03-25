@@ -12,21 +12,10 @@ from rest_framework.views import APIView
 from apps.projects.models import Project
 from apps.tickets.models import Ticket
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
+from apps.workspaces.access import WorkspaceRoleAccessMixin
 
 
-class ProjectAccessMixin:
-	def get_project_for_user(self, request: Request, project_id: str) -> Project:
-		project = (
-			Project.objects.filter(id=project_id, workspace__memberships__user=request.user)
-			.distinct()
-			.first()
-		)
-		if project is None:
-			raise NotFound("Proyecto no encontrado.")
-		return project
-
-
-class TicketListCreateView(ProjectAccessMixin, APIView):
+class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, project_id: str) -> Response:
@@ -36,6 +25,7 @@ class TicketListCreateView(ProjectAccessMixin, APIView):
 
 	def post(self, request: Request, project_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		serializer = TicketCreateSerializer(
 			data=request.data,
 			context={"project": project, "request": request},
@@ -53,11 +43,12 @@ class TicketListCreateView(ProjectAccessMixin, APIView):
 		return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
 
 
-class TicketDetailView(ProjectAccessMixin, APIView):
+class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 	permission_classes = [IsAuthenticated]
 
 	def patch(self, request: Request, project_id: str, ticket_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		ticket = project.tickets.select_related("column", "created_by").filter(id=ticket_id).first()
 		if ticket is None:
 			raise NotFound("Ticket no encontrado.")
@@ -82,6 +73,7 @@ class TicketDetailView(ProjectAccessMixin, APIView):
 
 	def delete(self, request: Request, project_id: str, ticket_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
 		ticket = project.tickets.filter(id=ticket_id).first()
 		if ticket is None:
 			raise NotFound("Ticket no encontrado.")

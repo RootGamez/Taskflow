@@ -13,7 +13,9 @@ import {
   useTickets,
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
+import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export default function KanbanPage() {
   const navigate = useNavigate();
@@ -22,6 +24,8 @@ export default function KanbanPage() {
   const { data: tickets = [] } = useTickets(projectId);
   const createTicketMutation = useCreateTicket(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
+  const canMutate = canMutateWorkspace(activeWorkspace?.role);
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [createColumnId, setCreateColumnId] = useState<string | null>(null);
@@ -51,6 +55,11 @@ export default function KanbanPage() {
     priority: "urgent" | "high" | "medium" | "low" | "none";
     due_date: string | null;
   }) => {
+    if (!canMutate) {
+      toast.error("No tienes permisos para crear tickets en este workspace");
+      return;
+    }
+
     if (!createColumnId) {
       return;
     }
@@ -77,6 +86,11 @@ export default function KanbanPage() {
     toColumnId: string;
     toOrder: number;
   }) => {
+    if (!canMutate) {
+      toast.error("No tienes permisos para mover tickets en este workspace");
+      return;
+    }
+
     try {
       await updateTicketMutation.mutateAsync({
         ticketId,
@@ -101,13 +115,15 @@ export default function KanbanPage() {
             <Tab key="board" title="Tablero" />
             <Tab key="list" title="Lista" />
           </Tabs>
-          <Button
-            color="primary"
-            onPress={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
-            isDisabled={projectColumns.length === 0}
-          >
-            Nuevo ticket
-          </Button>
+          {canMutate ? (
+            <Button
+              color="primary"
+              onPress={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
+              isDisabled={projectColumns.length === 0}
+            >
+              Nuevo ticket
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -120,13 +136,19 @@ export default function KanbanPage() {
       <KanbanBoard
         columns={projectColumns}
         tickets={tickets}
+        canMutate={canMutate}
         onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
         onCreateTicket={(columnId) => setCreateColumnId(columnId)}
         onMoveTicket={handleMoveTicket}
       />
-      <TicketDetail ticket={selectedTicket} isOpen={Boolean(selectedTicket)} onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)} />
+      <TicketDetail
+        ticket={selectedTicket}
+        isOpen={Boolean(selectedTicket)}
+        canEdit={canMutate}
+        onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
+      />
       <CreateTicketModal
-        isOpen={Boolean(createColumnId)}
+        isOpen={Boolean(createColumnId) && canMutate}
         isLoading={createTicketMutation.isPending}
         columnName={selectedCreateColumn?.name}
         onClose={() => setCreateColumnId(null)}

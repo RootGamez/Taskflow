@@ -10,7 +10,9 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
 import { ProjectList } from "@/features/projects/components/ProjectList";
 import { useCreateProject, useProjects } from "@/features/projects/hooks/useProjects";
+import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export default function WorkspaceDashboardPage() {
   const navigate = useNavigate();
@@ -18,12 +20,19 @@ export default function WorkspaceDashboardPage() {
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const { data: projects = [] } = useProjects(workspaceSlug);
   const createProjectMutation = useCreateProject();
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
+  const canMutate = canMutateWorkspace(activeWorkspace?.role);
 
   const handleCreateProject = async (input: {
     name: string;
     description?: string;
     color?: string;
   }) => {
+    if (!canMutate) {
+      toast.error("No tienes permisos para crear proyectos en este workspace");
+      return;
+    }
+
     try {
       const project = await createProjectMutation.mutateAsync({
         workspaceSlug,
@@ -42,21 +51,21 @@ export default function WorkspaceDashboardPage() {
       <PageHeader
         title="Workspace Dashboard"
         subtitle={`Workspace: ${workspaceSlug}`}
-        actions={<Button color="primary" onPress={() => setCreateModalOpen(true)}>Nuevo proyecto</Button>}
+        actions={canMutate ? <Button color="primary" onPress={() => setCreateModalOpen(true)}>Nuevo proyecto</Button> : undefined}
       />
       {projects.length === 0 ? (
         <EmptyState
           icon={FolderOpen}
           title="Sin proyectos aun"
           description="Crea tu primer proyecto para comenzar"
-          action={{ label: "Nuevo proyecto", onClick: () => setCreateModalOpen(true) }}
+          action={canMutate ? { label: "Nuevo proyecto", onClick: () => setCreateModalOpen(true) } : undefined}
         />
       ) : (
         <ProjectList projects={projects} />
       )}
 
       <CreateProjectModal
-        isOpen={isCreateModalOpen}
+        isOpen={isCreateModalOpen && canMutate}
         onClose={() => setCreateModalOpen(false)}
         onCreate={handleCreateProject}
         isLoading={createProjectMutation.isPending}

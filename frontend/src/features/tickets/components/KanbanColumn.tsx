@@ -44,14 +44,16 @@ export function KanbanColumn({
           </div>
         ))}
       </div>
-      <Button
-        variant="light"
-        className="mt-3 w-full text-zinc-600"
-        data-column-id={id}
-        onPress={() => onCreateTicket?.(id)}
-      >
-        + Nuevo ticket
-      </Button>
+      {onCreateTicket ? (
+        <Button
+          variant="light"
+          className="mt-3 w-full text-zinc-600"
+          data-column-id={id}
+          onPress={() => onCreateTicket(id)}
+        >
+          + Nuevo ticket
+        </Button>
+      ) : null}
     </section>
   );
 }

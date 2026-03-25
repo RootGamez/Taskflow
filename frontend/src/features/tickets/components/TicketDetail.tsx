@@ -133,6 +133,7 @@ interface TicketDetailProps {
   ticket: Ticket | null;
   isOpen: boolean;
   isLoading?: boolean;
+  canEdit?: boolean;
   onOpenChange: (open: boolean) => void;
   onUpdate?: (data: Partial<Ticket>) => Promise<void>;
   onDelete?: () => Promise<void>;
@@ -142,6 +143,7 @@ export function TicketDetail({
   ticket,
   isOpen,
   isLoading = false,
+  canEdit = true,
   onOpenChange,
   onUpdate,
   onDelete,
@@ -230,7 +232,7 @@ export function TicketDetail({
               </DialogDescription>
             </div>
             <div className="flex gap-2">
-              {editMode && (
+              {editMode && canEdit && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -240,14 +242,16 @@ export function TicketDetail({
                   Cancelar
                 </Button>
               )}
-              <Button
-                size="sm"
-                className={editMode ? "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700" : ""}
-                onClick={editMode ? handleSave : () => setEditMode(true)}
-                disabled={isLoading || !title.trim()}
-              >
-                {editMode ? "Guardar cambios" : "✏️ Editar"}
-              </Button>
+              {canEdit ? (
+                <Button
+                  size="sm"
+                  className={editMode ? "bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700" : ""}
+                  onClick={editMode ? handleSave : () => setEditMode(true)}
+                  disabled={isLoading || !title.trim()}
+                >
+                  {editMode ? "Guardar cambios" : "✏️ Editar"}
+                </Button>
+              ) : null}
             </div>
           </div>
         </DialogHeader>
@@ -458,23 +462,25 @@ export function TicketDetail({
               </div>
 
               {/* Comment input */}
-              <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
-                <Textarea
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  placeholder="Añade un comentario..."
-                  disabled={isLoading}
-                  className="border-zinc-200 bg-white/50 text-xs dark:border-zinc-700 dark:bg-zinc-900/50"
-                />
-                <Button
-                  size="sm"
-                  className="mt-2 w-full"
-                  onClick={() => setComment("")}
-                  disabled={!comment.trim() || isLoading}
-                >
-                  Comentar
-                </Button>
-              </div>
+              {canEdit ? (
+                <div className="border-t border-zinc-200 pt-3 dark:border-zinc-700">
+                  <Textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Añade un comentario..."
+                    disabled={isLoading}
+                    className="border-zinc-200 bg-white/50 text-xs dark:border-zinc-700 dark:bg-zinc-900/50"
+                  />
+                  <Button
+                    size="sm"
+                    className="mt-2 w-full"
+                    onClick={() => setComment("")}
+                    disabled={!comment.trim() || isLoading}
+                  >
+                    Comentar
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -567,7 +573,7 @@ export function TicketDetail({
             </div>
 
             {/* Peligro */}
-            {editMode && onDelete && (
+            {canEdit && editMode && onDelete && (
               <Button
                 variant="destructive"
                 size="sm"

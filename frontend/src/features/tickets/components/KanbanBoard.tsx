@@ -22,6 +22,7 @@ import type { Ticket } from "@/features/tickets/types/ticket.types";
 interface KanbanBoardProps {
   columns: Column[];
   tickets: Ticket[];
+  canMutate: boolean;
   onOpenTicket: (ticket: Ticket) => void;
   onCreateTicket: (columnId: string) => void;
   onMoveTicket: (payload: {
@@ -62,6 +63,7 @@ function SortableTicketCard({
 export function KanbanBoard({
   columns,
   tickets,
+  canMutate,
   onOpenTicket,
   onCreateTicket,
   onMoveTicket,
@@ -94,6 +96,10 @@ export function KanbanBoard({
   );
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    if (!canMutate) {
+      return;
+    }
+
     const activeTicket = ticketById.get(String(event.active.id));
     if (!activeTicket || !event.over) {
       return;
@@ -152,8 +158,10 @@ export function KanbanBoard({
                 color={column.color}
                 tickets={columnTickets}
                 onOpenTicket={onOpenTicket}
-                onCreateTicket={onCreateTicket}
-                renderTicket={(ticket) => <SortableTicketCard ticket={ticket} onOpen={onOpenTicket} />}
+                onCreateTicket={canMutate ? onCreateTicket : undefined}
+                renderTicket={(ticket) =>
+                  canMutate ? <SortableTicketCard ticket={ticket} onOpen={onOpenTicket} /> : <TicketCard ticket={ticket} onOpen={onOpenTicket} />
+                }
               />
             </SortableContext>
           );

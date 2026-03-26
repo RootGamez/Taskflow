@@ -56,3 +56,110 @@
 body {
   min-height: 100vh;
 }
+
+.ticket-rich-editor p {
+  margin: 0;
+}
+
+.ticket-rich-editor p + p,
+.ticket-rich-editor h2 + p,
+.ticket-rich-editor h3 + p,
+.ticket-rich-editor ul + p,
+.ticket-rich-editor ol + p,
+.ticket-rich-editor pre + p {
+  margin-top: 0.65rem;
+}
+
+.ticket-rich-editor h2,
+.ticket-rich-editor h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ticket-rich-editor h2 {
+  font-size: 1.125rem;
+}
+
+.ticket-rich-editor h3 {
+  font-size: 1rem;
+}
+
+.ticket-rich-editor ul,
+.ticket-rich-editor ol {
+  margin: 0.65rem 0;
+  padding-left: 1.2rem;
+}
+
+.ticket-rich-editor li {
+  margin: 0.2rem 0;
+}
+
+.ticket-rich-editor blockquote {
+  margin: 0.7rem 0;
+  border-left: 3px solid rgb(212 212 216);
+  padding-left: 0.85rem;
+  color: rgb(82 82 91);
+}
+
+.ticket-rich-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li > label {
+  margin-top: 0.15rem;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.ticket-rich-editor pre {
+  margin-top: 0.8rem;
+  overflow-x: auto;
+  border-radius: 0.55rem;
+  background: rgb(24 24 27);
+  padding: 0.7rem 0.9rem;
+  color: rgb(228 228 231);
+  font-size: 0.82rem;
+}
+
+.ticket-rich-editor code {
+  border-radius: 0.35rem;
+  background: rgb(244 244 245);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.82em;
+}
+
+.ticket-rich-editor .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: rgb(161 161 170);
+}
+
+.dark .ticket-rich-editor code {
+  background: rgb(39 39 42);
+}
+
+.dark .ticket-rich-editor blockquote {
+  border-left-color: rgb(63 63 70);
+  color: rgb(161 161 170);
+}
+
+.ticket-rich-editor .ProseMirror {
+  min-height: 100%;
+}
+
+.ticket-rich-editor {
+  cursor: text;
+}

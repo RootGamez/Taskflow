@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/shadcn/dialog";
 import { Input } from "@/components/ui/shadcn/input";
 import { Label } from "@/components/ui/shadcn/label";
-import { Textarea } from "@/components/ui/shadcn/textarea";
+import { TicketRichEditor } from "@/features/tickets/components/TicketRichEditor";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { Column } from "@/features/projects/types/project.types";
 import type { Priority, Ticket } from "@/features/tickets/types/ticket.types";
@@ -72,14 +72,63 @@ function toApiDate(dateInput: string): string | null {
   return parsed.toISOString();
 }
 
+function normalizeRichTextField(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!value) {
+    return "";
+  }
+
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+
+  return String(value);
+}
+
+function parseRichTextJson(value: string): Record<string, unknown> | null {
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(normalized);
+    if (parsed && typeof parsed === "object") {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Legacy plain text should not crash editor mounting.
+  }
+
+  return null;
+}
+
 function buildDraft(ticket: Ticket): TicketDraft {
+  const rawDescription = normalizeRichTextField(ticket.description).trim();
+  const progressNotes = normalizeRichTextField(ticket.progress_notes).trim();
+  let mergedDescription = rawDescription;
+
+  // Backward compatibility: old tickets may still store plain text in progress_notes.
+  if (!rawDescription.startsWith("{")) {
+    mergedDescription = [rawDescription, progressNotes]
+      .filter((segment): segment is string => Boolean(segment))
+      .join("\n\n");
+  }
+
   return {
     title: ticket.title,
     priority: ticket.priority,
     due_date: ticket.due_date,
     column_id: ticket.column_id,
-    description: ticket.description ?? "",
-    progress_notes: ticket.progress_notes ?? "",
+    description: mergedDescription,
+    progress_notes: "",
   };
 }
 
@@ -90,8 +139,10 @@ function getDiff(prev: TicketDraft, next: TicketDraft): Partial<TicketDraft> {
   if (prev.priority !== next.priority) payload.priority = next.priority;
   if (prev.due_date !== next.due_date) payload.due_date = next.due_date;
   if (prev.column_id !== next.column_id && next.column_id) payload.column_id = next.column_id;
-  if (prev.description !== next.description) payload.description = next.description;
-  if (prev.progress_notes !== next.progress_notes) payload.progress_notes = next.progress_notes;
+  if (prev.description !== next.description) {
+    payload.description = next.description;
+    payload.progress_notes = "";
+  }
 
   return payload;
 }
@@ -124,7 +175,6 @@ export function TicketDetail({
   const [dueDateInput, setDueDateInput] = useState("");
   const [columnId, setColumnId] = useState("");
   const [description, setDescription] = useState("");
-  const [progressNotes, setProgressNotes] = useState("");
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [immediateSaveNonce, setImmediateSaveNonce] = useState(0);
@@ -169,9 +219,6 @@ export function TicketDetail({
       pending.delete("description");
     }
 
-    if (pending.has("progress_notes") && serverDraft.progress_notes === progressNotes) {
-      pending.delete("progress_notes");
-    }
   };
 
   const handleFieldFocus = (field: EditableField) => {
@@ -195,6 +242,13 @@ export function TicketDetail({
       return;
     }
 
+    const remoteDescription = [
+      normalizeRichTextField(remoteLiveValues.description),
+      normalizeRichTextField(remoteLiveValues.progress_notes),
+    ]
+      .filter((segment): segment is string => segment.length > 0)
+      .join("\n\n");
+
     if (
       typeof remoteLiveValues.title === "string" &&
       activeFieldRef.current !== "title" &&
@@ -204,24 +258,11 @@ export function TicketDetail({
       setTitle(remoteLiveValues.title);
     }
 
-    if (
-      typeof remoteLiveValues.description === "string" &&
-      activeFieldRef.current !== "description" &&
-      remoteLiveValues.description !== description
-    ) {
+    if (activeFieldRef.current !== "description" && remoteDescription && remoteDescription !== description) {
       skipNextAutosaveRef.current = true;
-      setDescription(remoteLiveValues.description);
+      setDescription(remoteDescription);
     }
-
-    if (
-      typeof remoteLiveValues.progress_notes === "string" &&
-      activeFieldRef.current !== "progress_notes" &&
-      remoteLiveValues.progress_notes !== progressNotes
-    ) {
-      skipNextAutosaveRef.current = true;
-      setProgressNotes(remoteLiveValues.progress_notes);
-    }
-  }, [description, isOpen, progressNotes, remoteLiveValues, title]);
+  }, [description, isOpen, remoteLiveValues, title]);
 
   useEffect(() => {
     if (!ticket || !isOpen) {
@@ -267,9 +308,6 @@ export function TicketDetail({
     if (canSyncField("description")) {
       setDescription(draft.description);
     }
-    if (canSyncField("progress_notes")) {
-      setProgressNotes(draft.progress_notes);
-    }
 
     lastSyncedRef.current = draft;
 
@@ -292,9 +330,9 @@ export function TicketDetail({
       due_date: toApiDate(dueDateInput),
       column_id: columnId,
       description,
-      progress_notes: progressNotes,
+      progress_notes: "",
     }),
-    [title, priority, dueDateInput, columnId, description, progressNotes],
+    [title, priority, dueDateInput, columnId, description],
   );
 
   const debouncedDraft = useDebounce(draft, 450);
@@ -375,9 +413,38 @@ export function TicketDetail({
     void flushDraft();
   }, [canEdit, draft, flushDraft, hasLocalChanges, immediateSaveNonce, isHydrated, isOpen, onPatch, ticket]);
 
+  const progressNotesLock = fieldLocks.progress_notes;
+  const isProgressNotesLockedByOther = Boolean(
+    progressNotesLock && progressNotesLock.userId !== currentUserId,
+  );
+  const isUnifiedEditorLocked = isLockedByOther("description") || isProgressNotesLockedByOther;
+  const unifiedEditorLockOwner = isLockedByOther("description")
+    ? fieldLocks.description?.userName
+    : progressNotesLock?.userName;
+
+  const shouldKeepDialogOpen = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    return Boolean(target.closest("[data-ticket-editor-floating='true']"));
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-none border-l border-zinc-200 p-0 data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800">
+      <DialogContent
+        className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none border-l border-zinc-200 p-0 data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800"
+        onInteractOutside={(event) => {
+          if (shouldKeepDialogOpen(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          if (shouldKeepDialogOpen(event.target)) {
+            event.preventDefault();
+          }
+        }}
+      >
         <DialogHeader className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
           <DialogTitle className="text-base">Ticket</DialogTitle>
           <DialogDescription className="flex items-center gap-2 text-xs">
@@ -387,7 +454,7 @@ export function TicketDetail({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex h-[calc(100dvh-88px)] flex-col overflow-hidden">
+        <div className="flex min-h-[calc(100dvh-88px)] flex-col">
           <section className="space-y-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
             <div className="space-y-2">
               <Label htmlFor="ticket-title">Nombre</Label>
@@ -513,52 +580,35 @@ export function TicketDetail({
             </div>
           </section>
 
-          <section className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+          <section className="flex-1 space-y-5 px-6 py-5">
             <div className="space-y-2">
-              <Label htmlFor="ticket-description">Detalles del ticket</Label>
-              {isLockedByOther("description") ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {fieldLocks.description?.userName} esta editando, por favor espera.
-                </p>
-              ) : null}
-              <Textarea
-                id="ticket-description"
-                value={description}
-                onChange={(event) => {
-                  const next = event.target.value;
+              <p className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
+                Contenido
+              </p>
+              <TicketRichEditor
+                value={parseRichTextJson(description)}
+                placeholder="Describe el contexto, avances, decisiones y bloqueos del ticket"
+                disabled={isLoading || !canEdit}
+                isLocked={isUnifiedEditorLocked}
+                lockHint={
+                  unifiedEditorLockOwner
+                    ? `${unifiedEditorLockOwner} esta editando este ticket, por favor espera.`
+                    : undefined
+                }
+                onChange={(next) => {
+                  const serialized = JSON.stringify(next);
                   markLocalChange("description");
-                  setDescription(next);
-                  onTypingField?.("description", next);
+                  setDescription(serialized);
+                  onTypingField?.("description", serialized);
                 }}
-                onFocus={() => handleFieldFocus("description")}
-                onBlur={() => handleFieldBlur("description")}
-                placeholder="Contexto, criterios de aceptacion, links y notas del problema"
-                className="min-h-40"
-                disabled={isLoading || !canEdit || isLockedByOther("description")}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="ticket-progress">Avance y actualizaciones</Label>
-              {isLockedByOther("progress_notes") ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {fieldLocks.progress_notes?.userName} esta editando, por favor espera.
-                </p>
-              ) : null}
-              <Textarea
-                id="ticket-progress"
-                value={progressNotes}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  markLocalChange("progress_notes");
-                  setProgressNotes(next);
-                  onTypingField?.("progress_notes", next);
+                onFocus={() => {
+                  handleFieldFocus("description");
+                  onLockField?.("progress_notes");
                 }}
-                onFocus={() => handleFieldFocus("progress_notes")}
-                onBlur={() => handleFieldBlur("progress_notes")}
-                placeholder="Registra avances del ticket, bloqueos y decisiones"
-                className="min-h-40"
-                disabled={isLoading || !canEdit || isLockedByOther("progress_notes")}
+                onBlur={() => {
+                  handleFieldBlur("description");
+                  onUnlockField?.("progress_notes");
+                }}
               />
             </div>
 

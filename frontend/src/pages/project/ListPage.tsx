@@ -102,7 +102,7 @@ export default function ListPage() {
         field?: CollaborativeField;
         user_id?: string;
         user_name?: string;
-        value?: string;
+        value?: unknown;
       };
 
       if (data.type === "field.locked" && data.field && data.user_id && data.user_name) {
@@ -126,12 +126,19 @@ export default function ListPage() {
         return;
       }
 
-      if (data.type === "field.typing" && data.field && typeof data.value === "string") {
+      if (data.type === "field.typing" && data.field) {
         const field = data.field;
+        const normalizedValue =
+          typeof data.value === "string"
+            ? data.value
+            : data.value == null
+              ? ""
+              : JSON.stringify(data.value);
+
         if (!currentUserId || data.user_id !== currentUserId) {
           setRemoteLiveValues((prev) => ({
             ...prev,
-            [field]: data.value,
+            [field]: normalizedValue,
           }));
         }
         return;

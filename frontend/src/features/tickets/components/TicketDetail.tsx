@@ -242,12 +242,12 @@ export function TicketDetail({
       return;
     }
 
-    const remoteDescription = [
-      normalizeRichTextField(remoteLiveValues.description),
-      normalizeRichTextField(remoteLiveValues.progress_notes),
-    ]
-      .filter((segment): segment is string => segment.length > 0)
-      .join("\n\n");
+    // For RichEditor collaboration, description is the canonical live field (serialized JSON string).
+    // Keep progress_notes only as a legacy fallback when description is absent.
+    const hasRemoteDescription = typeof remoteLiveValues.description !== "undefined";
+    const remoteDescription = hasRemoteDescription
+      ? normalizeRichTextField(remoteLiveValues.description)
+      : normalizeRichTextField(remoteLiveValues.progress_notes);
 
     if (
       typeof remoteLiveValues.title === "string" &&
@@ -258,7 +258,10 @@ export function TicketDetail({
       setTitle(remoteLiveValues.title);
     }
 
-    if (activeFieldRef.current !== "description" && remoteDescription && remoteDescription !== description) {
+    if (
+      activeFieldRef.current !== "description" &&
+      remoteDescription !== description
+    ) {
       skipNextAutosaveRef.current = true;
       setDescription(remoteDescription);
     }

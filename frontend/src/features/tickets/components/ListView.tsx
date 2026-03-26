@@ -1,6 +1,7 @@
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 
 import type { Ticket } from "@/features/tickets/types/ticket.types";
+import { formatDueDateDayMonth } from "@/features/tickets/utils/dueDate";
 
 interface ListViewProps {
   tickets: Ticket[];
@@ -24,7 +25,7 @@ export function ListView({ tickets, onOpenTicket }: ListViewProps) {
           >
             <TableCell>{ticket.title}</TableCell>
             <TableCell>{ticket.priority}</TableCell>
-            <TableCell>{ticket.due_date ?? "-"}</TableCell>
+            <TableCell>{formatDueDateDayMonth(ticket.due_date)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

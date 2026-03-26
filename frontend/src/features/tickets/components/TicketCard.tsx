@@ -1,9 +1,9 @@
 import { Chip } from "@heroui/react";
-import { format, isPast } from "date-fns";
 import { AlertCircle, ArrowDown, ArrowUp, Minus, Paperclip } from "lucide-react";
 
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import type { Priority, Ticket } from "@/features/tickets/types/ticket.types";
+import { formatDueDateDayMonth, isDueDateOverdue } from "@/features/tickets/utils/dueDate";
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -27,8 +27,8 @@ function PriorityIcon({ priority }: { priority: Priority }) {
 }
 
 export function TicketCard({ ticket, onOpen }: TicketCardProps) {
-  const dueDate = ticket.due_date ? new Date(ticket.due_date) : null;
-  const isOverdue = dueDate ? isPast(dueDate) : false;
+  const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
+  const isOverdue = isDueDateOverdue(ticket.due_date);
 
   return (
     <button
@@ -55,9 +55,9 @@ export function TicketCard({ ticket, onOpen }: TicketCardProps) {
             </span>
           ) : null}
         </div>
-        {dueDate ? (
+        {ticket.due_date ? (
           <span className={`text-xs ${isOverdue ? "text-red-600" : "text-zinc-500"}`}>
-            {format(dueDate, "dd/MM")}
+            {dueDateLabel}
           </span>
         ) : null}
       </div>

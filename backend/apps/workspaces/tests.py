@@ -204,3 +204,36 @@ class WorkspaceFlowTests(APITestCase):
 		)
 
 		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_owner_can_list_and_cancel_pending_invitation(self) -> None:
+		workspace = Workspace.objects.create(name="Equipo", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		invited = User.objects.create_user(
+			email="pendiente@example.com",
+			full_name="Pendiente",
+			password="Passw0rd!123",
+		)
+
+		invite_response = self.client.post(
+			f"/api/v1/workspaces/{workspace.slug}/members/",
+			{"email": invited.email, "role": WorkspaceMember.Role.MEMBER},
+			format="json",
+		)
+		self.assertEqual(invite_response.status_code, status.HTTP_201_CREATED)
+		invitation_id = invite_response.data["id"]
+
+		list_response = self.client.get(f"/api/v1/workspaces/{workspace.slug}/invitations/")
+		self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(list_response.data), 1)
+		self.assertEqual(list_response.data[0]["status"], "pending")
+
+		cancel_response = self.client.delete(
+			f"/api/v1/workspaces/{workspace.slug}/invitations/{invitation_id}/"
+		)
+		self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(cancel_response.data["status"], "cancelled")

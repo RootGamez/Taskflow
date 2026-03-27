@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -8,7 +9,10 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.workspaces.access import WorkspaceRoleAccessMixin
-from apps.workspaces.models import WorkspaceMember
+from apps.notifications.realtime import send_notification_event
+from apps.notifications.serializers import NotificationSerializer
+from apps.workspaces.models import WorkspaceInvitation, WorkspaceMember
+from apps.workspaces.realtime import send_workspace_event
 from apps.workspaces.serializers import (
 	WorkspaceCreateSerializer,
 	WorkspaceInvitationSerializer,
@@ -163,4 +167,82 @@ class WorkspaceMemberDetailView(WorkspaceMembersManageMixin, APIView):
 			raise ValidationError({"detail": message})
 
 		updated_membership = serializer.save()
+		send_workspace_event(
+			str(updated_membership.workspace_id),
+			"member.updated",
+			{"member": WorkspaceMemberSerializer(updated_membership).data},
+		)
 		return Response(WorkspaceMemberSerializer(updated_membership).data, status=status.HTTP_200_OK)
+
+
+class WorkspaceInvitationListCancelView(WorkspaceMembersManageMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request, workspace_slug: str) -> Response:
+		workspace_membership = self.assert_workspace_member_management_access(request, workspace_slug)
+		now = timezone.now()
+		WorkspaceInvitation.objects.filter(
+			workspace=workspace_membership.workspace,
+			status=WorkspaceInvitation.Status.PENDING,
+			expires_at__lte=now,
+		).update(status=WorkspaceInvitation.Status.EXPIRED, responded_at=now)
+
+		invitations = (
+			WorkspaceInvitation.objects.select_related("invited_user", "invited_by")
+			.filter(
+				workspace=workspace_membership.workspace,
+				status=WorkspaceInvitation.Status.PENDING,
+				expires_at__gt=now,
+			)
+			.order_by("-created_at")
+		)
+		return Response(WorkspaceInvitationSerializer(invitations, many=True).data, status=status.HTTP_200_OK)
+
+	def delete(self, request: Request, workspace_slug: str, invitation_id: str) -> Response:
+		workspace_membership = self.assert_workspace_member_management_access(request, workspace_slug)
+		invitation = (
+			WorkspaceInvitation.objects.select_related("notification")
+			.filter(id=invitation_id, workspace=workspace_membership.workspace)
+			.first()
+		)
+		if invitation is None:
+			raise NotFound("Invitacion no encontrada.")
+
+		now = timezone.now()
+		if invitation.status != WorkspaceInvitation.Status.PENDING or invitation.expires_at <= now:
+			if invitation.status == WorkspaceInvitation.Status.PENDING and invitation.expires_at <= now:
+				invitation.status = WorkspaceInvitation.Status.EXPIRED
+				invitation.responded_at = now
+				invitation.save(update_fields=["status", "responded_at"])
+			raise ValidationError({"detail": "La invitacion ya no esta pendiente."})
+
+		invitation.status = WorkspaceInvitation.Status.CANCELLED
+		invitation.responded_at = now
+		invitation.save(update_fields=["status", "responded_at"])
+
+		notification = getattr(invitation, "notification", None)
+		if notification is not None:
+			notification.data = {
+				**notification.data,
+				"invitation_status": WorkspaceInvitation.Status.CANCELLED,
+			}
+			notification.title = f"Invitacion cancelada en workspace {invitation.workspace.name}"
+			notification.message = f"La invitacion a \"{invitation.workspace.name}\" fue cancelada."
+			notification.is_read = True
+			notification.read_at = now
+			notification.save(update_fields=["data", "title", "message", "is_read", "read_at"])
+			send_notification_event(
+				str(invitation.invited_user_id),
+				{
+					"type": "notification.updated",
+					"notification": NotificationSerializer(notification).data,
+				},
+			)
+
+		send_workspace_event(
+			str(invitation.workspace_id),
+			"invitation.updated",
+			{"invitation": WorkspaceInvitationSerializer(invitation).data},
+		)
+
+		return Response(WorkspaceInvitationSerializer(invitation).data, status=status.HTTP_200_OK)

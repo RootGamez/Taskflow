@@ -99,3 +99,33 @@ class NotificationInvitationFlowTests(APITestCase):
 		)
 		self.invitation.refresh_from_db()
 		self.assertEqual(self.invitation.status, WorkspaceInvitation.Status.REJECTED)
+
+	def test_cannot_accept_cancelled_invitation(self) -> None:
+		self.client.credentials()
+		owner_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": self.owner.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {owner_login.data['access']}")
+
+		cancel_response = self.client.delete(
+			f"/api/v1/workspaces/{self.workspace.slug}/invitations/{self.invitation.id}/"
+		)
+		self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+
+		self.client.credentials()
+		invited_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": self.invited.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {invited_login.data['access']}")
+
+		response = self.client.post(
+			f"/api/v1/notifications/{self.notification.id}/action/",
+			{"action": "accept"},
+			format="json",
+		)
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertEqual(str(response.data["detail"]), "La invitacion expiro o fue cancelada.")

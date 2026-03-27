@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.text import slugify
+
+
+def workspace_invitation_default_expiration():
+	return timezone.now() + timedelta(days=7)
 
 
 class Workspace(models.Model):
@@ -75,6 +80,8 @@ class WorkspaceInvitation(models.Model):
 		PENDING = "pending", "Pending"
 		ACCEPTED = "accepted", "Accepted"
 		REJECTED = "rejected", "Rejected"
+		CANCELLED = "cancelled", "Cancelled"
+		EXPIRED = "expired", "Expired"
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	workspace = models.ForeignKey(
@@ -94,6 +101,7 @@ class WorkspaceInvitation(models.Model):
 	)
 	role = models.CharField(max_length=20, choices=WorkspaceMember.Role.choices, default=WorkspaceMember.Role.MEMBER)
 	status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+	invitation_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
 	notification = models.OneToOneField(
 		"notifications.Notification",
 		on_delete=models.SET_NULL,
@@ -102,6 +110,7 @@ class WorkspaceInvitation(models.Model):
 		blank=True,
 	)
 	created_at = models.DateTimeField(default=timezone.now)
+	expires_at = models.DateTimeField(default=workspace_invitation_default_expiration)
 	responded_at = models.DateTimeField(null=True, blank=True)
 
 	class Meta:

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.notifications.models import Notification
 from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationSerializer
+from apps.workspaces.realtime import send_workspace_event
 from apps.workspaces.models import Workspace, WorkspaceInvitation, WorkspaceMember
 
 User = get_user_model()
@@ -149,6 +151,15 @@ class WorkspaceMemberInviteSerializer(serializers.Serializer):
         workspace: Workspace = self.context["workspace"]
         request_user = self.context["request"].user
         target_user = self.context["target_user"]
+
+        now = timezone.now()
+        WorkspaceInvitation.objects.filter(
+            workspace=workspace,
+            invited_user=target_user,
+            status=WorkspaceInvitation.Status.PENDING,
+            expires_at__lte=now,
+        ).update(status=WorkspaceInvitation.Status.EXPIRED, responded_at=now)
+
         if target_user == request_user:
             raise serializers.ValidationError("No puedes invitarte a ti mismo.")
         if WorkspaceMember.objects.filter(workspace=workspace, user=target_user).exists():
@@ -187,6 +198,7 @@ class WorkspaceMemberInviteSerializer(serializers.Serializer):
                     "workspace_name": workspace.name,
                     "role": validated_data["role"],
                     "invitation_id": str(invitation.id),
+                    "invitation_token": str(invitation.invitation_token),
                     "invitation_status": WorkspaceInvitation.Status.PENDING,
                 },
             )
@@ -199,6 +211,12 @@ class WorkspaceMemberInviteSerializer(serializers.Serializer):
                     "type": "notification.created",
                     "notification": NotificationSerializer(notification).data,
                 },
+            )
+
+            send_workspace_event(
+                str(workspace.id),
+                "invitation.created",
+                {"invitation": WorkspaceInvitationSerializer(invitation).data},
             )
 
         return invitation
@@ -223,6 +241,9 @@ class WorkspaceMemberRoleUpdateSerializer(serializers.Serializer):
 class WorkspaceInvitationSerializer(serializers.ModelSerializer):
     invited_user_id = serializers.UUIDField(source="invited_user.id", read_only=True)
     invited_user_email = serializers.EmailField(source="invited_user.email", read_only=True)
+    invited_by_id = serializers.UUIDField(source="invited_by.id", read_only=True)
+    invited_by_email = serializers.EmailField(source="invited_by.email", read_only=True)
+    invitation_token = serializers.UUIDField(read_only=True)
 
     class Meta:
         model = WorkspaceInvitation
@@ -231,8 +252,12 @@ class WorkspaceInvitationSerializer(serializers.ModelSerializer):
             "workspace_id",
             "invited_user_id",
             "invited_user_email",
+            "invited_by_id",
+            "invited_by_email",
+            "invitation_token",
             "role",
             "status",
             "created_at",
+            "expires_at",
         )
         read_only_fields = fields

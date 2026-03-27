@@ -8,11 +8,14 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import UserPreferences
+from apps.users.storage import normalize_avatar_url
 
 User = get_user_model()
 
 
 class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = (
@@ -23,6 +26,9 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "created_at",
         )
+
+    def get_avatar_url(self, obj):
+        return normalize_avatar_url(obj.avatar_url)
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -129,7 +135,7 @@ def issue_tokens_for_user(user: Any) -> dict[str, str]:
 class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ("full_name", "avatar_url")
+        fields = ("full_name",)
 
 
 class ChangePasswordSerializer(serializers.Serializer):

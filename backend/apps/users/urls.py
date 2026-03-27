@@ -8,10 +8,12 @@ from apps.users.views import (
 	UserSessionRevokeOthersView,
 	UserPreferencesView,
 	UserDeactivateView,
+	UserAvatarUploadView,
 )
 
 urlpatterns = [
 	path("me/", MeView.as_view(), name="me"),
+	path("me/avatar/", UserAvatarUploadView.as_view(), name="user_avatar_upload"),
 	path("me/change-password/", ChangePasswordView.as_view(), name="change_password"),
 	path("me/sessions/", UserSessionListView.as_view(), name="user_sessions"),
 	path("me/sessions/<uuid:session_id>/", UserSessionDetailView.as_view(), name="user_session_detail"),

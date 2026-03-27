@@ -27,6 +27,8 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_BROWSER: "on"
+      MINIO_CONSOLE_ADDRESS: ":9001"
     volumes:
       - minio_data:/data
     ports:
@@ -41,8 +43,14 @@ services:
     entrypoint: >
       /bin/sh -c "
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
-      mc mb -p local/taskflow-media || true;
-      mc anonymous set none local/taskflow-media || true;
+      if ! mc ls local/public >/dev/null 2>&1; then
+        mc mb -p local/public;
+        mc anonymous set download local/public;
+      fi;
+      if ! mc ls local/private >/dev/null 2>&1; then
+        mc mb -p local/private;
+        mc anonymous set none local/private;
+      fi;
       exit 0;
       "
 
@@ -73,9 +81,12 @@ services:
       ACCESS_TOKEN_LIFETIME_MINUTES: "15"
       REFRESH_TOKEN_LIFETIME_DAYS: "7"
       MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_ENDPOINT: localhost:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: taskflow-media
+      MINIO_PUBLIC_BUCKET: public
+      MINIO_PRIVATE_BUCKET: private
       MINIO_USE_SSL: "False"
     volumes:
       - .:/app
@@ -108,6 +119,8 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: taskflow-media
+      MINIO_PUBLIC_BUCKET: public
+      MINIO_PRIVATE_BUCKET: private
       MINIO_USE_SSL: "False"
     volumes:
       - .:/app

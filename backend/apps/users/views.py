@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -21,6 +22,7 @@ from apps.users.serializers import (
 	UserPreferencesSerializer,
 	issue_tokens_for_user,
 )
+from apps.users.storage import upload_user_avatar
 
 User = get_user_model()
 
@@ -215,3 +217,24 @@ class UserDeactivateView(APIView):
 		
 		# Retornar una respuesta vacía
 		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserAvatarUploadView(APIView):
+	permission_classes = [IsAuthenticated]
+	parser_classes = [MultiPartParser, FormParser]
+
+	def post(self, request: Request) -> Response:
+		avatar = request.FILES.get("avatar")
+		if avatar is None:
+			raise ValidationError({"detail": "Debes seleccionar una imagen."})
+
+		try:
+			avatar_url = upload_user_avatar(avatar, str(request.user.id))
+		except ValueError as exc:
+			raise ValidationError({"detail": str(exc)}) from exc
+		except Exception as exc:
+			raise ValidationError({"detail": "No se pudo subir la imagen de perfil."}) from exc
+
+		request.user.avatar_url = avatar_url
+		request.user.save(update_fields=["avatar_url"])
+		return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)

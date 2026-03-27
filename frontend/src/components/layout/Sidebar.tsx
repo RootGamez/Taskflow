@@ -1,21 +1,16 @@
 import { Button } from "@heroui/react";
 import { ChevronLeft, ChevronRight, KanbanSquare, LayoutDashboard, Settings, Users } from "lucide-react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
-import { useAuth } from "@/features/auth/hooks/useAuth";
 import { useProjects } from "@/features/projects/hooks/useProjects";
-import { useAuthStore } from "@/store/authStore";
 import { useUIStore } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { workspaceSlug = "ws-demo" } = useParams();
   const { data: projects = [] } = useProjects(workspaceSlug);
-  const user = useAuthStore((state) => state.user);
-  const { logoutMutation } = useAuth();
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const setTheme = useUIStore((state) => state.setTheme);
@@ -84,19 +79,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      <button
-        type="button"
-        onClick={async () => {
-          await logoutMutation.mutateAsync();
-          navigate("/login");
-        }}
-        className="mt-auto flex items-center gap-2 border-t border-zinc-200 px-3 py-4 text-left text-sm text-zinc-600 dark:border-zinc-800 dark:text-zinc-300"
-      >
-        <span className="h-8 w-8 rounded-full bg-zinc-200" />
-        {!sidebarCollapsed ? <span className="truncate">{user?.full_name ?? "Cerrar sesion"}</span> : null}
-      </button>
       {!sidebarCollapsed ? (
-        <div className="grid grid-cols-3 gap-1 border-t border-zinc-200 p-2 dark:border-zinc-800">
+        <div className="mt-auto grid grid-cols-3 gap-1 border-t border-zinc-200 p-2 dark:border-zinc-800">
           <Button size="sm" variant="light" onPress={() => setTheme("light")}>Claro</Button>
           <Button size="sm" variant="light" onPress={() => setTheme("dark")}>Oscuro</Button>
           <Button size="sm" variant="light" onPress={() => setTheme("system")}>Sistema</Button>

@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { SettingsLayout } from "@/components/layout/SettingsLayout";
 import { useAuthStore } from "@/store/authStore";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
@@ -10,6 +11,9 @@ import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
 import KanbanPage from "@/pages/project/KanbanPage";
 import ListPage from "@/pages/project/ListPage";
 import TicketDetailPage from "@/pages/ticket/TicketDetailPage";
+import { UserProfilePage } from "@/pages/user/UserProfilePage";
+import { UserSecurityPage } from "@/pages/user/UserSecurityPage";
+import { UserAccountPage } from "@/pages/user/UserAccountPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 
 function ProtectedLayout() {
@@ -66,6 +70,24 @@ export const router = createBrowserRouter([
       {
         path: "/tickets/:ticketId",
         element: <TicketDetailPage />,
+      },
+      {
+        path: "/settings",
+        element: <SettingsLayout />,
+        children: [
+          {
+            path: "profile",
+            element: <UserProfilePage />,
+          },
+          {
+            path: "security",
+            element: <UserSecurityPage />,
+          },
+          {
+            path: "account",
+            element: <UserAccountPage />,
+          },
+        ],
       },
     ],
   },

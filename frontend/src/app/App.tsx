@@ -10,7 +10,8 @@ export function App() {
     <ErrorBoundary>
       <AppProviders router={router}>
         <Toaster
-          position="top-right"
+          position="top-left"
+          containerClassName="taskflow-toast-container"
           toastOptions={{
             duration: 4000,
             style: {

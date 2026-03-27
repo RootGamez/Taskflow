@@ -163,3 +163,32 @@ body {
 .ticket-rich-editor {
   cursor: text;
 }
+
+.taskflow-toast-container {
+  top: 0.9rem !important;
+  left: 17rem !important;
+  right: auto !important;
+}
+
+.taskflow-toast-container > div {
+  min-width: 22rem;
+  max-width: 28rem;
+}
+
+@media (max-width: 1024px) {
+  .taskflow-toast-container {
+    left: 5rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .taskflow-toast-container {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+  }
+
+  .taskflow-toast-container > div {
+    min-width: unset;
+    max-width: 100%;
+  }
+}

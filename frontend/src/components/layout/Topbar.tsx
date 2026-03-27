@@ -2,7 +2,7 @@ import { Input } from "@heroui/react";
 import { Search } from "lucide-react";
 import { useParams } from "react-router-dom";
 
-import { MemberAvatar } from "@/features/members/components/MemberAvatar";
+import { UserMenu } from "@/features/auth/components/UserMenu";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { useAuthStore } from "@/store/authStore";
 
@@ -20,7 +20,7 @@ export function Topbar() {
       </div>
       <div className="flex items-center gap-2">
         <NotificationBell />
-        {user ? <MemberAvatar user={user} size="sm" showTooltip /> : null}
+        <UserMenu user={user} />
       </div>
     </header>
   );

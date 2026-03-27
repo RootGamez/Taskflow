@@ -1,6 +1,6 @@
 import { Button, Card, Input } from "@heroui/react";
 import { User } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 
 import { apiClient } from "@/lib/axios";
@@ -13,6 +13,8 @@ export function UserProfilePage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url ?? "");
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleSave = async () => {
     if (!user) return;
@@ -21,7 +23,6 @@ export function UserProfilePage() {
     try {
       const response = await apiClient.patch("/users/me/", {
         full_name: fullName,
-        avatar_url: avatarUrl,
       });
 
       setUser(response.data);
@@ -30,6 +31,40 @@ export function UserProfilePage() {
       toast.error("Error al actualizar perfil");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSelectAvatar = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    setIsUploadingAvatar(true);
+    try {
+      const response = await apiClient.post("/users/me/avatar/", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setUser(response.data);
+      setAvatarUrl(response.data.avatar_url ?? "");
+      toast.success("Foto de perfil actualizada");
+    } catch {
+      toast.error("No se pudo subir la foto de perfil");
+    } finally {
+      setIsUploadingAvatar(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -62,20 +97,27 @@ export function UserProfilePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">URL de avatar</label>
-            <Input
-              value={avatarUrl}
-              onChange={(e) => setAvatarUrl(e.target.value)}
-              placeholder="https://ejemplo.com/avatar.jpg"
-              type="url"
-              className="mt-1"
-            />
-            {avatarUrl && (
-              <div className="mt-3 flex items-center gap-3">
-                <span className="text-xs text-zinc-600 dark:text-zinc-400">Vista previa:</span>
-                <img src={avatarUrl} alt="Avatar preview" className="h-10 w-10 rounded-full object-cover" />
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300">Foto de perfil</label>
+            <div className="mt-2 flex items-center gap-3">
+              <img
+                src={avatarUrl || undefined}
+                alt="Avatar preview"
+                className="h-14 w-14 rounded-full border border-zinc-200 object-cover dark:border-zinc-700"
+              />
+              <div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <Button size="sm" variant="flat" onPress={handleSelectAvatar} isLoading={isUploadingAvatar}>
+                  Subir foto
+                </Button>
+                <p className="mt-1 text-xs text-zinc-500">JPG, PNG, WEBP o GIF. Max 5MB.</p>
               </div>
-            )}
+            </div>
           </div>
 
           <Button color="primary" onPress={handleSave} isLoading={isSaving}>

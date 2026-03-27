@@ -101,6 +101,37 @@ class WorkspaceSelectActiveSerializer(serializers.Serializer):
         return membership
 
 
+class WorkspaceUpdateSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, required=False)
+    slug = serializers.SlugField(max_length=255, required=False, allow_blank=True)
+    logo_url = serializers.URLField(required=False, allow_blank=True)
+
+    def validate_slug(self, value: str) -> str:
+        workspace: Workspace = self.context["workspace"]
+        if not value:
+            return value
+
+        exists = Workspace.objects.filter(slug=value).exclude(id=workspace.id).exists()
+        if exists:
+            raise serializers.ValidationError("Este slug ya esta en uso.")
+        return value
+
+    def validate(self, attrs: dict) -> dict:
+        if not attrs:
+            raise serializers.ValidationError("Debes enviar al menos un campo para actualizar.")
+        return attrs
+
+    def save(self, **kwargs) -> Workspace:
+        workspace: Workspace = self.context["workspace"]
+
+        for field in ("name", "slug", "logo_url"):
+            if field in self.validated_data:
+                setattr(workspace, field, self.validated_data[field])
+
+        workspace.save()
+        return workspace
+
+
 class WorkspaceMemberSerializer(serializers.ModelSerializer):
     user_id = serializers.UUIDField(source="user.id", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)

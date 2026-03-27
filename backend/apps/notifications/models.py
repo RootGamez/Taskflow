@@ -10,6 +10,7 @@ from django.utils import timezone
 class Notification(models.Model):
 	class Type(models.TextChoices):
 		WORKSPACE_INVITATION = "workspace_invitation", "Workspace invitation"
+		WORKSPACE_DELETED = "workspace_deleted", "Workspace deleted"
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	recipient = models.ForeignKey(

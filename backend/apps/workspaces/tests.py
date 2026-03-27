@@ -237,3 +237,105 @@ class WorkspaceFlowTests(APITestCase):
 		)
 		self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
 		self.assertEqual(cancel_response.data["status"], "cancelled")
+
+	def test_owner_can_update_workspace_settings(self) -> None:
+		workspace = Workspace.objects.create(name="Original", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+
+		response = self.client.patch(
+			f"/api/v1/workspaces/{workspace.slug}/",
+			{"name": "Nuevo Nombre", "slug": "nuevo-slug"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["name"], "Nuevo Nombre")
+		self.assertEqual(response.data["slug"], "nuevo-slug")
+
+	def test_admin_can_update_workspace_settings(self) -> None:
+		owner = self.user
+		workspace = Workspace.objects.create(name="Equipo", owner=owner)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=owner,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=False,
+		)
+
+		admin = User.objects.create_user(
+			email="admin-settings@example.com",
+			full_name="Admin Settings",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=admin,
+			role=WorkspaceMember.Role.ADMIN,
+			is_active=True,
+		)
+
+		admin_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": admin.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {admin_login.data['access']}")
+
+		response = self.client.patch(
+			f"/api/v1/workspaces/{workspace.slug}/",
+			{"name": "Equipo Admin"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["name"], "Equipo Admin")
+
+	def test_member_cannot_delete_workspace(self) -> None:
+		owner = self.user
+		workspace = Workspace.objects.create(name="Eliminar", owner=owner)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=owner,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=False,
+		)
+
+		member = User.objects.create_user(
+			email="member-delete@example.com",
+			full_name="Member Delete",
+			password="Passw0rd!123",
+		)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=member,
+			role=WorkspaceMember.Role.MEMBER,
+			is_active=True,
+		)
+
+		member_login = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": member.email, "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {member_login.data['access']}")
+
+		response = self.client.delete(f"/api/v1/workspaces/{workspace.slug}/")
+		self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+	def test_owner_can_delete_workspace(self) -> None:
+		workspace = Workspace.objects.create(name="Borrar", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+
+		response = self.client.delete(f"/api/v1/workspaces/{workspace.slug}/")
+		self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+		self.assertFalse(Workspace.objects.filter(id=workspace.id).exists())

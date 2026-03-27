@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.workspaces.access import WorkspaceRoleAccessMixin
+from apps.notifications.models import Notification
 from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationSerializer
 from apps.workspaces.models import WorkspaceInvitation, WorkspaceMember
@@ -21,6 +22,7 @@ from apps.workspaces.serializers import (
 	WorkspaceMemberSerializer,
 	WorkspaceSelectActiveSerializer,
 	WorkspaceSerializer,
+	WorkspaceUpdateSerializer,
 )
 
 
@@ -83,6 +85,101 @@ class WorkspaceSelectActiveView(APIView):
 			context={"membership_by_workspace": {membership.workspace_id: membership}},
 		)
 		return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+
+class WorkspaceDetailView(WorkspaceRoleAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	EDITABLE_ROLES = {
+		WorkspaceMember.Role.OWNER,
+		WorkspaceMember.Role.ADMIN,
+	}
+
+	def get(self, request: Request, workspace_slug: str) -> Response:
+		membership = self.get_workspace_membership_for_user(request, workspace_slug=workspace_slug)
+		serializer = WorkspaceSerializer(
+			membership.workspace,
+			context={"membership_by_workspace": {membership.workspace_id: membership}},
+		)
+		return Response(serializer.data, status=status.HTTP_200_OK)
+
+	def patch(self, request: Request, workspace_slug: str) -> Response:
+		membership = self.get_workspace_membership_for_user(request, workspace_slug=workspace_slug)
+		if membership.role not in self.EDITABLE_ROLES:
+			raise PermissionDenied("No tienes permisos para editar este workspace.")
+
+		serializer = WorkspaceUpdateSerializer(
+			data=request.data,
+			context={"workspace": membership.workspace},
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo actualizar el workspace."
+			raise ValidationError({"detail": message})
+
+		workspace = serializer.save()
+		response_serializer = WorkspaceSerializer(
+			workspace,
+			context={"membership_by_workspace": {membership.workspace_id: membership}},
+		)
+
+		send_workspace_event(
+			str(workspace.id),
+			"workspace.updated",
+			{"workspace": response_serializer.data},
+		)
+
+		return Response(response_serializer.data, status=status.HTTP_200_OK)
+
+	def delete(self, request: Request, workspace_slug: str) -> Response:
+		membership = self.get_workspace_membership_for_user(request, workspace_slug=workspace_slug)
+		if membership.role != WorkspaceMember.Role.OWNER:
+			raise PermissionDenied("Solo el owner puede eliminar el workspace.")
+
+		workspace = membership.workspace
+		
+		# Obtener todos los miembros del workspace
+		members = WorkspaceMember.objects.filter(workspace=workspace).select_related("user")
+		
+		# Crear notificaciones para cada miembro (excepto quién la eliminó)
+		for member in members:
+			if member.user_id != request.user.id:
+				notification = Notification.objects.create(
+					recipient=member.user,
+					actor=request.user,
+					notification_type=Notification.Type.WORKSPACE_DELETED,
+					title=f"Workspace eliminado: {workspace.name}",
+					message=f"{request.user.full_name} eliminó el workspace {workspace.name}",
+					data={
+						"workspace_id": str(workspace.id),
+						"workspace_name": workspace.name,
+					},
+				)
+				# Enviar evento en tiempo real
+				send_notification_event(
+					str(member.user.id),
+					{
+						"type": "notification.created",
+						"notification": NotificationSerializer(notification).data,
+					},
+				)
+		
+		send_workspace_event(
+			str(workspace.id),
+			"workspace.deleted",
+			{
+				"workspace_id": str(workspace.id),
+				"workspace_slug": workspace.slug,
+				"workspace_name": workspace.name,
+				"deleted_by": str(request.user.id),
+			},
+		)
+		workspace.delete()
+		return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class WorkspaceMembersManageMixin(WorkspaceRoleAccessMixin):

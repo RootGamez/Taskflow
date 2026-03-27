@@ -120,7 +120,7 @@ export default function WorkspaceMembersPage() {
               value={role}
               onChange={(event) => setRole(event.target.value as Exclude<WorkspaceRole, "owner">)}
               disabled={!canManageMembers || inviteMutation.isPending}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-900 [color-scheme:light] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark]"
             >
               {ROLE_OPTIONS.map((option) => (
                 <option key={option} value={option}>
@@ -137,7 +137,7 @@ export default function WorkspaceMembersPage() {
             </Button>
           </div>
           {!canManageMembers ? (
-            <p className="text-xs text-zinc-500">Solo owner o admin pueden invitar y cambiar roles.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Solo owner o admin pueden invitar y cambiar roles.</p>
           ) : null}
         </CardBody>
       </Card>
@@ -147,7 +147,7 @@ export default function WorkspaceMembersPage() {
           <div className="space-y-2">
             <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Invitaciones pendientes</p>
             {pendingInvitations.length === 0 ? (
-              <p className="text-sm text-zinc-500">No hay invitaciones pendientes.</p>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">No hay invitaciones pendientes.</p>
             ) : (
               pendingInvitations.map((invitation) => (
                 <div
@@ -161,7 +161,7 @@ export default function WorkspaceMembersPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-xs capitalize text-zinc-500">{roleLabel(invitation.role)}</span>
+                    <span className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{roleLabel(invitation.role)}</span>
                     <Button
                       size="sm"
                       color="danger"
@@ -192,10 +192,10 @@ export default function WorkspaceMembersPage() {
               >
                 <div>
                   <p className="font-medium text-zinc-900 dark:text-zinc-50">{member.full_name}</p>
-                  <p className="text-sm text-zinc-500">{member.email}</p>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">{member.email}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-zinc-500">Rol</span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400">Rol</span>
                   <select
                     value={member.role}
                     disabled={!canEditRole || updateRoleMutation.isPending}
@@ -205,7 +205,7 @@ export default function WorkspaceMembersPage() {
                         void handleChangeRole(member.id, nextRole);
                       }
                     }}
-                    className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm capitalize dark:border-zinc-700 dark:bg-zinc-900"
+                    className="h-9 rounded-md border border-zinc-300 bg-white px-3 text-sm capitalize text-zinc-900 [color-scheme:light] dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark]"
                   >
                     {isOwner ? (
                       <option value="owner">Owner</option>
@@ -223,7 +223,7 @@ export default function WorkspaceMembersPage() {
           })}
 
           {sortedMembers.length === 0 ? (
-            <p className="text-sm text-zinc-500">No hay miembros en este workspace.</p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">No hay miembros en este workspace.</p>
           ) : null}
         </CardBody>
       </Card>

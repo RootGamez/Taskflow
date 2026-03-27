@@ -1,48 +1,25 @@
-import { Button, Chip, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Chip } from "@heroui/react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { CheckCircle2, Mail, X, XCircle } from "lucide-react";
-import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { Mail } from "lucide-react";
 
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
-  useNotificationAction,
   useNotifications,
 } from "@/features/notifications/hooks/useNotifications";
-import { getApiErrorMessage } from "@/lib/errors";
+import type { NotificationItem } from "@/features/notifications/types/notification.types";
 
-export function NotificationList() {
-  const navigate = useNavigate();
+interface NotificationListProps {
+  onOpenInvitation?: (notification: NotificationItem) => void;
+}
+
+export function NotificationList({ onOpenInvitation }: NotificationListProps) {
   const { data = [] } = useNotifications();
   const markAllMutation = useMarkAllNotificationsRead();
   const markOneMutation = useMarkNotificationRead();
-  const actionMutation = useNotificationAction();
 
   const hasNotifications = data.length > 0;
-  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
-
-  const selectedNotification = data.find((item) => item.id === selectedNotificationId) ?? null;
-  const selectedWorkspaceName = selectedNotification?.data.workspace_name;
-  const selectedRole = selectedNotification?.data.role;
-
-  const handleInvitationAction = async (
-    notificationId: string,
-    action: "accept" | "reject",
-    workspaceSlug?: string,
-  ) => {
-    try {
-      await actionMutation.mutateAsync({ notificationId, action });
-      if (action === "accept" && workspaceSlug) {
-        navigate(`/workspaces/${workspaceSlug}`);
-      }
-      toast.success(action === "accept" ? "Invitacion aceptada" : "Invitacion rechazada");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo procesar la invitacion"));
-    }
-  };
 
   return (
     <div className="w-[340px] max-w-[92vw] space-y-2 rounded-2xl border border-zinc-200/80 bg-white p-2.5 dark:border-zinc-800 dark:bg-zinc-950">
@@ -81,7 +58,7 @@ export function NotificationList() {
               tabIndex={isPendingInvitation ? 0 : -1}
               onClick={() => {
                 if (isPendingInvitation) {
-                  setSelectedNotificationId(notification.id);
+                  onOpenInvitation?.(notification);
                 }
               }}
               onKeyDown={(event) => {
@@ -90,7 +67,7 @@ export function NotificationList() {
                 }
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setSelectedNotificationId(notification.id);
+                  onOpenInvitation?.(notification);
                 }
               }}
               className={`rounded-xl border px-2.5 py-2.5 transition ${
@@ -121,7 +98,15 @@ export function NotificationList() {
               {isInvitation ? (
                 <div className="mt-2 flex items-center gap-2">
                   {isPendingInvitation ? (
-                    <Button size="sm" variant="flat" color="primary" className="h-7 rounded-lg px-2 text-[11px]">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="primary"
+                      className="h-7 rounded-lg px-2 text-[11px]"
+                      onPress={() => {
+                        onOpenInvitation?.(notification);
+                      }}
+                    >
                       Revisar invitacion
                     </Button>
                   ) : null}
@@ -152,96 +137,6 @@ export function NotificationList() {
           );
         })}
       </div>
-
-      <Modal
-        isOpen={Boolean(selectedNotification)}
-        hideCloseButton
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedNotificationId(null);
-          }
-        }}
-        placement="center"
-      >
-        <ModalContent className="overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 shadow-2xl dark:border-zinc-800 dark:bg-zinc-950">
-          <ModalHeader className="border-b border-zinc-200 px-5 py-4 dark:border-zinc-800">
-            <div className="flex w-full items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">Invitacion</p>
-                <h3 className="text-base font-semibold leading-5 text-zinc-900 dark:text-zinc-50">
-                  {selectedNotification?.title ?? "Nueva invitacion"}
-                </h3>
-              </div>
-              <Button
-                isIconOnly
-                variant="light"
-                radius="full"
-                className="h-8 w-8 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                onPress={() => setSelectedNotificationId(null)}
-                aria-label="Cerrar modal"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </ModalHeader>
-
-          <ModalBody className="space-y-4 px-5 py-5">
-            <p className="text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-              {selectedNotification?.message}
-            </p>
-
-            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900/70">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-zinc-500">Workspace</p>
-              <p className="mt-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                {selectedWorkspaceName ?? "Sin nombre"}
-              </p>
-              {selectedRole ? (
-                <Chip size="sm" variant="flat" color="primary" className="mt-2 h-6 capitalize text-xs">
-                  Rol sugerido: {selectedRole}
-                </Chip>
-              ) : null}
-            </div>
-          </ModalBody>
-
-          <ModalFooter className="border-t border-zinc-200 bg-zinc-50 px-5 py-4 dark:border-zinc-800 dark:bg-zinc-900/60">
-            <Button
-              variant="flat"
-              size="sm"
-              className="h-9 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm text-rose-700 hover:bg-rose-100 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50"
-              startContent={<XCircle className="h-4 w-4" />}
-              isLoading={actionMutation.isPending}
-              onPress={() => {
-                if (!selectedNotification) {
-                  return;
-                }
-                void handleInvitationAction(selectedNotification.id, "reject");
-                setSelectedNotificationId(null);
-              }}
-            >
-              Rechazar
-            </Button>
-            <Button
-              size="sm"
-              className="h-9 rounded-xl bg-emerald-600 px-4 text-sm text-white hover:bg-emerald-700"
-              startContent={<CheckCircle2 className="h-4 w-4" />}
-              isLoading={actionMutation.isPending}
-              onPress={() => {
-                if (!selectedNotification) {
-                  return;
-                }
-                void handleInvitationAction(
-                  selectedNotification.id,
-                  "accept",
-                  selectedNotification.data.workspace_slug,
-                );
-                setSelectedNotificationId(null);
-              }}
-            >
-              Aceptar
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 }

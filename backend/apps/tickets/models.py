@@ -45,3 +45,28 @@ class Ticket(models.Model):
 
 	def __str__(self) -> str:
 		return self.title
+
+
+class TicketFieldLock(models.Model):
+	ticket = models.ForeignKey(
+		Ticket,
+		on_delete=models.CASCADE,
+		related_name="field_locks",
+	)
+	field = models.CharField(max_length=64)
+	user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="ticket_field_locks",
+	)
+	user_name = models.CharField(max_length=255)
+	expires_at = models.DateTimeField()
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		constraints = [
+			models.UniqueConstraint(fields=["ticket", "field"], name="unique_ticket_field_lock"),
+		]
+
+	def __str__(self) -> str:
+		return f"{self.ticket_id}:{self.field} - {self.user_id}"

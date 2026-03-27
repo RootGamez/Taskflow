@@ -4,6 +4,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
 from django.db.models import F
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
@@ -13,7 +14,7 @@ from rest_framework.views import APIView
 
 from apps.projects.models import Project
 from apps.tickets.consumers import TicketConsumer
-from apps.tickets.models import Ticket
+from apps.tickets.models import Ticket, TicketFieldLock
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
 from apps.workspaces.access import WorkspaceRoleAccessMixin
 
@@ -43,7 +44,20 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 			raise ValidationError({"detail": message})
 
 		ticket = serializer.save()
-		return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
+		serialized_ticket = TicketSerializer(ticket).data
+
+		channel_layer = get_channel_layer()
+		if channel_layer is not None:
+			async_to_sync(channel_layer.group_send)(
+				f"project_{project_id}",
+				{
+					"type": "ticket.created",
+					"ticket": serialized_ticket,
+					"source": str(request.user.id),
+				},
+			)
+
+		return Response(serialized_ticket, status=status.HTTP_201_CREATED)
 
 
 class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
@@ -57,10 +71,14 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 			raise NotFound("Ticket no encontrado.")
 
 		request_fields = set(request.data.keys())
+		now = timezone.now()
 		for field in TicketConsumer.EDITABLE_FIELDS.intersection(request_fields):
-			lock = TicketConsumer.get_active_lock(str(ticket.id), field)
-			if lock and lock.get("user_id") != str(request.user.id):
-				owner = lock.get("user_name", "Otro usuario")
+			lock = TicketFieldLock.objects.filter(ticket=ticket, field=field).first()
+			if lock and lock.expires_at <= now:
+				lock.delete()
+				lock = None
+			if lock and str(lock.user_id) != str(request.user.id):
+				owner = lock.user_name or "Otro usuario"
 				raise ValidationError({"detail": f"{owner} esta editando este campo, por favor espera."})
 
 		serializer = TicketUpdateSerializer(
@@ -82,11 +100,20 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 
 		channel_layer = get_channel_layer()
 		if channel_layer is not None:
+			serialized_ticket = TicketSerializer(updated_ticket).data
 			async_to_sync(channel_layer.group_send)(
 				f"ticket_{updated_ticket.id}",
 				{
 					"type": "ticket.updated",
-					"ticket": TicketSerializer(updated_ticket).data,
+					"ticket": serialized_ticket,
+					"source": str(request.user.id),
+				},
+			)
+			async_to_sync(channel_layer.group_send)(
+				f"project_{project_id}",
+				{
+					"type": "ticket.updated",
+					"ticket": serialized_ticket,
 					"source": str(request.user.id),
 				},
 			)
@@ -105,6 +132,19 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 			deleted_order = ticket.order
 			ticket.delete()
 			project.tickets.filter(column_id=column_id, order__gt=deleted_order).update(order=F("order") - 1)
+
+		channel_layer = get_channel_layer()
+		if channel_layer is not None:
+			async_to_sync(channel_layer.group_send)(
+				f"project_{project_id}",
+				{
+					"type": "ticket.deleted",
+					"ticket_id": str(ticket_id),
+					"project_id": str(project_id),
+					"column_id": str(column_id),
+					"source": str(request.user.id),
+				},
+			)
 
 		return Response(status=status.HTTP_204_NO_CONTENT)
 

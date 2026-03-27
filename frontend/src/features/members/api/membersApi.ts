@@ -19,6 +19,21 @@ export async function inviteWorkspaceMember(
   return data;
 }
 
+export async function getWorkspaceInvitations(workspaceSlug: string): Promise<WorkspaceInvitationSummary[]> {
+  const { data } = await apiClient.get<WorkspaceInvitationSummary[]>(`/workspaces/${workspaceSlug}/invitations/`);
+  return data;
+}
+
+export async function cancelWorkspaceInvitation(
+  workspaceSlug: string,
+  invitationId: string,
+): Promise<WorkspaceInvitationSummary> {
+  const { data } = await apiClient.delete<WorkspaceInvitationSummary>(
+    `/workspaces/${workspaceSlug}/invitations/${invitationId}/`,
+  );
+  return data;
+}
+
 export async function updateWorkspaceMemberRole(
   workspaceSlug: string,
   memberId: string,

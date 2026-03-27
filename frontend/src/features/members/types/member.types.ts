@@ -26,7 +26,11 @@ export interface WorkspaceInvitationSummary {
   workspace_id: string;
   invited_user_id: string;
   invited_user_email: string;
+  invited_by_id: string;
+  invited_by_email: string;
+  invitation_token: string;
   role: Exclude<WorkspaceRole, "owner">;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "cancelled" | "expired";
   created_at: string;
+  expires_at: string;
 }

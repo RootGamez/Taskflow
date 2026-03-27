@@ -1,4 +1,6 @@
 import { Button, Card, CardBody, Input } from "@heroui/react";
+import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useParams } from "react-router-dom";
@@ -6,9 +8,12 @@ import { useParams } from "react-router-dom";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
+  useCancelWorkspaceInvitation,
   useInviteWorkspaceMember,
   useMembers,
   useUpdateWorkspaceMemberRole,
+  useWorkspaceInvitations,
+  useWorkspaceMembersRealtime,
 } from "@/features/members";
 import type { WorkspaceRole } from "@/features/members";
 import { canManageWorkspaceMembers } from "@/features/workspaces/lib/permissions";
@@ -32,8 +37,12 @@ export default function WorkspaceMembersPage() {
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const canManageMembers = canManageWorkspaceMembers(activeWorkspace?.role);
 
+  useWorkspaceMembersRealtime(workspaceSlug);
+
   const { data: members = [], isLoading } = useMembers(workspaceSlug);
+  const { data: invitations = [], isLoading: isLoadingInvitations } = useWorkspaceInvitations(workspaceSlug);
   const inviteMutation = useInviteWorkspaceMember(workspaceSlug);
+  const cancelInvitationMutation = useCancelWorkspaceInvitation(workspaceSlug);
   const updateRoleMutation = useUpdateWorkspaceMemberRole(workspaceSlug);
 
   const [email, setEmail] = useState("");
@@ -42,6 +51,10 @@ export default function WorkspaceMembersPage() {
   const sortedMembers = useMemo(
     () => [...members].sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [members],
+  );
+  const pendingInvitations = useMemo(
+    () => invitations.filter((item) => item.status === "pending"),
+    [invitations],
   );
 
   const handleInvite = async () => {
@@ -72,7 +85,16 @@ export default function WorkspaceMembersPage() {
     }
   };
 
-  if (isLoading) {
+  const handleCancelInvitation = async (invitationId: string) => {
+    try {
+      await cancelInvitationMutation.mutateAsync(invitationId);
+      toast.success("Invitacion cancelada");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo cancelar la invitacion"));
+    }
+  };
+
+  if (isLoading || isLoadingInvitations) {
     return <LoadingSpinner />;
   }
 
@@ -122,6 +144,43 @@ export default function WorkspaceMembersPage() {
 
       <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <CardBody className="space-y-3">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">Invitaciones pendientes</p>
+            {pendingInvitations.length === 0 ? (
+              <p className="text-sm text-zinc-500">No hay invitaciones pendientes.</p>
+            ) : (
+              pendingInvitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50/40 p-3 dark:border-amber-900/40 dark:bg-amber-950/20 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-50">{invitation.invited_user_email}</p>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                      Expira {formatDistanceToNow(new Date(invitation.expires_at), { addSuffix: true, locale: es })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs capitalize text-zinc-500">{roleLabel(invitation.role)}</span>
+                    <Button
+                      size="sm"
+                      color="danger"
+                      variant="flat"
+                      isDisabled={!canManageMembers || cancelInvitationMutation.isPending}
+                      onPress={() => {
+                        void handleCancelInvitation(invitation.id);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="h-px bg-zinc-200 dark:bg-zinc-800" />
+
           {sortedMembers.map((member) => {
             const isOwner = member.role === "owner";
             const canEditRole = canManageMembers && !isOwner;

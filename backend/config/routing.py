@@ -1,1 +1,7 @@
-from apps.tickets.ws_urls import websocket_urlpatterns
+from apps.notifications.ws_urls import websocket_urlpatterns as notification_websocket_urlpatterns
+from apps.tickets.ws_urls import websocket_urlpatterns as ticket_websocket_urlpatterns
+
+websocket_urlpatterns = [
+	*ticket_websocket_urlpatterns,
+	*notification_websocket_urlpatterns,
+]

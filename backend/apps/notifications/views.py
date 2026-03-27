@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.notifications.models import Notification
+from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationActionSerializer, NotificationSerializer
 from apps.workspaces.models import WorkspaceInvitation, WorkspaceMember
 
@@ -27,10 +28,23 @@ class NotificationMarkAllReadView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def post(self, request: Request) -> Response:
+		unread_ids = list(
+			Notification.objects.filter(recipient=request.user, is_read=False).values_list("id", flat=True)
+		)
+		read_at = timezone.now()
 		Notification.objects.filter(recipient=request.user, is_read=False).update(
 			is_read=True,
-			read_at=timezone.now(),
+			read_at=read_at,
 		)
+		if unread_ids:
+			send_notification_event(
+				str(request.user.id),
+				{
+					"type": "notification.bulk_read",
+					"ids": [str(notification_id) for notification_id in unread_ids],
+					"read_at": read_at.isoformat(),
+				},
+			)
 		return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -42,6 +56,14 @@ class NotificationMarkReadView(APIView):
 		if notification is None:
 			raise NotFound("Notificacion no encontrada.")
 		notification.mark_as_read()
+		send_notification_event(
+			str(request.user.id),
+			{
+				"type": "notification.read",
+				"notification_id": str(notification.id),
+				"read_at": notification.read_at.isoformat() if notification.read_at else None,
+			},
+		)
 		return Response(NotificationSerializer(notification).data, status=status.HTTP_200_OK)
 
 
@@ -94,5 +116,13 @@ class NotificationActionView(APIView):
 			notification.is_read = True
 			notification.read_at = timezone.now()
 			notification.save(update_fields=["title", "message", "data", "is_read", "read_at"])
+
+		send_notification_event(
+			str(request.user.id),
+			{
+				"type": "notification.updated",
+				"notification": NotificationSerializer(notification).data,
+			},
+		)
 
 		return Response(NotificationSerializer(notification).data, status=status.HTTP_200_OK)

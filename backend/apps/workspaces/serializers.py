@@ -5,6 +5,8 @@ from django.db import transaction
 from rest_framework import serializers
 
 from apps.notifications.models import Notification
+from apps.notifications.realtime import send_notification_event
+from apps.notifications.serializers import NotificationSerializer
 from apps.workspaces.models import Workspace, WorkspaceInvitation, WorkspaceMember
 
 User = get_user_model()
@@ -190,6 +192,14 @@ class WorkspaceMemberInviteSerializer(serializers.Serializer):
             )
             invitation.notification = notification
             invitation.save(update_fields=["notification"])
+
+            send_notification_event(
+                str(target_user.id),
+                {
+                    "type": "notification.created",
+                    "notification": NotificationSerializer(notification).data,
+                },
+            )
 
         return invitation
 

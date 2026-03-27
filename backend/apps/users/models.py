@@ -49,3 +49,40 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 	def __str__(self):
 		return self.email
+
+
+class UserSession(models.Model):
+	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+	user = models.ForeignKey(
+		User,
+		on_delete=models.CASCADE,
+		related_name="sessions",
+	)
+	user_agent = models.CharField(max_length=500)
+	ip_address = models.CharField(max_length=45)
+	last_activity = models.DateTimeField(default=timezone.now)
+	created_at = models.DateTimeField(default=timezone.now)
+
+	class Meta:
+		ordering = ["-last_activity"]
+
+	def __str__(self):
+		return f"{self.user.email} - {self.user_agent}"
+
+
+class UserPreferences(models.Model):
+	user = models.OneToOneField(
+		User,
+		on_delete=models.CASCADE,
+		related_name="preferences",
+	)
+	email_notifications = models.BooleanField(default=True)
+	push_notifications = models.BooleanField(default=True)
+	created_at = models.DateTimeField(default=timezone.now)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name_plural = "User preferences"
+
+	def __str__(self):
+		return f"Preferences for {self.user.email}"

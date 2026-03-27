@@ -21,6 +21,7 @@ urlpatterns = [
     path('api/v1/auth/token/', TokenObtainPairView.as_view(), name='token-obtain-pair'),
     path('api/v1/auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('api/v1/auth/token/verify/', TokenVerifyView.as_view(), name='token-verify'),
+    path('api/v1/users/', include('apps.users.urls')),
     path('api/v1/workspaces/', include('apps.workspaces.urls')),
     path('api/v1/', include('apps.projects.urls')),
     path('api/v1/', include('apps.tickets.urls')),

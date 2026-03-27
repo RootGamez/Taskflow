@@ -7,6 +7,8 @@ from rest_framework import exceptions, serializers
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.users.models import UserPreferences
+
 User = get_user_model()
 
 
@@ -122,3 +124,50 @@ def issue_tokens_for_user(user: Any) -> dict[str, str]:
         "access": str(refresh.access_token),
         "refresh": str(refresh),
     }
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("full_name", "avatar_url")
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True,
+        error_messages={
+            "required": "La contraseña actual es obligatoria.",
+            "blank": "La contraseña actual es obligatoria.",
+        },
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages={
+            "required": "La nueva contraseña es obligatoria.",
+            "blank": "La nueva contraseña es obligatoria.",
+            "min_length": "La contraseña debe tener al menos 8 caracteres.",
+        },
+    )
+
+    def validate_current_password(self, value: str) -> str:
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Contraseña actual incorrecta.")
+        return value
+
+
+class UserSessionSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    user_agent = serializers.CharField()
+    ip_address = serializers.CharField()
+    last_activity = serializers.DateTimeField()
+    created_at = serializers.DateTimeField()
+    is_current = serializers.BooleanField()
+
+
+class UserPreferencesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ("email_notifications", "push_notifications")
+

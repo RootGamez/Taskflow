@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   createWorkspace,
+  deleteWorkspace,
   getWorkspaces,
   selectActiveWorkspace,
+  updateWorkspace,
 } from "@/features/workspaces/api/workspacesApi";
 
 export function useWorkspaces() {
@@ -31,6 +33,29 @@ export function useSelectActiveWorkspace() {
 
   return useMutation({
     mutationFn: (workspaceId: string) => selectActiveWorkspace(workspaceId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+}
+
+export function useUpdateWorkspace(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { name?: string; slug?: string; logo_url?: string }) =>
+      updateWorkspace(workspaceSlug, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+}
+
+export function useDeleteWorkspace(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => deleteWorkspace(workspaceSlug),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
     },

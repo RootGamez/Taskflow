@@ -2,9 +2,10 @@ import { Button, Popover, PopoverContent, PopoverTrigger } from "@heroui/react";
 import { Bell } from "lucide-react";
 
 import { NotificationList } from "@/features/notifications/components/NotificationList";
-import { useNotifications } from "@/features/notifications/hooks/useNotifications";
+import { useNotifications, useNotificationsRealtime } from "@/features/notifications/hooks/useNotifications";
 
 export function NotificationBell() {
+  useNotificationsRealtime();
   const { data = [] } = useNotifications();
   const unread = data.filter((item) => !item.is_read).length;
   const unreadLabel = unread > 99 ? "99+" : String(unread);

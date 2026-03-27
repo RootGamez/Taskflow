@@ -92,6 +92,18 @@ export default function ListPage() {
     queryClient.setQueryData(["ticket", incomingTicket.id], incomingTicket);
   }, [projectId, queryClient]);
 
+  const removeTicketFromCache = useCallback((ticketId: string) => {
+    queryClient.setQueryData<Ticket[]>(["tickets", projectId], (previous) => {
+      const previousTickets = previous ?? [];
+      return previousTickets.filter((ticket) => ticket.id !== ticketId);
+    });
+    queryClient.removeQueries({ queryKey: ["ticket", ticketId], exact: true });
+
+    if (selectedTicketId === ticketId) {
+      setSelectedTicketId(null);
+    }
+  }, [projectId, queryClient, selectedTicketId]);
+
   const handleTicketSocketMessage = useCallback((event: MessageEvent<string>) => {
     try {
       const data = JSON.parse(event.data) as {
@@ -161,6 +173,35 @@ export default function ListPage() {
       toast.error("No se pudo procesar una actualizacion en vivo del ticket");
     }
   }, [currentUserId, upsertTicketInCache]);
+
+  const handleProjectSocketMessage = useCallback((event: MessageEvent<string>) => {
+    try {
+      const data = JSON.parse(event.data) as {
+        type?: string;
+        ticket?: Ticket;
+        ticket_id?: string;
+      };
+
+      if ((data.type === "ticket.created" || data.type === "ticket.updated") && data.ticket) {
+        upsertTicketInCache(data.ticket);
+        return;
+      }
+
+      if (data.type === "ticket.deleted" && data.ticket_id) {
+        removeTicketFromCache(data.ticket_id);
+      }
+    } catch {
+      return;
+    }
+  }, [removeTicketFromCache, upsertTicketInCache]);
+
+  useWebSocket(
+    accessToken ? `/projects/${projectId}/?token=${encodeURIComponent(accessToken)}` : "",
+    {
+      enabled: Boolean(projectId && accessToken),
+      onMessage: handleProjectSocketMessage,
+    },
+  );
 
   const ticketSocketRef = useWebSocket(
     selectedTicketId && accessToken

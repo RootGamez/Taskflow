@@ -7,6 +7,7 @@ from django.db.models import F
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -14,8 +15,9 @@ from rest_framework.views import APIView
 
 from apps.projects.models import Project
 from apps.tickets.consumers import TicketConsumer
-from apps.tickets.models import Ticket, TicketFieldLock
+from apps.tickets.models import Ticket, TicketFieldLock, TicketImage
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
+from apps.tickets.storage import upload_ticket_image
 from apps.workspaces.access import WorkspaceRoleAccessMixin
 
 
@@ -163,3 +165,53 @@ class TicketSingleView(APIView):
 			raise NotFound("Ticket no encontrado.")
 
 		return Response(TicketSerializer(ticket).data, status=status.HTTP_200_OK)
+
+
+class TicketImageUploadView(WorkspaceRoleAccessMixin, APIView):
+	"""Recibe una imagen, la sube a MinIO y devuelve la URL pública.
+
+	Endpoint: POST /api/v1/projects/<project_id>/tickets/<ticket_id>/images/
+	Body: multipart/form-data con campo 'image'.
+	Respuesta 201: { "url": "https://..." }
+	"""
+
+	permission_classes = [IsAuthenticated]
+	parser_classes = [MultiPartParser, FormParser]
+
+	def post(self, request: Request, project_id: str, ticket_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
+
+		ticket = project.tickets.filter(id=ticket_id).first()
+		if ticket is None:
+			raise NotFound("Ticket no encontrado.")
+
+		image_file = request.FILES.get("image")
+		if image_file is None:
+			raise ValidationError({"detail": "Debes adjuntar un campo 'image'."})
+
+		try:
+			object_key, public_url = upload_ticket_image(
+				image_file,
+				ticket_id=str(ticket.id),
+				user_id=str(request.user.id),
+			)
+		except ValueError as exc:
+			raise ValidationError({"detail": str(exc)}) from exc
+		except Exception as exc:
+			raise ValidationError({"detail": "No se pudo subir la imagen."}) from exc
+
+		ticket_image = TicketImage.objects.create(
+			ticket=ticket,
+			uploaded_by=request.user,
+			object_key=object_key,
+			url=public_url,
+			file_name=image_file.name or "",
+			content_type=image_file.content_type or "",
+			file_size=image_file.size or 0,
+		)
+
+		return Response(
+			{"url": ticket_image.url, "id": str(ticket_image.id)},
+			status=status.HTTP_201_CREATED,
+		)

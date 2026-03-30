@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { AppShell } from "@/components/layout/AppShell";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SettingsLayout } from "@/components/layout/SettingsLayout";
 import { useAuthStore } from "@/store/authStore";
 import LoginPage from "@/pages/auth/LoginPage";
@@ -61,11 +63,19 @@ export const router = createBrowserRouter([
       },
       {
         path: "/workspaces/:workspaceSlug/projects/:projectId/board",
-        element: <KanbanPage />,
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <KanbanPage />
+          </Suspense>
+        ),
       },
       {
         path: "/workspaces/:workspaceSlug/projects/:projectId/list",
-        element: <ListPage />,
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <ListPage />
+          </Suspense>
+        ),
       },
       {
         path: "/tickets/:ticketId",

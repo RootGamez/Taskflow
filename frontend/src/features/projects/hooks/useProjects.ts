@@ -1,14 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 
 import {
   createProject,
   getProjectById,
   getProjectsByWorkspace,
 } from "@/features/projects/api/projectsApi";
+import { projectQueryKeys } from "@/features/projects/lib/projectQueryKeys";
 
 export function useProjects(workspaceSlug: string) {
   return useQuery({
-    queryKey: ["projects", workspaceSlug],
+    queryKey: projectQueryKeys.list(workspaceSlug),
     queryFn: () => getProjectsByWorkspace(workspaceSlug),
     enabled: Boolean(workspaceSlug),
   });
@@ -16,9 +17,16 @@ export function useProjects(workspaceSlug: string) {
 
 export function useProject(workspaceSlug: string, projectId: string) {
   return useQuery({
-    queryKey: ["project", workspaceSlug, projectId],
+    queryKey: projectQueryKeys.detail(workspaceSlug, projectId),
     queryFn: () => getProjectById(workspaceSlug, projectId),
     enabled: Boolean(workspaceSlug) && Boolean(projectId),
+  });
+}
+
+export function useProjectSuspense(workspaceSlug: string, projectId: string) {
+  return useSuspenseQuery({
+    queryKey: projectQueryKeys.detail(workspaceSlug, projectId),
+    queryFn: () => getProjectById(workspaceSlug, projectId),
   });
 }
 
@@ -36,8 +44,8 @@ export function useCreateProject() {
     mutationFn: ({ workspaceSlug, ...payload }: CreateProjectInput) =>
       createProject(workspaceSlug, payload),
     onSuccess: (_project, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ["projects", variables.workspaceSlug] });
-      void queryClient.invalidateQueries({ queryKey: ["projects"] });
+      void queryClient.invalidateQueries({ queryKey: projectQueryKeys.list(variables.workspaceSlug) });
+      void queryClient.invalidateQueries({ queryKey: projectQueryKeys.all });
     },
   });
 }

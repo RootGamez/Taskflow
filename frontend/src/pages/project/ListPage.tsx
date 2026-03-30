@@ -1,14 +1,13 @@
 import { Tab, Tabs } from "@heroui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { useProject } from "@/features/projects/hooks/useProjects";
+import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
 import { ListView } from "@/features/tickets/components/ListView";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
-import { useTickets, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import { useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -19,17 +18,17 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes";
 
 export default function ListPage() {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { workspaceSlug = "ws-demo", projectId = "p-1" } = useParams();
-  const { data: project, isLoading: isLoadingProject } = useProject(workspaceSlug, projectId);
-  const { data: tickets = [] } = useTickets(projectId);
+  const { data: project } = useProjectSuspense(workspaceSlug, projectId);
+  const { data: tickets } = useTicketsSuspense(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const accessToken = useAuthStore((state) => state.accessToken);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const { upsertTicketInCache, removeTicketFromCache } = useTicketRealtimeCache(projectId);
   const [fieldLocks, setFieldLocks] = useState<{
     title: { userId: string; userName: string } | null;
     priority: { userId: string; userName: string } | null;
@@ -75,34 +74,6 @@ export default function ListPage() {
     });
     setRemoteLiveValues({});
   }, [selectedTicketId]);
-
-  const upsertTicketInCache = useCallback((incomingTicket: Ticket) => {
-    queryClient.setQueryData<Ticket[]>(["tickets", projectId], (previous) => {
-      const previousTickets = previous ?? [];
-      const exists = previousTickets.some((ticket) => ticket.id === incomingTicket.id);
-      if (!exists) {
-        return [...previousTickets, incomingTicket];
-      }
-
-      return previousTickets.map((ticket) =>
-        ticket.id === incomingTicket.id ? incomingTicket : ticket,
-      );
-    });
-
-    queryClient.setQueryData(["ticket", incomingTicket.id], incomingTicket);
-  }, [projectId, queryClient]);
-
-  const removeTicketFromCache = useCallback((ticketId: string) => {
-    queryClient.setQueryData<Ticket[]>(["tickets", projectId], (previous) => {
-      const previousTickets = previous ?? [];
-      return previousTickets.filter((ticket) => ticket.id !== ticketId);
-    });
-    queryClient.removeQueries({ queryKey: ["ticket", ticketId], exact: true });
-
-    if (selectedTicketId === ticketId) {
-      setSelectedTicketId(null);
-    }
-  }, [projectId, queryClient, selectedTicketId]);
 
   const handleTicketSocketMessage = useCallback((event: MessageEvent<string>) => {
     try {
@@ -189,11 +160,14 @@ export default function ListPage() {
 
       if (data.type === "ticket.deleted" && data.ticket_id) {
         removeTicketFromCache(data.ticket_id);
+        if (selectedTicketId === data.ticket_id) {
+          setSelectedTicketId(null);
+        }
       }
     } catch {
       return;
     }
-  }, [removeTicketFromCache, upsertTicketInCache]);
+  }, [removeTicketFromCache, selectedTicketId, upsertTicketInCache]);
 
   useWebSocket(
     accessToken ? `/projects/${projectId}/?token=${encodeURIComponent(accessToken)}` : "",
@@ -253,10 +227,6 @@ export default function ListPage() {
   const handleTypingField = useCallback((field: CollaborativeField, value: string) => {
     sendSocketMessage({ action: "typing", field, value });
   }, [sendSocketMessage]);
-
-  if (isLoadingProject) {
-    return <LoadingSpinner />;
-  }
 
   return (
     <div className="space-y-4">

@@ -38,7 +38,6 @@ function AuthBootstrap() {
     queryFn: getMe,
     enabled: isAuthenticated,
     retry: false,
-    staleTime: 1000 * 60,
   });
 
   useEffect(() => {

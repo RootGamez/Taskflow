@@ -21,6 +21,11 @@ interface UpdateTicketPayload {
   order?: number;
 }
 
+export interface UploadTicketImageResponse {
+  url: string;
+  id: string;
+}
+
 export async function getTicketsByProject(projectId: string): Promise<Ticket[]> {
   const { data } = await apiClient.get<Ticket[]>(`/projects/${projectId}/tickets/`);
   return data;
@@ -44,6 +49,26 @@ export async function updateTicket(
   const { data } = await apiClient.patch<Ticket>(
     `/projects/${projectId}/tickets/${ticketId}/`,
     payload,
+  );
+  return data;
+}
+
+/**
+ * Sube una imagen al ticket y devuelve la URL pública de MinIO.
+ * Úsala para insertar imágenes en el rich editor antes de serializar el JSON.
+ */
+export async function uploadTicketImage(
+  projectId: string,
+  ticketId: string,
+  file: File,
+): Promise<UploadTicketImageResponse> {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const { data } = await apiClient.post<UploadTicketImageResponse>(
+    `/projects/${projectId}/tickets/${ticketId}/images/`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
   );
   return data;
 }

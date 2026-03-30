@@ -7,6 +7,7 @@ import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
 import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
 import { CreateTicketModal } from "@/features/tickets/components/CreateTicketModal";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
+import { uploadTicketImage } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import {
   useCreateTicket,
@@ -288,6 +289,12 @@ export default function KanbanPage() {
     sendSocketMessage({ action: "typing", field, value });
   }, [sendSocketMessage]);
 
+  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
+    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
+    const result = await uploadTicketImage(projectId, selectedTicketId, file);
+    return result.url;
+  }, [projectId, selectedTicketId]);
+
   if (!project) {
     return <p className="text-sm text-zinc-600">No se encontro el proyecto.</p>;
   }
@@ -341,6 +348,7 @@ export default function KanbanPage() {
         onLockField={handleLockField}
         onUnlockField={handleUnlockField}
         onTypingField={handleTypingField}
+        onUploadImage={canMutate ? handleUploadImage : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />
       <CreateTicketModal

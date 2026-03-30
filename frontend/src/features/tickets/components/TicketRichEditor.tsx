@@ -1,5 +1,5 @@
 "use client";
- 
+
 import {
   useCallback,
   useEffect,
@@ -13,6 +13,7 @@ import {
   GripVertical,
   Heading2,
   Heading3,
+  ImageIcon,
   List,
   ListOrdered,
   Pilcrow,
@@ -26,6 +27,7 @@ import {
   useEditor,
   Extension,
 } from "@tiptap/react";
+import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
@@ -36,9 +38,30 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
- 
+
 // ─── Tipos ────────────────────────────────────────────────────────────────────
- 
+
+/** Función de upload: recibe un File y devuelve la URL pública. */
+export type ImageUploadFn = (file: File) => Promise<string>;
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const ALLOWED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+const MAX_IMAGE_SIZE_MB = 10;
+
+function isImageFile(file: File): boolean {
+  return ALLOWED_IMAGE_TYPES.includes(file.type);
+}
+
+function validateImageFile(file: File): string | null {
+  if (!isImageFile(file)) {
+    return `Formato no soportado. Usa: ${ALLOWED_IMAGE_EXTENSIONS.join(", ")}.`;
+  }
+  if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+    return `La imagen supera el límite de ${MAX_IMAGE_SIZE_MB} MB.`;
+  }
+  return null;
+}
+
 interface TicketRichEditorProps {
   /** JSON de ProseMirror (objeto) o string vacío */
   value: Record<string, unknown> | null;
@@ -50,27 +73,29 @@ interface TicketRichEditorProps {
   onChange: (value: Record<string, unknown>) => void;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** Función para subir imágenes al servidor. Recibe un File, devuelve URL pública. */
+  onUploadImage?: ImageUploadFn;
 }
- 
+
 interface BlockOption {
   id: string;
   label: string;
   description: string;
-  group: "basic" | "lists" | "advanced";
+  group: "basic" | "lists" | "advanced" | "media";
   keywords: string[];
   icon: React.ElementType;
   apply: (editor: Editor) => void;
 }
- 
+
 interface BlockMenuState {
   open: boolean;
   // posición en coordenadas de la ventana, para el portal
   x: number;
   y: number;
 }
- 
+
 // ─── Helpers de bloques ───────────────────────────────────────────────────────
- 
+
 function getBlockIndexAtPos(editor: Editor, pos: number): number {
   const { doc } = editor.state;
   let offset = 0;
@@ -83,7 +108,7 @@ function getBlockIndexAtPos(editor: Editor, pos: number): number {
   }
   return -1;
 }
- 
+
 function getBlockRange(editor: Editor, index: number) {
   const { doc } = editor.state;
   let offset = 0;
@@ -96,82 +121,82 @@ function getBlockRange(editor: Editor, index: number) {
   }
   return null;
 }
- 
+
 function moveBlock(editor: Editor, direction: "up" | "down") {
   const { selection, doc } = editor.state;
   const currentIndex = getBlockIndexAtPos(editor, selection.from);
   if (currentIndex === -1) return;
- 
+
   const swapIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
   if (swapIndex < 0 || swapIndex >= doc.childCount) return;
- 
+
   const current = getBlockRange(editor, currentIndex);
   const swap = getBlockRange(editor, swapIndex);
   if (!current || !swap) return;
- 
+
   const rangeFrom = Math.min(current.from, swap.from) - 1;
   const rangeTo = Math.max(current.to, swap.to);
- 
+
   const { tr } = editor.state;
   const nodes =
     direction === "up"
       ? Fragment.fromArray([current.node, swap.node])
       : Fragment.fromArray([swap.node, current.node]);
- 
+
   tr.replaceWith(rangeFrom, rangeTo, nodes);
- 
+
   const newPos =
     direction === "up"
       ? rangeFrom + 1
       : rangeFrom + swap.node.nodeSize + 1;
- 
+
   const resolved = tr.doc.resolve(Math.min(newPos, tr.doc.content.size - 1));
   tr.setSelection(TextSelection.near(resolved));
   editor.view.dispatch(tr);
   editor.commands.focus();
 }
- 
+
 // ─── Extensión: slash command (/comando) ──────────────────────────────────────
 // Detecta cuando el usuario escribe "/" al inicio de un bloque vacío
 // y notifica para abrir el menú de bloques.
- 
+
 interface SlashCommandOptions {
   onTrigger: (coords: { x: number; y: number }) => void;
   onClose: () => void;
 }
- 
+
 const SlashCommandExtension = Extension.create<SlashCommandOptions>({
   name: "slashCommand",
- 
+
   addOptions() {
     return {
-      onTrigger: () => {},
-      onClose: () => {},
+      onTrigger: () => { },
+      onClose: () => { },
     };
   },
- 
+
   addProseMirrorPlugins() {
     const { onTrigger, onClose } = this.options;
- 
+
     return [
       new Plugin({
         key: new PluginKey("slashCommand"),
         props: {
           handleKeyDown(view, event) {
             if (event.key !== "/") return false;
- 
+
             const { selection, doc } = view.state;
             const { from } = selection;
- 
+
             // Solo activar si el bloque actual está vacío
             const resolved = doc.resolve(from);
             const node = resolved.parent;
             if (!node.isTextblock || node.textContent !== "") return false;
- 
+
             // Calcular posición del cursor en pantalla
             const coords = view.coordsAtPos(from);
             onTrigger({ x: coords.left, y: coords.bottom });
- 
+
             return false; // No consumir el evento — el "/" igual se escribe y lo borramos
           },
           handleTextInput(_view, _from, _to, text) {
@@ -185,19 +210,19 @@ const SlashCommandExtension = Extension.create<SlashCommandOptions>({
     ];
   },
 });
- 
+
 // ─── Portal para menús flotantes ─────────────────────────────────────────────
 // Renderiza fuera del DOM del editor para evitar problemas de overflow/clip.
- 
+
 import { createPortal } from "react-dom";
- 
+
 interface FloatingPortalProps {
   children: React.ReactNode;
   x: number;
   y: number;
   container?: HTMLElement | null;
 }
- 
+
 function FloatingPortal({ children, x, y, container }: FloatingPortalProps) {
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -255,9 +280,9 @@ function FloatingPortal({ children, x, y, container }: FloatingPortalProps) {
     container ?? document.body
   );
 }
- 
+
 // ─── Menú de bloques ─────────────────────────────────────────────────────────
- 
+
 interface BlockMenuProps {
   options: BlockOption[];
   onSelect: (option: BlockOption) => void;
@@ -266,14 +291,14 @@ interface BlockMenuProps {
   y: number;
   portalContainer?: HTMLElement | null;
 }
- 
+
 function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockMenuProps) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPointerOverList, setIsPointerOverList] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
- 
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       inputRef.current?.focus();
@@ -283,7 +308,7 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
       window.clearTimeout(timer);
     };
   }, []);
- 
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
@@ -293,28 +318,30 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
         o.keywords.some((k) => k.includes(q))
     );
   }, [options, search]);
- 
+
   // Resetear índice activo al filtrar
   useEffect(() => {
     setActiveIndex(0);
   }, [filtered.length]);
- 
+
   const grouped = useMemo(() => {
     const groups: { label: string; items: BlockOption[] }[] = [];
     const basic = filtered.filter((o) => o.group === "basic");
     const lists = filtered.filter((o) => o.group === "lists");
     const advanced = filtered.filter((o) => o.group === "advanced");
+    const media = filtered.filter((o) => o.group === "media");
     if (basic.length) groups.push({ label: "Básico", items: basic });
     if (lists.length) groups.push({ label: "Listas", items: lists });
     if (advanced.length) groups.push({ label: "Avanzado", items: advanced });
+    if (media.length) groups.push({ label: "Media", items: media });
     return groups;
   }, [filtered]);
- 
+
   const flatFiltered = useMemo(
     () => grouped.flatMap((g) => g.items),
     [grouped]
   );
- 
+
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -342,7 +369,7 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [activeIndex, flatFiltered, onClose, onSelect]);
- 
+
   useEffect(() => {
     const handleClick = (e: PointerEvent) => {
       if (!containerRef.current?.contains(e.target as Node)) {
@@ -352,7 +379,7 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
     window.addEventListener("pointerdown", handleClick);
     return () => window.removeEventListener("pointerdown", handleClick);
   }, [onClose]);
- 
+
   // Scroll automático al elemento activo
   useEffect(() => {
     const el = containerRef.current?.querySelector(
@@ -380,9 +407,9 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
     },
     [isPointerOverList]
   );
- 
+
   let globalIndex = 0;
- 
+
   return (
     <FloatingPortal x={x} y={y + 4} container={portalContainer}>
       <div
@@ -399,7 +426,7 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
             className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
         </div>
- 
+
         {/* Lista de opciones */}
         <div
           className="max-h-72 overflow-y-auto overscroll-contain p-1"
@@ -458,9 +485,9 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
     </FloatingPortal>
   );
 }
- 
+
 // ─── Menú de acciones de bloque (grip) ────────────────────────────────────────
- 
+
 interface BlockActionsMenuProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -470,7 +497,7 @@ interface BlockActionsMenuProps {
   y: number;
   portalContainer?: HTMLElement | null;
 }
- 
+
 function BlockActionsMenu({
   onMoveUp,
   onMoveDown,
@@ -481,7 +508,7 @@ function BlockActionsMenu({
   portalContainer,
 }: BlockActionsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
- 
+
   useEffect(() => {
     const handleClick = (e: PointerEvent) => {
       if (!ref.current?.contains(e.target as Node)) onClose();
@@ -489,7 +516,7 @@ function BlockActionsMenu({
     window.addEventListener("pointerdown", handleClick);
     return () => window.removeEventListener("pointerdown", handleClick);
   }, [onClose]);
- 
+
   return (
     <FloatingPortal x={x} y={y} container={portalContainer}>
       <div
@@ -537,16 +564,18 @@ function BlockActionsMenu({
     </FloatingPortal>
   );
 }
- 
+
 // ─── Controles flotantes por bloque (+ y grip) ────────────────────────────────
 // Se posicionan siguiendo el cursor, no el FloatingMenu de Tiptap.
- 
+
 interface BlockControlsProps {
   editor: Editor;
   disabled: boolean;
+  onUploadImage?: ImageUploadFn;
+  triggerImageFileInput?: (() => void) | null;
 }
- 
-function BlockControls({ editor, disabled }: BlockControlsProps) {
+
+function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput }: BlockControlsProps) {
   const [hoveredBlockIndex, setHoveredBlockIndex] = useState<number | null>(null);
   const [controlsY, setControlsY] = useState(0);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
@@ -562,8 +591,8 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     y: number;
   }>({ open: false, x: 0, y: 0 });
   const portalContainer = editor.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null;
- 
-  const BLOCK_OPTIONS = useBlockOptions(editor);
+
+  const BLOCK_OPTIONS = useBlockOptions(editor, onUploadImage, triggerImageFileInput);
 
   const clearHideTimer = useCallback(() => {
     if (hideControlsTimeoutRef.current !== null) {
@@ -571,7 +600,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
       hideControlsTimeoutRef.current = null;
     }
   }, []);
- 
+
   // Detectar sobre qué bloque está el mouse
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -595,7 +624,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
         return;
       }
       setHoveredBlockIndex(index);
- 
+
       // Calcular Y del bloque en pantalla
       const range = getBlockRange(editor, index);
       if (range) {
@@ -612,7 +641,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     },
     [editor, disabled]
   );
- 
+
   const handleMouseLeave = useCallback(() => {
     clearHideTimer();
     hideControlsTimeoutRef.current = window.setTimeout(() => {
@@ -621,7 +650,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
       }
     }, 140);
   }, [actionsMenu.open, blockMenu.open, clearHideTimer, isHoveringControls]);
- 
+
   useEffect(() => {
     const editorEl = editor.view.dom;
     editorEl.addEventListener("mousemove", handleMouseMove as EventListener);
@@ -637,7 +666,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
       clearHideTimer();
     };
   }, [clearHideTimer]);
- 
+
   const openBlockMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -658,7 +687,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     },
     [editor, hoveredBlockIndex]
   );
- 
+
   const openActionsMenu = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -678,14 +707,14 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     },
     [editor, hoveredBlockIndex]
   );
- 
+
   const handleSelectBlock = useCallback(
     (option: BlockOption) => {
       if (!editor) return;
       const { selection, doc } = editor.state;
       const node = doc.nodeAt(selection.from - 1) || doc.nodeAt(selection.from);
       const isEmpty = node?.isTextblock && node.textContent === "";
- 
+
       if (isEmpty) {
         // Bloque vacío: solo cambiamos el tipo
         option.apply(editor);
@@ -695,9 +724,9 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
         // Le aplicamos la opción al bloque nuevecito que acabamos de crear
         option.apply(editor);
       }
- 
+
       setBlockMenu({ open: false, x: 0, y: 0 });
- 
+
       // Si el bloque se abrió via slash command, borrar el "/"
       const { state } = editor;
       const { from: curFrom } = state.selection;
@@ -711,7 +740,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     },
     [editor]
   );
- 
+
   const deleteBlock = useCallback(() => {
     const { selection } = editor.state;
     const index = getBlockIndexAtPos(editor, selection.from);
@@ -724,11 +753,11 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
       .deleteRange({ from: range.from - 1, to: range.to })
       .run();
   }, [editor]);
- 
+
   if (disabled) return null;
- 
+
   const showControls = hoveredBlockIndex !== null || blockMenu.open || actionsMenu.open;
- 
+
   return (
     <>
       {/* Botones flotantes a la izquierda del editor */}
@@ -777,7 +806,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
           </button>
         </div>
       )}
- 
+
       {/* Menú de tipos de bloque */}
       {blockMenu.open && (
         <BlockMenu
@@ -789,7 +818,7 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
           portalContainer={portalContainer}
         />
       )}
- 
+
       {/* Menú de acciones del bloque */}
       {actionsMenu.open && (
         <BlockActionsMenu
@@ -805,10 +834,14 @@ function BlockControls({ editor, disabled }: BlockControlsProps) {
     </>
   );
 }
- 
+
 // ─── Hook: opciones de bloques ────────────────────────────────────────────────
- 
-function useBlockOptions(editor: Editor | null): BlockOption[] {
+
+function useBlockOptions(
+  editor: Editor | null,
+  onUploadImage?: ImageUploadFn,
+  triggerImageFileInput?: (() => void) | null,
+): BlockOption[] {
   return useMemo<BlockOption[]>(() => {
     if (!editor) return [];
     return [
@@ -893,13 +926,30 @@ function useBlockOptions(editor: Editor | null): BlockOption[] {
         icon: Code2,
         apply: (e) => e.chain().focus().toggleCodeBlock().run(),
       },
+      // ─── Media ──────────────────────────────────────────────────────────────
+      ...(onUploadImage
+        ? [
+          {
+            id: "image",
+            label: "Imagen",
+            description: "Sube una imagen desde tu equipo",
+            group: "media" as const,
+            keywords: ["imagen", "foto", "image", "picture", "img", "upload"],
+            icon: ImageIcon,
+            apply: (_e: Editor) => {
+              // Abrir el file picker nativo mediante el input oculto
+              triggerImageFileInput?.();
+            },
+          },
+        ]
+        : []),
     ];
-  }, [editor]);
+  }, [editor, onUploadImage, triggerImageFileInput]);
 }
- 
+
 // ─── Estilos CSS del editor ───────────────────────────────────────────────────
 // Se inyectan como <style> global una sola vez.
- 
+
 const EDITOR_STYLES = `
 .tf-editor .tiptap {
   outline: none;
@@ -1060,10 +1110,56 @@ const EDITOR_STYLES = `
 .tf-editor .tiptap .ProseMirror-dropcursor {
   border-top: 2px solid #3b82f6;
 }
+
+/* ─── Imágenes ─────────────────────────────────────────────── */
+.tf-editor .tiptap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.10);
+  display: block;
+  margin: 0.75rem 0;
+  transition: box-shadow 0.15s, outline 0.15s;
+  cursor: default;
+}
+.tf-editor .tiptap img.ProseMirror-selectednode {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px #bfdbfe55;
+}
+.dark .tf-editor .tiptap img {
+  box-shadow: 0 1px 8px rgba(0,0,0,0.40);
+}
+
+/* Placeholder de carga (shimmer) */
+.tf-editor .tiptap [data-image-placeholder] {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
+  background-size: 200% 100%;
+  animation: tf-shimmer 1.4s infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+  font-size: 0.85rem;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.dark .tf-editor .tiptap [data-image-placeholder] {
+  background: linear-gradient(90deg, #27272a 25%, #3f3f46 50%, #27272a 75%);
+  background-size: 200% 100%;
+  color: #71717a;
+}
+@keyframes tf-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 `;
- 
+
 // ─── Componente principal ─────────────────────────────────────────────────────
- 
+
 export function TicketRichEditor({
   value,
   placeholder = "Escribe algo, o presiona '/' para insertar un bloque...",
@@ -1073,15 +1169,28 @@ export function TicketRichEditor({
   onChange,
   onFocus,
   onBlur,
+  onUploadImage,
 }: TicketRichEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const onChangeRef = useRef(onChange);
+  const onUploadImageRef = useRef(onUploadImage);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
- 
+
+  useEffect(() => {
+    onUploadImageRef.current = onUploadImage;
+  }, [onUploadImage]);
+
+  // Función estable para lanzar el input file
+  const triggerImageFileInput = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
   // Calcular la posición X de los controles flotantes
   useEffect(() => {
     if (!containerRef.current) return;
@@ -1102,31 +1211,38 @@ export function TicketRichEditor({
 
     return () => ro.disconnect();
   }, []);
- 
+
   // Slash command state
   const [slashMenu, setSlashMenu] = useState<BlockMenuState>({
     open: false,
     x: 0,
     y: 0,
   });
- 
+
   const handleSlashTrigger = useCallback(
     (coords: { x: number; y: number }) => {
       setSlashMenu({ open: true, x: coords.x, y: coords.y });
     },
     []
   );
- 
+
   const handleSlashClose = useCallback(() => {
     setSlashMenu({ open: false, x: 0, y: 0 });
   }, []);
- 
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
         // Deshabilitar dropcursor del StarterKit para usar el nuestro
         dropcursor: false,
+      }),
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+        HTMLAttributes: {
+          class: "tf-image",
+        },
       }),
       Link.configure({
         openOnClick: false,
@@ -1147,6 +1263,57 @@ export function TicketRichEditor({
         onTrigger: handleSlashTrigger,
         onClose: handleSlashClose,
       }),
+      // ─── Extensión de upload de imágenes ──────────────────────────────────
+      Extension.create({
+        name: "imageUpload",
+        addProseMirrorPlugins() {
+          return [
+            new Plugin({
+              key: new PluginKey("imageUpload"),
+              props: {
+                // ── Paste desde portapapeles ──────────────────────────────
+                handlePaste(view, event) {
+                  const items = Array.from(event.clipboardData?.items ?? []);
+                  const imageItem = items.find(
+                    (i) => i.kind === "file" && isImageFile(i.getAsFile()!),
+                  );
+                  if (!imageItem) return false;
+
+                  const file = imageItem.getAsFile();
+                  if (!file) return false;
+
+                  const uploadFn = onUploadImageRef.current;
+                  if (!uploadFn) return false;
+
+                  event.preventDefault();
+                  handleImageUpload(view, file, uploadFn);
+                  return true;
+                },
+                // ── Drop desde explorador de archivos ────────────────────
+                handleDrop(view, event, _slice, moved) {
+                  if (moved) return false;
+                  const files = Array.from(event.dataTransfer?.files ?? []);
+                  const imageFiles = files.filter(isImageFile);
+                  if (imageFiles.length === 0) return false;
+
+                  const uploadFn = onUploadImageRef.current;
+                  if (!uploadFn) return false;
+
+                  event.preventDefault();
+                  const pos = view.posAtCoords({
+                    left: event.clientX,
+                    top: event.clientY,
+                  });
+                  for (const file of imageFiles) {
+                    handleImageUpload(view, file, uploadFn, pos?.pos);
+                  }
+                  return true;
+                },
+              },
+            }),
+          ];
+        },
+      }),
     ],
     // Contenido inicial desde JSON de ProseMirror
     content: value ?? "",
@@ -1165,7 +1332,7 @@ export function TicketRichEditor({
     onBlur: () => onBlur?.(),
     immediatelyRender: false,
   });
- 
+
   // Sincronizar valor externo → editor
   useEffect(() => {
     if (!editor || editor.isFocused) return;
@@ -1174,15 +1341,15 @@ export function TicketRichEditor({
     if (current === incoming) return;
     editor.commands.setContent(value ?? "", false);
   }, [editor, value]);
- 
+
   // Sincronizar editable
   useEffect(() => {
     if (!editor) return;
     editor.setEditable(!disabled && !isLocked);
   }, [editor, disabled, isLocked]);
- 
-  const BLOCK_OPTIONS = useBlockOptions(editor);
- 
+
+  const BLOCK_OPTIONS = useBlockOptions(editor, onUploadImage, triggerImageFileInput);
+
   const handleSlashSelect = useCallback(
     (option: BlockOption) => {
       if (!editor) return;
@@ -1200,7 +1367,7 @@ export function TicketRichEditor({
     },
     [editor]
   );
- 
+
   return (
     <div className="relative">
       <style suppressHydrationWarning>{EDITOR_STYLES}</style>
@@ -1209,12 +1376,58 @@ export function TicketRichEditor({
           {lockHint ?? "Otro usuario está editando este contenido."}
         </p>
       )}
- 
+
+      {/* Input file oculto para selección manual de imagen */}
+      {onUploadImage && !disabled && !isLocked && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ALLOWED_IMAGE_TYPES.join(",")}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !editor) return;
+            // Resetear para permitir seleccionar el mismo archivo de nuevo
+            e.target.value = "";
+
+            const error = validateImageFile(file);
+            if (error) {
+              const { default: toast } = await import("react-hot-toast");
+              toast.error(error);
+              return;
+            }
+
+            setIsUploading(true);
+            try {
+              handleImageUpload(editor.view, file, onUploadImage);
+            } finally {
+              // El estado de carga se controla dentro de handleImageUpload
+              setIsUploading(false);
+            }
+          }}
+        />
+      )}
+
+      {/* Indicador de carga de imagen */}
+      {isUploading && (
+        <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-500" />
+          Subiendo imagen...
+        </div>
+      )}
+
       {/* Controles flotantes por bloque (hover) */}
       {editor && !disabled && !isLocked && (
-        <BlockControls editor={editor} disabled={disabled || isLocked} />
+        <BlockControls
+          editor={editor}
+          disabled={disabled || isLocked}
+          onUploadImage={onUploadImage}
+          triggerImageFileInput={triggerImageFileInput}
+        />
       )}
- 
+
       {/* Área del editor */}
       <div
         ref={containerRef}
@@ -1232,7 +1445,7 @@ export function TicketRichEditor({
       >
         <EditorContent editor={editor} />
       </div>
- 
+
       {/* Menú de slash command */}
       {slashMenu.open && editor && (
         <BlockMenu
@@ -1246,4 +1459,74 @@ export function TicketRichEditor({
       )}
     </div>
   );
+}
+
+// ─── Helper: inserta imagen con preview optimista → reemplaza con URL real ─────
+//
+// Flujo:
+//   1. Crea una object URL local (blob://) como preview inmediato.
+//   2. Inserta el nodo `image` en el editor con esa URL temporal.
+//   3. Llama a uploadFn(file) → URL permanente de MinIO.
+//   4. Reemplaza el src de blob:// por la URL real.
+//   5. Si falla, elimina el nodo y muestra un toast de error.
+
+function handleImageUpload(
+  view: Editor["view"],
+  file: File,
+  uploadFn: ImageUploadFn,
+  insertAtPos?: number,
+) {
+  const { state } = view;
+  const imageNodeType = state.schema.nodes.image;
+  if (!imageNodeType) return;
+
+  // Preview local instantáneo
+  const objectUrl = URL.createObjectURL(file);
+  const previewNode = imageNodeType.create({
+    src: objectUrl,
+    alt: file.name,
+    title: "__uploading__",
+  });
+
+  const { tr } = state;
+  const pos = insertAtPos ?? state.selection.from;
+  tr.insert(pos, previewNode);
+  view.dispatch(tr);
+
+  // Upload al servidor
+  uploadFn(file)
+    .then((publicUrl) => {
+      // Buscar y reemplazar el nodo con la URL temporal
+      const { state: nextState } = view;
+      nextState.doc.descendants((node, nodePos) => {
+        if (
+          node.type.name === "image" &&
+          node.attrs.src === objectUrl
+        ) {
+          const update = view.state.tr.setNodeMarkup(nodePos, undefined, {
+            ...node.attrs,
+            src: publicUrl,
+            title: undefined,
+          });
+          view.dispatch(update);
+          URL.revokeObjectURL(objectUrl);
+        }
+      });
+    })
+    .catch(async () => {
+      // Eliminar el nodo placeholder en caso de error
+      const { state: errState } = view;
+      errState.doc.descendants((node, nodePos) => {
+        if (
+          node.type.name === "image" &&
+          node.attrs.src === objectUrl
+        ) {
+          const removal = view.state.tr.delete(nodePos, nodePos + node.nodeSize);
+          view.dispatch(removal);
+          URL.revokeObjectURL(objectUrl);
+        }
+      });
+      const { default: toast } = await import("react-hot-toast");
+      toast.error("No se pudo subir la imagen.");
+    });
 }

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/shadcn/dialog";
 import { Input } from "@/components/ui/shadcn/input";
 import { Label } from "@/components/ui/shadcn/label";
-import { TicketRichEditor } from "@/features/tickets/components/TicketRichEditor";
+import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import { useCollaborativeField } from "../hooks/useCollaborativeField";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { Column } from "@/features/projects/types/project.types";
@@ -62,6 +62,8 @@ interface TicketDetailProps {
   onUnlockField?: (field: CollaborativeField) => void;
   onTypingField?: (field: CollaborativeField, value: string) => void;
   onDelete?: () => Promise<void>;
+  /** Función para subir imágenes al servidor desde el editor de contenido. */
+  onUploadImage?: ImageUploadFn;
 }
 
 function toDateInput(isoDate: string | null): string {
@@ -248,6 +250,7 @@ export function TicketDetail({
   onUnlockField,
   onTypingField,
   onDelete,
+  onUploadImage,
 }: TicketDetailProps) {
   const [draftState, dispatch] = useReducer(draftReducer, initialDraft);
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
@@ -719,6 +722,7 @@ export function TicketDetail({
                     ? `${unifiedEditorLockOwner} esta editando este ticket, por favor espera.`
                     : undefined
                 }
+                onUploadImage={onUploadImage}
                 onChange={(next) => {
                   if (activeFieldRef.current !== "description") {
                     return;

@@ -8,6 +8,7 @@ import { ListView } from "@/features/tickets/components/ListView";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
+import { uploadTicketImage } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -228,6 +229,12 @@ export default function ListPage() {
     sendSocketMessage({ action: "typing", field, value });
   }, [sendSocketMessage]);
 
+  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
+    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
+    const result = await uploadTicketImage(projectId, selectedTicketId, file);
+    return result.url;
+  }, [projectId, selectedTicketId]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -254,6 +261,7 @@ export default function ListPage() {
         onLockField={handleLockField}
         onUnlockField={handleUnlockField}
         onTypingField={handleTypingField}
+        onUploadImage={canMutate ? handleUploadImage : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />
     </div>

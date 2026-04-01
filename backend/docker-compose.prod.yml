@@ -69,6 +69,8 @@ services:
       - minio_init
     environment:
       DJANGO_ENV: prod
+      DJANGO_SETTINGS_MODULE: config.settings.base
+      RUN_MIGRATIONS: "true"
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-to-a-secure-key-in-production}
       DJANGO_DEBUG: "False"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
@@ -106,6 +108,7 @@ services:
       - redis
     environment:
       DJANGO_ENV: prod
+      DJANGO_SETTINGS_MODULE: config.settings.base
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-change-me-to-a-secure-key-in-production}
       DJANGO_DEBUG: "False"
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}

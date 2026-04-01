@@ -28,7 +28,9 @@ export function useWebSocket(path: string, options: UseWebSocketOptions = {}) {
     let reconnectCount = 0;
     let manualClose = false;
 
-    const base = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000/ws";
+    const apiBaseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api/v1";
+    const derivedWsUrl = apiBaseUrl.replace("http", "ws").replace("/api/v1", "/ws");
+    const base = import.meta.env.VITE_WS_URL ?? derivedWsUrl;
 
     const connect = () => {
       if (manualClose) {

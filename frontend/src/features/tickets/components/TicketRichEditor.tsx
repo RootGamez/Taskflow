@@ -20,6 +20,9 @@ import {
   Plus,
   Quote,
   Minus,
+  Link as LinkIcon,
+  Trash2,
+  ExternalLink
 } from "lucide-react";
 import {
   EditorContent,
@@ -32,12 +35,16 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import { BookmarkExtension } from "./BookmarkExtension";
+import { BubbleMenu } from "@tiptap/react";
 import Dropcursor from "@tiptap/extension-dropcursor";
 import StarterKit from "@tiptap/starter-kit";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -89,9 +96,10 @@ interface BlockOption {
 
 interface BlockMenuState {
   open: boolean;
-  // posición en coordenadas de la ventana, para el portal
   x: number;
   y: number;
+  query: string;
+  startPos: number; // Posición donde se escribió el "/"
 }
 
 // ─── Helpers de bloques ───────────────────────────────────────────────────────
@@ -161,7 +169,7 @@ function moveBlock(editor: Editor, direction: "up" | "down") {
 // y notifica para abrir el menú de bloques.
 
 interface SlashCommandOptions {
-  onTrigger: (coords: { x: number; y: number }) => void;
+  onTrigger: (coords: { x: number; y: number }, from: number) => void;
   onClose: () => void;
 }
 
@@ -181,8 +189,35 @@ const SlashCommandExtension = Extension.create<SlashCommandOptions>({
     return [
       new Plugin({
         key: new PluginKey("slashCommand"),
+        state: {
+          init() { return { active: false, startPos: 0 }; },
+          apply(tr, value) {
+            const meta = tr.getMeta("slash-active");
+            if (meta !== undefined) {
+              return { active: meta.active, startPos: meta.startPos ?? value.startPos };
+            }
+            return value;
+          }
+        },
         props: {
           handleKeyDown(view, event) {
+            const pluginState = this.getState(view.state);
+            
+            // Si está activo, interceptar teclas de navegación para el BubbleMenu
+            if (pluginState?.active) {
+              if (["ArrowUp", "ArrowDown", "Enter"].includes(event.key)) {
+                // Dispatch a custom event to window so BlockMenu can handle it
+                const customEvent = new CustomEvent('tf-slash-keydown', { detail: { key: event.key } });
+                window.dispatchEvent(customEvent);
+                return true; // prevent editor from doing anything
+              }
+              if (event.key === "Escape") {
+                view.dispatch(view.state.tr.setMeta("slash-active", { active: false }));
+                onClose();
+                return true;
+              }
+            }
+
             if (event.key !== "/") return false;
 
             const { selection, doc } = view.state;
@@ -195,15 +230,10 @@ const SlashCommandExtension = Extension.create<SlashCommandOptions>({
 
             // Calcular posición del cursor en pantalla
             const coords = view.coordsAtPos(from);
-            onTrigger({ x: coords.left, y: coords.bottom });
+            view.dispatch(view.state.tr.setMeta("slash-active", { active: true, startPos: from }));
+            onTrigger({ x: coords.left, y: coords.bottom }, from);
 
-            return false; // No consumir el evento — el "/" igual se escribe y lo borramos
-          },
-          handleTextInput(_view, _from, _to, text) {
-            if (text !== "/") {
-              onClose();
-            }
-            return false;
+            return false; // No consumir el evento — el "/" se escribe
           },
         },
       }),
@@ -290,24 +320,28 @@ interface BlockMenuProps {
   x: number;
   y: number;
   portalContainer?: HTMLElement | null;
+  /** Si isSlash=true, no mostramos <input> y usamos searchProp */
+  isSlash?: boolean;
+  searchProp?: string;
 }
 
-function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockMenuProps) {
-  const [search, setSearch] = useState("");
+function BlockMenu({ options, onSelect, onClose, x, y, portalContainer, isSlash = false, searchProp = "" }: BlockMenuProps) {
+  const [localSearch, setLocalSearch] = useState("");
+  const search = isSlash ? searchProp : localSearch;
+  
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPointerOverList, setIsPointerOverList] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      inputRef.current?.focus();
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, []);
+    if (!isSlash) {
+      const timer = window.setTimeout(() => {
+        inputRef.current?.focus();
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isSlash]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -343,31 +377,39 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
   );
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
+    const handleKey = (e: KeyboardEvent | CustomEvent) => {
+      const key = 'detail' in e ? (e as CustomEvent).detail.key : (e as KeyboardEvent).key;
+      if (key === "Escape") {
+        if ('preventDefault' in e) e.preventDefault();
         onClose();
         return;
       }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
+      if (key === "ArrowDown") {
+        if ('preventDefault' in e) e.preventDefault();
         setActiveIndex((i) => Math.min(i + 1, flatFiltered.length - 1));
         return;
       }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
+      if (key === "ArrowUp") {
+        if ('preventDefault' in e) e.preventDefault();
         setActiveIndex((i) => Math.max(i - 1, 0));
         return;
       }
-      if (e.key === "Enter") {
-        e.preventDefault();
+      if (key === "Enter") {
+        if ('preventDefault' in e) e.preventDefault();
         const selected = flatFiltered[activeIndex];
         if (selected) onSelect(selected);
         return;
       }
     };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    
+    // Listen to real keydowns (for + button) and custom events (for slash menu)
+    window.addEventListener("keydown", handleKey as EventListener);
+    window.addEventListener("tf-slash-keydown", handleKey as EventListener);
+    
+    return () => {
+      window.removeEventListener("keydown", handleKey as EventListener);
+      window.removeEventListener("tf-slash-keydown", handleKey as EventListener);
+    };
   }, [activeIndex, flatFiltered, onClose, onSelect]);
 
   useEffect(() => {
@@ -416,16 +458,18 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
         ref={containerRef}
         className="w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
       >
-        {/* Buscador */}
-        <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar bloques..."
-            className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-          />
-        </div>
+        {/* Buscador (solo si NO es slash menu) */}
+        {!isSlash && (
+          <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
+            <Input
+              ref={inputRef}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              placeholder="Buscar bloques..."
+              className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500 border-none shadow-none focus-visible:ring-0 px-0 h-auto"
+            />
+          </div>
+        )}
 
         {/* Lista de opciones */}
         <div
@@ -446,12 +490,12 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
                   const idx = globalIndex++;
                   const Icon = option.icon;
                   return (
-                    <button
+                    <Button
                       key={option.id}
                       data-index={idx}
-                      type="button"
+                      variant="ghost"
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition",
+                        "flex w-full items-center justify-start gap-3 rounded-lg px-2 py-1.5 text-left transition h-auto font-normal",
                         idx === activeIndex
                           ? "bg-zinc-100 dark:bg-zinc-800"
                           : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
@@ -474,7 +518,7 @@ function BlockMenu({ options, onSelect, onClose, x, y, portalContainer }: BlockM
                           {option.description}
                         </span>
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -521,11 +565,11 @@ function BlockActionsMenu({
     <FloatingPortal x={x} y={y} container={portalContainer}>
       <div
         ref={ref}
-        className="w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900"
+        className="w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 flex flex-col items-stretch"
       >
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        <Button
+          variant="ghost"
+          className="flex w-full items-center justify-start gap-2 px-3 py-1.5 text-sm font-normal text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800 h-auto rounded-none"
           onPointerDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -534,10 +578,10 @@ function BlockActionsMenu({
           }}
         >
           ↑ Mover arriba
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        </Button>
+        <Button
+          variant="ghost"
+          className="flex w-full items-center justify-start gap-2 px-3 py-1.5 text-sm font-normal text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800 h-auto rounded-none"
           onPointerDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -546,11 +590,11 @@ function BlockActionsMenu({
           }}
         >
           ↓ Mover abajo
-        </button>
+        </Button>
         <div className="mx-2 my-1 border-t border-zinc-100 dark:border-zinc-800" />
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+        <Button
+          variant="ghost"
+          className="flex w-full items-center justify-start gap-2 px-3 py-1.5 text-sm font-normal text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 h-auto rounded-none"
           onPointerDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -559,7 +603,7 @@ function BlockActionsMenu({
           }}
         >
           Eliminar bloque
-        </button>
+        </Button>
       </div>
     </FloatingPortal>
   );
@@ -584,6 +628,8 @@ function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput 
     open: false,
     x: 0,
     y: 0,
+    query: "",
+    startPos: 0,
   });
   const [actionsMenu, setActionsMenu] = useState<{
     open: boolean;
@@ -683,6 +729,8 @@ function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput 
         open: true,
         x: e.clientX + 8,
         y: e.clientY,
+        query: "",
+        startPos: 0,
       });
     },
     [editor, hoveredBlockIndex]
@@ -725,7 +773,7 @@ function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput 
         option.apply(editor);
       }
 
-      setBlockMenu({ open: false, x: 0, y: 0 });
+      setBlockMenu({ open: false, x: 0, y: 0, query: "", startPos: 0 });
 
       // Si el bloque se abrió via slash command, borrar el "/"
       const { state } = editor;
@@ -784,26 +832,28 @@ function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput 
             }
           }}
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             aria-label="Agregar bloque"
             title="Agregar bloque"
-            className="inline-flex h-6 w-6 items-center justify-center rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="h-6 w-6 rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 bg-transparent px-0"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openBlockMenu}
           >
             <Plus className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             aria-label="Opciones de bloque"
             title="Mover o eliminar bloque"
-            className="inline-flex h-6 w-6 cursor-grab items-center justify-center rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="h-6 w-6 cursor-grab rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200 bg-transparent px-0"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openActionsMenu}
           >
             <GripVertical className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -812,7 +862,7 @@ function BlockControls({ editor, disabled, onUploadImage, triggerImageFileInput 
         <BlockMenu
           options={BLOCK_OPTIONS}
           onSelect={handleSelectBlock}
-          onClose={() => setBlockMenu({ open: false, x: 0, y: 0 })}
+          onClose={() => setBlockMenu({ open: false, x: 0, y: 0, query: "", startPos: 0 })}
           x={blockMenu.x}
           y={blockMenu.y}
           portalContainer={portalContainer}
@@ -925,6 +975,20 @@ function useBlockOptions(
         keywords: ["code", "codigo", "snippet", "bloque", "pre"],
         icon: Code2,
         apply: (e) => e.chain().focus().toggleCodeBlock().run(),
+      },
+      {
+        id: "bookmark",
+        label: "Enlace visual",
+        description: "Tarjeta de vista previa web",
+        group: "advanced",
+        keywords: ["bookmark", "enlace", "link", "tarjeta", "card", "ogp"],
+        icon: LinkIcon,
+        apply: (e) => {
+          const url = window.prompt("Introduce la URL para previsualizar:");
+          if (url) {
+            e.chain().focus().insertContent({ type: "bookmark", attrs: { url } }).run();
+          }
+        },
       },
       // ─── Media ──────────────────────────────────────────────────────────────
       ...(onUploadImage
@@ -1196,10 +1260,12 @@ export function TicketRichEditor({
     if (!containerRef.current) return;
     const updateLeft = () => {
       const rect = containerRef.current!.getBoundingClientRect();
-      // Los botones van a 52px a la izquierda del borde del contenedor
+      // En móvil aseguramos que nunca se salga de la pantalla usando Math.max
+      // Ponemos los botones dentro del padding izquierdo del contenedor (a 8px del borde izquierdo)
+      const leftPos = Math.max(4, rect.left + 8);
       containerRef.current!.style.setProperty(
         "--editor-controls-left",
-        `${rect.left - 56}px`
+        `${leftPos}px`
       );
     };
     updateLeft();
@@ -1217,17 +1283,19 @@ export function TicketRichEditor({
     open: false,
     x: 0,
     y: 0,
+    query: "",
+    startPos: 0,
   });
 
   const handleSlashTrigger = useCallback(
-    (coords: { x: number; y: number }) => {
-      setSlashMenu({ open: true, x: coords.x, y: coords.y });
+    (coords: { x: number; y: number }, from: number) => {
+      setSlashMenu({ open: true, x: coords.x, y: coords.y, query: "", startPos: from });
     },
     []
   );
 
   const handleSlashClose = useCallback(() => {
-    setSlashMenu({ open: false, x: 0, y: 0 });
+    setSlashMenu({ open: false, x: 0, y: 0, query: "", startPos: 0 });
   }, []);
 
   const editor = useEditor({
@@ -1248,6 +1316,9 @@ export function TicketRichEditor({
         openOnClick: false,
         autolink: true,
         defaultProtocol: "https",
+        HTMLAttributes: {
+          class: "cursor-pointer font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline underline-offset-2",
+        },
       }),
       Placeholder.configure({
         placeholder,
@@ -1263,6 +1334,7 @@ export function TicketRichEditor({
         onTrigger: handleSlashTrigger,
         onClose: handleSlashClose,
       }),
+      BookmarkExtension,
       // ─── Extensión de upload de imágenes ──────────────────────────────────
       Extension.create({
         name: "imageUpload",
@@ -1321,6 +1393,8 @@ export function TicketRichEditor({
     onUpdate: ({ editor: e }) => {
       // Emitir JSON, no HTML
       onChangeRef.current(e.getJSON() as Record<string, unknown>);
+
+      // Ya no filtramos el texto con onUpdate, usaremos el buscador interno interactivo del menú para mejor confiabilidad
     },
     editorProps: {
       attributes: {
@@ -1358,15 +1432,28 @@ export function TicketRichEditor({
       const slashIndex = textBefore.lastIndexOf("/");
 
       if (slashIndex !== -1) {
+        // En prosemirror, hay que borrar desde la base del parent + slashIndex
         const absoluteSlashPos = $from.start() + slashIndex;
         editor.commands.deleteRange({ from: absoluteSlashPos, to: $from.pos });
       }
 
       option.apply(editor);
-      setSlashMenu({ open: false, x: 0, y: 0 });
+      handleSlashClose();
     },
-    [editor]
+    [editor, handleSlashClose]
   );
+
+  // Link BubbleMenu state
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkInputUrl, setLinkInputUrl] = useState("");
+
+  const setLink = useCallback(() => {
+    if (linkInputUrl) {
+      editor?.chain().focus().setLink({ href: linkInputUrl, target: "_blank" }).run();
+    }
+    setEditingLink(false);
+    setLinkInputUrl("");
+  }, [editor, linkInputUrl]);
 
   return (
     <div className="relative">
@@ -1433,8 +1520,8 @@ export function TicketRichEditor({
         ref={containerRef}
         className={cn(
           "tf-editor relative cursor-text",
-          // Padding izquierdo generoso para que los botones no sobrepongan el texto
-          "pl-6",
+          // Padding izquierdo extra en móvil para que los botones entren y no sobrepongan el texto
+          "pl-14 sm:pl-16",
           disabled && "pointer-events-none opacity-60"
         )}
         onClick={(e) => {
@@ -1446,6 +1533,73 @@ export function TicketRichEditor({
         <EditorContent editor={editor} />
       </div>
 
+      {/* Menú de Bubble de Enlaces */}
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          tippyOptions={{ duration: 100, placement: "bottom", maxWidth: 400 }}
+          shouldShow={({ editor }) => {
+            return editor.isActive("link");
+          }}
+          className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50 p-1"
+        >
+          {editingLink ? (
+            <div className="flex items-center gap-2 p-1">
+              <Input
+                autoFocus
+                type="url"
+                value={linkInputUrl}
+                onChange={(e) => setLinkInputUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") setLink();
+                  if (e.key === "Escape") setEditingLink(false);
+                }}
+                className="w-64 h-8"
+                placeholder="https://..."
+              />
+              <Button
+                onClick={setLink}
+                size="sm"
+                className="bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Guardar
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 p-1">
+              <a
+                href={editor.getAttributes("link").href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 max-w-[200px] truncate px-3 py-1.5 text-sm text-blue-600 hover:bg-zinc-100 dark:text-blue-400 dark:hover:bg-zinc-800 rounded-md transition"
+              >
+                <ExternalLink className="h-4 w-4 shrink-0" />
+                <span className="truncate">{editor.getAttributes("link").href}</span>
+              </a>
+              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1"></div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setLinkInputUrl(editor.getAttributes('link').href || ''); setEditingLink(true); }}
+                className="h-7 w-7 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition rounded-md"
+                title="Editar enlace"
+              >
+                <LinkIcon className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => editor.chain().focus().unsetLink().run()}
+                className="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 transition rounded-md"
+                title="Eliminar enlace"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </BubbleMenu>
+      )}
+
       {/* Menú de slash command */}
       {slashMenu.open && editor && (
         <BlockMenu
@@ -1455,6 +1609,8 @@ export function TicketRichEditor({
           x={slashMenu.x}
           y={slashMenu.y}
           portalContainer={portalContainer}
+          // Usamos el buscador estándar para dar confiabilidad
+          isSlash={false}
         />
       )}
     </div>

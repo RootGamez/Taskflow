@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.tickets.views import TicketDetailView, TicketImageUploadView, TicketListCreateView, TicketSingleView
+from apps.tickets.views import TicketDetailView, TicketImageUploadView, TicketVideoUploadView, TicketListCreateView, TicketSingleView
 
 urlpatterns = [
     path(
@@ -17,6 +17,11 @@ urlpatterns = [
         "projects/<uuid:project_id>/tickets/<uuid:ticket_id>/images/",
         TicketImageUploadView.as_view(),
         name="ticket-image-upload",
+    ),
+    path(
+        "projects/<uuid:project_id>/tickets/<uuid:ticket_id>/videos/",
+        TicketVideoUploadView.as_view(),
+        name="ticket-video-upload",
     ),
     path(
         "tickets/<uuid:ticket_id>/",

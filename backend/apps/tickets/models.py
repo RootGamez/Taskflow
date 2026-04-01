@@ -101,3 +101,32 @@ class TicketImage(models.Model):
 
 	def __str__(self) -> str:
 		return f"{self.ticket_id} - {self.file_name or self.id}"
+
+
+class TicketVideo(models.Model):
+	"""Video subido al contenido de un ticket, almacenado en MinIO."""
+
+	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+	ticket = models.ForeignKey(
+		Ticket,
+		on_delete=models.CASCADE,
+		related_name="videos",
+	)
+	uploaded_by = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		related_name="uploaded_ticket_videos",
+	)
+	object_key = models.CharField(max_length=512)
+	url = models.URLField(max_length=2000)
+	file_name = models.CharField(max_length=255, blank=True)
+	content_type = models.CharField(max_length=100, blank=True)
+	file_size = models.PositiveIntegerField(default=0)  # bytes
+	created_at = models.DateTimeField(default=timezone.now)
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self) -> str:
+		return f"{self.ticket_id} - {self.file_name or self.id}"

@@ -15,9 +15,9 @@ from rest_framework.views import APIView
 
 from apps.projects.models import Project
 from apps.tickets.consumers import TicketConsumer
-from apps.tickets.models import Ticket, TicketFieldLock, TicketImage
+from apps.tickets.models import Ticket, TicketFieldLock, TicketImage, TicketVideo
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
-from apps.tickets.storage import upload_ticket_image
+from apps.tickets.storage import upload_ticket_image, upload_ticket_video
 from apps.workspaces.access import WorkspaceRoleAccessMixin
 
 
@@ -213,5 +213,54 @@ class TicketImageUploadView(WorkspaceRoleAccessMixin, APIView):
 
 		return Response(
 			{"url": ticket_image.url, "id": str(ticket_image.id)},
+			status=status.HTTP_201_CREATED,
+		)
+
+class TicketVideoUploadView(WorkspaceRoleAccessMixin, APIView):
+	"""Recibe un video, lo sube a MinIO y devuelve la URL pública.
+
+	Endpoint: POST /api/v1/projects/<project_id>/tickets/<ticket_id>/videos/
+	Body: multipart/form-data con campo 'video'.
+	Respuesta 201: { "url": "https://..." }
+	"""
+
+	permission_classes = [IsAuthenticated]
+	parser_classes = [MultiPartParser, FormParser]
+
+	def post(self, request: Request, project_id: str, ticket_id: str) -> Response:
+		project = self.get_project_for_user(request, project_id)
+		self.assert_project_write_access(request, project)
+
+		ticket = project.tickets.filter(id=ticket_id).first()
+		if ticket is None:
+			raise NotFound("Ticket no encontrado.")
+
+		video_file = request.FILES.get("video")
+		if video_file is None:
+			raise ValidationError({"detail": "Debes adjuntar un campo 'video'."})
+
+		try:
+			object_key, public_url = upload_ticket_video(
+				video_file,
+				ticket_id=str(ticket.id),
+				user_id=str(request.user.id),
+			)
+		except ValueError as exc:
+			raise ValidationError({"detail": str(exc)}) from exc
+		except Exception as exc:
+			raise ValidationError({"detail": "No se pudo subir el video."}) from exc
+
+		ticket_video = TicketVideo.objects.create(
+			ticket=ticket,
+			uploaded_by=request.user,
+			object_key=object_key,
+			url=public_url,
+			file_name=video_file.name or "",
+			content_type=video_file.content_type or "",
+			file_size=video_file.size or 0,
+		)
+
+		return Response(
+			{"url": ticket_video.url, "id": str(ticket_video.id)},
 			status=status.HTTP_201_CREATED,
 		)

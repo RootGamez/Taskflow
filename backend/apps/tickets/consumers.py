@@ -138,16 +138,17 @@ class TicketConsumer(BaseJWTConsumer):
             await self.send_json({"type": "field.snapshot", "locks": locks})
 
     async def disconnect(self, close_code):
-        released_fields = await self._release_all_locks_for_user()
-        for field in released_fields:
-            await self.channel_layer.group_send(
-                self.group_name,
-                {
-                    "type": "field.released",
-                    "field": field,
-                    "user_id": self.user_id,
-                },
-            )
+        if hasattr(self, "user_id"):
+            released_fields = await self._release_all_locks_for_user()
+            for field in released_fields:
+                await self.channel_layer.group_send(
+                    self.group_name,
+                    {
+                        "type": "field.released",
+                        "field": field,
+                        "user_id": self.user_id,
+                    },
+                )
 
         if hasattr(self, "group_name"):
             await self.channel_layer.group_discard(self.group_name, self.channel_name)

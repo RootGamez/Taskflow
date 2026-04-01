@@ -1,0 +1,17 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        # Se requiere setear esta variable de entorno en la terminal antes de construir:
+        # export VITE_API_URL="https://api.tudominio.com"
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    container_name: taskflow_frontend_prod
+    restart: unless-stopped
+    networks:
+      - proxy_network
+
+networks:
+  proxy_network:
+    external: true

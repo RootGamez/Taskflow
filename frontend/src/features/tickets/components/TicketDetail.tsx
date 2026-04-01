@@ -64,6 +64,8 @@ interface TicketDetailProps {
   onDelete?: () => Promise<void>;
   /** Función para subir imágenes al servidor desde el editor de contenido. */
   onUploadImage?: ImageUploadFn;
+  /** Función para subir videos al servidor desde el editor de contenido. */
+  onUploadVideo?: ImageUploadFn;
 }
 
 function toDateInput(isoDate: string | null): string {
@@ -251,6 +253,7 @@ export function TicketDetail({
   onTypingField,
   onDelete,
   onUploadImage,
+  onUploadVideo,
 }: TicketDetailProps) {
   const [draftState, dispatch] = useReducer(draftReducer, initialDraft);
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
@@ -723,6 +726,7 @@ export function TicketDetail({
                     : undefined
                 }
                 onUploadImage={onUploadImage}
+                onUploadVideo={onUploadVideo}
                 onChange={(next) => {
                   if (activeFieldRef.current !== "description") {
                     return;

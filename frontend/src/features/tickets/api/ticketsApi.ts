@@ -26,6 +26,11 @@ export interface UploadTicketImageResponse {
   id: string;
 }
 
+export interface UploadTicketVideoResponse {
+  url: string;
+  id: string;
+}
+
 export async function getTicketsByProject(projectId: string): Promise<Ticket[]> {
   const { data } = await apiClient.get<Ticket[]>(`/projects/${projectId}/tickets/`);
   return data;
@@ -67,6 +72,25 @@ export async function uploadTicketImage(
 
   const { data } = await apiClient.post<UploadTicketImageResponse>(
     `/projects/${projectId}/tickets/${ticketId}/images/`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
+  return data;
+}
+
+/**
+ * Sube un video al ticket y devuelve la URL pública de MinIO.
+ */
+export async function uploadTicketVideo(
+  projectId: string,
+  ticketId: string,
+  file: File,
+): Promise<UploadTicketVideoResponse> {
+  const formData = new FormData();
+  formData.append("video", file);
+
+  const { data } = await apiClient.post<UploadTicketVideoResponse>(
+    `/projects/${projectId}/tickets/${ticketId}/videos/`,
     formData,
     { headers: { "Content-Type": "multipart/form-data" } },
   );

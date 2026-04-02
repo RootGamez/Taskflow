@@ -361,7 +361,14 @@ class TicketConsumer(BaseJWTConsumer):
                 message = "No se pudo actualizar el ticket."
             return {"error": message}
 
-        updated_ticket = serializer.save()
+        serializer.save()
+
+        # Re-fetch with all relations to ensure assignees are populated correctly
+        updated_ticket = (
+            Ticket.objects.select_related("project", "column", "created_by")
+            .prefetch_related("assignees")
+            .get(id=ticket_id)
+        )
         serialized_ticket = TicketSerializer(updated_ticket).data
         return {"ticket": serialized_ticket, "project_id": str(serialized_ticket["project_id"])}
 

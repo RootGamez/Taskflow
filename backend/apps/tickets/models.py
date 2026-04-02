@@ -31,6 +31,11 @@ class Ticket(models.Model):
 		null=True,
 		related_name="created_tickets",
 	)
+	assignees = models.ManyToManyField(
+		settings.AUTH_USER_MODEL,
+		related_name="assigned_tickets",
+		blank=True,
+	)
 	title = models.CharField(max_length=255)
 	description = models.TextField(blank=True)
 	progress_notes = models.TextField(blank=True)

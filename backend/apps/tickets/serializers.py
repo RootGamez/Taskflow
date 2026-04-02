@@ -6,6 +6,7 @@ from rest_framework import serializers
 
 from apps.projects.models import ProjectColumn
 from apps.tickets.models import Ticket
+from apps.users.serializers import UserSerializer
 
 
 def normalize_ticket_positions(ticket: Ticket, target_column: ProjectColumn, requested_order: int | None) -> tuple[ProjectColumn, int]:
@@ -48,7 +49,7 @@ class TicketSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
     column_id = serializers.UUIDField(source="column.id", read_only=True)
     created_by = serializers.SerializerMethodField()
-    assignees = serializers.SerializerMethodField()
+    assignees = UserSerializer(many=True, read_only=True)
     labels = serializers.SerializerMethodField()
 
     class Meta:
@@ -73,9 +74,6 @@ class TicketSerializer(serializers.ModelSerializer):
     def get_created_by(self, obj: Ticket):
         return str(obj.created_by_id) if obj.created_by_id else None
 
-    def get_assignees(self, _obj: Ticket):
-        return []
-
     def get_labels(self, _obj: Ticket):
         return []
 
@@ -94,6 +92,11 @@ class TicketCreateSerializer(serializers.Serializer):
     due_date = serializers.DateTimeField(required=False, allow_null=True)
     column_id = serializers.UUIDField(required=False)
     order = serializers.IntegerField(required=False, min_value=1)
+    assignee_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
 
     def validate_column_id(self, value):
         project = self.context["project"]
@@ -122,7 +125,7 @@ class TicketCreateSerializer(serializers.Serializer):
 
             project.tickets.filter(column=column, order__gte=target_order).update(order=F("order") + 1)
 
-            return Ticket.objects.create(
+            ticket = Ticket.objects.create(
                 project=project,
                 column=column,
                 created_by=request_user,
@@ -134,6 +137,11 @@ class TicketCreateSerializer(serializers.Serializer):
                 order=target_order,
             )
 
+            if "assignee_ids" in validated_data:
+                ticket.assignees.set(validated_data["assignee_ids"])
+
+            return ticket
+
 
 class TicketUpdateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255, required=False)
@@ -143,6 +151,11 @@ class TicketUpdateSerializer(serializers.Serializer):
     due_date = serializers.DateTimeField(required=False, allow_null=True)
     column_id = serializers.UUIDField(required=False)
     order = serializers.IntegerField(required=False, min_value=1)
+    assignee_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
 
     def validate_column_id(self, value):
         project = self.context["project"]
@@ -153,26 +166,26 @@ class TicketUpdateSerializer(serializers.Serializer):
         return value
 
     def update(self, instance: Ticket, validated_data: dict) -> Ticket:
-        for field in ("title", "description", "progress_notes", "priority", "due_date"):
+        # Build update_fields dynamically — only touch what was actually sent in the PATCH
+        scalar_fields = ("title", "description", "progress_notes", "priority", "due_date")
+        fields_to_save: list[str] = []
+        for field in scalar_fields:
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
+                fields_to_save.append(field)
 
         requested_order = validated_data.get("order")
         target_column = self.context.get("target_column", instance.column)
 
         with transaction.atomic():
-            instance.save(
-                update_fields=[
-                    "title",
-                    "description",
-                    "progress_notes",
-                    "priority",
-                    "due_date",
-                    "updated_at",
-                ]
-            )
+            if fields_to_save:
+                instance.save(update_fields=[*fields_to_save, "updated_at"])
 
             if requested_order is not None or target_column.id != instance.column_id:
                 normalize_ticket_positions(instance, target_column, requested_order)
+
+            # Set M2M assignees inside the same transaction for atomicity
+            if "assignee_ids" in validated_data:
+                instance.assignees.set(validated_data["assignee_ids"])
 
         return instance

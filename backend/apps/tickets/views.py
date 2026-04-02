@@ -26,7 +26,11 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 
 	def get(self, request: Request, project_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
-		tickets = project.tickets.select_related("column", "created_by").order_by("column__order", "order", "created_at")
+		tickets = (
+			project.tickets.select_related("column", "created_by")
+			.prefetch_related("assignees")
+			.order_by("column__order", "order", "created_at")
+		)
 		return Response(TicketSerializer(tickets, many=True).data, status=status.HTTP_200_OK)
 
 	def post(self, request: Request, project_id: str) -> Response:
@@ -46,6 +50,7 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 			raise ValidationError({"detail": message})
 
 		ticket = serializer.save()
+		ticket = project.tickets.select_related("column", "created_by").prefetch_related("assignees").get(id=ticket.id)
 		serialized_ticket = TicketSerializer(ticket).data
 
 		channel_layer = get_channel_layer()
@@ -99,6 +104,11 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 			raise ValidationError({"detail": message})
 
 		updated_ticket = serializer.save()
+		updated_ticket = (
+			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			.prefetch_related("assignees")
+			.get(id=updated_ticket.id)
+		)
 
 		channel_layer = get_channel_layer()
 		if channel_layer is not None:
@@ -157,6 +167,7 @@ class TicketSingleView(APIView):
 	def get(self, request: Request, ticket_id: str) -> Response:
 		ticket = (
 			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			.prefetch_related("assignees")
 			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
 			.distinct()
 			.first()

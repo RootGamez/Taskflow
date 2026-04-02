@@ -10,6 +10,7 @@ from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationSerializer
 from apps.workspaces.realtime import send_workspace_event
 from apps.workspaces.models import Workspace, WorkspaceInvitation, WorkspaceMember
+from apps.users.storage import normalize_avatar_url
 
 User = get_user_model()
 
@@ -136,7 +137,7 @@ class WorkspaceMemberSerializer(serializers.ModelSerializer):
     user_id = serializers.UUIDField(source="user.id", read_only=True)
     email = serializers.EmailField(source="user.email", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
-    avatar_url = serializers.CharField(source="user.avatar_url", read_only=True)
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = WorkspaceMember
@@ -152,6 +153,9 @@ class WorkspaceMemberSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = fields
+
+    def get_avatar_url(self, obj: WorkspaceMember):
+        return normalize_avatar_url(obj.user.avatar_url)
 
 
 class WorkspaceMemberInviteSerializer(serializers.Serializer):

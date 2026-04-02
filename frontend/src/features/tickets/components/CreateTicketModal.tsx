@@ -36,7 +36,7 @@ import Dropcursor from "@tiptap/extension-dropcursor";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 import { Button } from "@/components/ui/shadcn/button";
-import { Dialog, DialogContent } from "@/components/ui/shadcn/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
 import type { Priority } from "@/features/tickets/types/ticket.types";
@@ -693,6 +693,13 @@ export function CreateTicketModal({
         className="flex max-h-[92vh] w-full max-w-[860px] flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200/80 p-0 shadow-2xl dark:border-zinc-800"
         onKeyDown={handleKeyDown}
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Nuevo ticket</DialogTitle>
+          <DialogDescription>
+            Formulario para crear un ticket con título, prioridad, fecha y contenido.
+          </DialogDescription>
+        </DialogHeader>
+
         <style suppressHydrationWarning>{MODAL_EDITOR_STYLES}</style>
 
         {/* Hidden file inputs */}

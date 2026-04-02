@@ -86,6 +86,14 @@ function moveBlock(editor: Editor, hoveredIndex: number, direction: "up" | "down
   editor.commands.focus();
 }
 
+function setCursorNear(editor: Editor, pos: number) {
+  const { doc, tr } = editor.state;
+  const safePos = Math.max(1, Math.min(pos, doc.content.size));
+  const resolved = doc.resolve(safePos);
+  editor.view.dispatch(tr.setSelection(TextSelection.near(resolved)));
+  editor.commands.focus();
+}
+
 /** Safely set the cursor to the block so the BlockMenu can insert after it */
 function prepareInsertAfter(editor: Editor, index: number) {
   const range = getBlockRange(editor, index);
@@ -98,11 +106,10 @@ function prepareInsertAfter(editor: Editor, index: number) {
       .chain()
       .focus()
       .insertContentAt(range.to, { type: "paragraph" })
-      .setTextSelection(range.to + 1)
       .run();
+    setCursorNear(editor, range.to + 1);
   } else {
-    editor.commands.setTextSelection(range.to);
-    editor.commands.focus();
+    setCursorNear(editor, range.to + 1);
   }
 }
 
@@ -431,8 +438,7 @@ export function BlockControls({
           if (range.node.isAtom || !range.node.isTextblock) {
             editor.chain().setNodeSelection(range.from - 1).focus().run();
           } else {
-            editor.commands.setTextSelection(range.from);
-            editor.commands.focus();
+            setCursorNear(editor, range.from + 1);
           }
         }
       }

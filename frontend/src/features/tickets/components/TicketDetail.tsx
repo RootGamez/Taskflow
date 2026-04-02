@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/shadcn/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/shadcn/dialog";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
@@ -624,6 +627,13 @@ export function TicketDetail({
           }
         }}
       >
+        <DialogHeader className="sr-only">
+          <DialogTitle>Detalle del ticket</DialogTitle>
+          <DialogDescription>
+            Panel lateral para editar el ticket, sus responsables, prioridad y descripción.
+          </DialogDescription>
+        </DialogHeader>
+
         <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
           <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
             <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>

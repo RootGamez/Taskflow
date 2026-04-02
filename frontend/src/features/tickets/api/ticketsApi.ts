@@ -83,7 +83,6 @@ export async function uploadTicketImage(
   const { data } = await apiClient.post<UploadTicketImageResponse>(
     `/projects/${projectId}/tickets/${ticketId}/images/`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } },
   );
   return data;
 }
@@ -102,7 +101,6 @@ export async function uploadTicketVideo(
   const { data } = await apiClient.post<UploadTicketVideoResponse>(
     `/projects/${projectId}/tickets/${ticketId}/videos/`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } },
   );
   return data;
 }

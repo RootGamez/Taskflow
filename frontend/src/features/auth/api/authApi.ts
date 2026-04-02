@@ -1,6 +1,8 @@
 import type {
   DetailResponse,
+  ForgotPasswordRequestPayload,
   LoginPayload,
+  PasswordResetConfirmPayload,
   RegisterRequestCodePayload,
   RegisterValidateCodePayload,
   RegisterVerifyCodePayload,
@@ -31,6 +33,20 @@ export async function validateRegisterCode(payload: RegisterValidateCodePayload)
 
 export async function getMe(): Promise<User> {
   const { data } = await apiClient.get<User>("/auth/me/");
+  return data;
+}
+
+export async function requestPasswordReset(
+  payload: ForgotPasswordRequestPayload,
+): Promise<DetailResponse> {
+  const { data } = await apiClient.post<DetailResponse>("/auth/password-reset/request/", payload);
+  return data;
+}
+
+export async function confirmPasswordReset(
+  payload: PasswordResetConfirmPayload,
+): Promise<DetailResponse> {
+  const { data } = await apiClient.post<DetailResponse>("/auth/password-reset/confirm/", payload);
   return data;
 }
 

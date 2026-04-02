@@ -5,8 +5,10 @@ import { AppShell } from "@/components/layout/AppShell";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { SettingsLayout } from "@/components/layout/SettingsLayout";
 import { useAuthStore } from "@/store/authStore";
+import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
+import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
 import WorkspaceDashboardPage from "@/pages/workspace/WorkspaceDashboardPage";
 import WorkspaceMembersPage from "@/pages/workspace/WorkspaceMembersPage";
 import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
@@ -41,6 +43,14 @@ export const router = createBrowserRouter([
   {
     path: "/register",
     element: <RegisterPage />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgotPasswordPage />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
   },
   {
     path: "/",

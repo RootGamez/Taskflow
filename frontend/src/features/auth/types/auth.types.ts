@@ -34,6 +34,15 @@ export interface RegisterValidateCodePayload {
   code: string;
 }
 
+export interface ForgotPasswordRequestPayload {
+  email: string;
+}
+
+export interface PasswordResetConfirmPayload {
+  token: string;
+  new_password: string;
+}
+
 export interface DetailResponse {
   detail: string;
 }

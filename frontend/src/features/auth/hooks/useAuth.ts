@@ -1,15 +1,19 @@
 import { useMutation } from "@tanstack/react-query";
 
 import {
+  confirmPasswordReset,
   getMe,
   login,
   logout,
+  requestPasswordReset,
   requestRegisterCode,
   validateRegisterCode,
   verifyRegisterCode,
 } from "@/features/auth/api/authApi";
 import type {
+  ForgotPasswordRequestPayload,
   LoginPayload,
+  PasswordResetConfirmPayload,
   RegisterRequestCodePayload,
   RegisterValidateCodePayload,
   RegisterVerifyCodePayload,
@@ -50,6 +54,14 @@ export function useAuth() {
     mutationFn: async (payload: RegisterValidateCodePayload) => validateRegisterCode(payload),
   });
 
+  const requestPasswordResetMutation = useMutation({
+    mutationFn: async (payload: ForgotPasswordRequestPayload) => requestPasswordReset(payload),
+  });
+
+  const confirmPasswordResetMutation = useMutation({
+    mutationFn: async (payload: PasswordResetConfirmPayload) => confirmPasswordReset(payload),
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       if (refreshToken) {
@@ -66,6 +78,8 @@ export function useAuth() {
     registerRequestCodeMutation,
     registerValidateCodeMutation,
     registerVerifyCodeMutation,
+    requestPasswordResetMutation,
+    confirmPasswordResetMutation,
     logoutMutation,
   };
 }

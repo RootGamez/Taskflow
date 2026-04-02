@@ -63,6 +63,9 @@ export function LoginForm() {
         Iniciar sesión
       </Button>
       <p className="text-sm text-zinc-500">
+        <Link to="/forgot-password" className="text-brand-600">¿Olvidaste tu contraseña?</Link>
+      </p>
+      <p className="text-sm text-zinc-500">
         ¿No tienes cuenta? <Link to="/register" className="text-brand-600">Regístrate</Link>
       </p>
     </form>

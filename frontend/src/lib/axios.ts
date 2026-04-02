@@ -22,6 +22,8 @@ const AUTH_ENDPOINTS_TO_BYPASS = [
   "/auth/register/request-code/",
   "/auth/register/validate-code/",
   "/auth/register/verify-code/",
+  "/auth/password-reset/request/",
+  "/auth/password-reset/confirm/",
   "/auth/refresh/",
   "/auth/logout/",
 ];

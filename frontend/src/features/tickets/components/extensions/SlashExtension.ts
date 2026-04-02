@@ -35,8 +35,6 @@ export const SlashExtension = Extension.create<SlashExtensionOptions>({
         char: "/",
         startOfLine: true,
         allowSpaces: false,
-        // Prevent from firing when the change came from a remote user (collaboration)
-        shouldShow: null,
         items: () => [],
         render: () => ({}),
         command: ({ editor, range, props }) => {

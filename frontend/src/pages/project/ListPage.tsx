@@ -16,7 +16,7 @@ import { useAuthStore } from "@/store/authStore";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
-type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes";
+type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes" | "assignees";
 
 export default function ListPage() {
   const navigate = useNavigate();
@@ -37,6 +37,7 @@ export default function ListPage() {
     column_id: { userId: string; userName: string } | null;
     description: { userId: string; userName: string } | null;
     progress_notes: { userId: string; userName: string } | null;
+    assignees: { userId: string; userName: string } | null;
   }>({
     title: null,
     priority: null,
@@ -44,6 +45,7 @@ export default function ListPage() {
     column_id: null,
     description: null,
     progress_notes: null,
+    assignees: null,
   });
   const [remoteLiveValues, setRemoteLiveValues] = useState<{
     title?: string;
@@ -72,6 +74,7 @@ export default function ListPage() {
       column_id: null,
       description: null,
       progress_notes: null,
+      assignees: null,
     });
     setRemoteLiveValues({});
   }, [selectedTicketId]);

@@ -212,6 +212,8 @@ export default function KanbanPage() {
     title: string;
     priority: "urgent" | "high" | "medium" | "low" | "none";
     due_date: string | null;
+    description?: Record<string, unknown>;
+    assignee_ids?: string[];
   }) => {
     if (!canMutate) {
       toast.error("No tienes permisos para crear tickets en este workspace");

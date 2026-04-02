@@ -8,7 +8,6 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/shadcn/dialog";
-import { Input } from "@/components/ui/shadcn/input";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
@@ -284,6 +283,15 @@ export function TicketDetail({
   const flushInFlightRef = useRef(false);
   const queuedDraftRef = useRef<TicketPatchPayload | null>(null);
   const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-size the title textarea when value changes externally (hydration, remote)
+  useEffect(() => {
+    const el = titleTextareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
 
   const markFieldPending = (field: EditableField) => {
     pendingFieldsRef.current.add(field);
@@ -633,21 +641,40 @@ export function TicketDetail({
 
         <div className="flex min-h-[calc(100dvh-53px)] flex-col px-8 py-6">
           <div className="mb-8 space-y-4">
-            <Input
-              id="ticket-title"
-              value={title}
-              onChange={(event) => {
-                const next = event.target.value;
-                markLocalChange("title");
-                dispatch({ type: "SET_TITLE", value: next });
-                onTypingField?.("title", next);
-              }}
-              onFocus={titleField.onFocus}
-              onBlur={titleField.onBlur}
-              placeholder="Título del ticket"
-              className="h-auto border-none bg-transparent px-0 py-1 text-3xl font-semibold tracking-tight shadow-none focus-visible:ring-0 md:text-4xl dark:placeholder:text-zinc-700"
-              disabled={isLoading || !canEdit || titleField.isLockedByOther}
-            />
+            <div className="mb-2">
+              <textarea
+                ref={titleTextareaRef}
+                id="ticket-title"
+                value={title}
+                rows={1}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  // Auto-grow
+                  event.target.style.height = "auto";
+                  event.target.style.height = `${event.target.scrollHeight}px`;
+                  markLocalChange("title");
+                  dispatch({ type: "SET_TITLE", value: next });
+                  onTypingField?.("title", next);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
+                onFocus={titleField.onFocus}
+                onBlur={titleField.onBlur}
+                placeholder="Título del ticket"
+                disabled={isLoading || !canEdit || titleField.isLockedByOther}
+                className={
+                  "w-full resize-none overflow-hidden bg-transparent outline-none " +
+                  "text-[1.55rem] font-bold leading-tight tracking-tight " +
+                  "text-zinc-900 dark:text-zinc-50 " +
+                  "placeholder:text-zinc-300 placeholder:font-bold placeholder:tracking-tight dark:placeholder:text-zinc-600 " +
+                  "transition-colors duration-150 " +
+                  (isLoading || !canEdit || titleField.isLockedByOther ? "opacity-50 cursor-not-allowed" : "")
+                }
+                style={{ height: "auto" }}
+              />
+              <div className="mt-2 h-[2px] rounded-full bg-gradient-to-r from-violet-400 via-indigo-300 to-transparent opacity-60 dark:from-violet-600 dark:via-indigo-500 dark:to-transparent" />
+            </div>
 
             <div className="flex flex-col gap-3 py-4 text-sm">
               {/* Asignados */}

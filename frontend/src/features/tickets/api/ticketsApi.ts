@@ -3,12 +3,13 @@ import { apiClient } from "@/lib/axios";
 
 interface CreateTicketPayload {
   title: string;
-  description?: string;
+  description?: string | Record<string, unknown>;
   progress_notes?: string;
   priority?: Ticket["priority"];
   due_date?: string | null;
   column_id?: string;
   order?: number;
+  assignee_ids?: string[];
 }
 
 interface UpdateTicketPayload {
@@ -43,7 +44,15 @@ export async function getTicketById(ticketId: string): Promise<Ticket | null> {
 }
 
 export async function createTicket(projectId: string, payload: CreateTicketPayload): Promise<Ticket> {
-  const { data } = await apiClient.post<Ticket>(`/projects/${projectId}/tickets/`, payload);
+  const normalizedPayload = {
+    ...payload,
+    description:
+      typeof payload.description === "string" || payload.description === undefined
+        ? payload.description
+        : JSON.stringify(payload.description),
+  };
+
+  const { data } = await apiClient.post<Ticket>(`/projects/${projectId}/tickets/`, normalizedPayload);
   return data;
 }
 

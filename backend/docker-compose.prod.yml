@@ -92,6 +92,8 @@ services:
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
       EMAIL_USE_SSL: ${EMAIL_USE_SSL:-False}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-no-reply@taskflow.local}
+      FRONTEND_URL: ${FRONTEND_URL:-https://app.taskflow.test}
+      PASSWORD_RESET_TOKEN_TTL_MINUTES: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:-30}
       MINIO_ENDPOINT: minio:9000
       MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-minio.test} 
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}

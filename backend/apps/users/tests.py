@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -8,7 +9,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.users.models import EmailVerification
+from apps.users.models import EmailVerification, PasswordResetToken
 
 User = get_user_model()
 
@@ -176,3 +177,72 @@ class AuthFlowTests(APITestCase):
 
 		verification = EmailVerification.objects.get(email=payload["email"])
 		self.assertIsNone(verification.consumed_at)
+
+	def test_password_reset_request_is_generic_for_registered_and_unregistered(self) -> None:
+		User.objects.create_user(
+			email="reset@example.com",
+			full_name="Reset User",
+			password="Passw0rd!123",
+		)
+
+		response_registered = self.client.post(
+			"/api/v1/auth/password-reset/request/",
+			{"email": "reset@example.com"},
+			format="json",
+		)
+		self.assertEqual(response_registered.status_code, status.HTTP_200_OK)
+		self.assertIn("Si el correo existe", str(response_registered.data["detail"]))
+		self.assertEqual(len(mail.outbox), 1)
+
+		response_unregistered = self.client.post(
+			"/api/v1/auth/password-reset/request/",
+			{"email": "unknown@example.com"},
+			format="json",
+		)
+		self.assertEqual(response_unregistered.status_code, status.HTTP_200_OK)
+		self.assertIn("Si el correo existe", str(response_unregistered.data["detail"]))
+		self.assertEqual(len(mail.outbox), 1)
+
+	def test_password_reset_confirm_changes_password_and_consumes_token(self) -> None:
+		user = User.objects.create_user(
+			email="recover@example.com",
+			full_name="Recover User",
+			password="OldPassw0rd!123",
+		)
+
+		request_response = self.client.post(
+			"/api/v1/auth/password-reset/request/",
+			{"email": user.email},
+			format="json",
+		)
+		self.assertEqual(request_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(len(mail.outbox), 1)
+
+		url_match = re.search(r"https?://\S+", mail.outbox[-1].body)
+		self.assertIsNotNone(url_match)
+		query = parse_qs(urlparse(url_match.group(0)).query)
+		token = query.get("token", [None])[0]
+		self.assertIsNotNone(token)
+
+		confirm_response = self.client.post(
+			"/api/v1/auth/password-reset/confirm/",
+			{"token": token, "new_password": "NewPassw0rd!123"},
+			format="json",
+		)
+		self.assertEqual(confirm_response.status_code, status.HTTP_200_OK)
+		self.assertEqual(str(confirm_response.data["detail"]), "Contraseña restablecida correctamente.")
+
+		user.refresh_from_db()
+		self.assertTrue(user.check_password("NewPassw0rd!123"))
+
+		stored_token = PasswordResetToken.objects.get(user=user)
+		self.assertIsNotNone(stored_token.used_at)
+
+		# Token de un solo uso.
+		reuse_response = self.client.post(
+			"/api/v1/auth/password-reset/confirm/",
+			{"token": token, "new_password": "AnotherPassw0rd!123"},
+			format="json",
+		)
+		self.assertEqual(reuse_response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertEqual(str(reuse_response.data["detail"]), "El enlace es invalido o ha expirado.")

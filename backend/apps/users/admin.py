@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import EmailVerification, User
+from .models import EmailVerification, PasswordResetToken, User
 
 
 @admin.register(User)
@@ -50,4 +50,11 @@ class EmailVerificationAdmin(admin.ModelAdmin):
 		"created_at",
 	)
 	search_fields = ("email", "full_name")
+	ordering = ("-created_at",)
+
+
+@admin.register(PasswordResetToken)
+class PasswordResetTokenAdmin(admin.ModelAdmin):
+	list_display = ("user", "expires_at", "used_at", "created_at")
+	search_fields = ("user__email",)
 	ordering = ("-created_at",)

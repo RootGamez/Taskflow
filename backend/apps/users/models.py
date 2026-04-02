@@ -1,4 +1,5 @@
 import uuid
+from hashlib import sha256
 
 from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.base_user import BaseUserManager
@@ -113,3 +114,31 @@ class EmailVerification(models.Model):
 
 	def is_expired(self) -> bool:
 		return timezone.now() >= self.expires_at
+
+
+class PasswordResetToken(models.Model):
+	user = models.ForeignKey(
+		User,
+		on_delete=models.CASCADE,
+		related_name="password_reset_tokens",
+	)
+	token_hash = models.CharField(max_length=64, unique=True)
+	expires_at = models.DateTimeField()
+	used_at = models.DateTimeField(null=True, blank=True)
+	created_at = models.DateTimeField(default=timezone.now)
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self):
+		return f"Password reset for {self.user.email}"
+
+	@staticmethod
+	def build_token_hash(raw_token: str) -> str:
+		return sha256(raw_token.encode("utf-8")).hexdigest()
+
+	def is_expired(self) -> bool:
+		return timezone.now() >= self.expires_at
+
+	def is_active(self) -> bool:
+		return self.used_at is None and not self.is_expired()

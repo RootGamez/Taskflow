@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import exceptions, serializers
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -115,6 +116,38 @@ class RegisterVerifyCodeSerializer(RegisterValidateCodeSerializer):
             "min_length": "La contraseña debe tener al menos 8 caracteres.",
         },
     )
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(
+        error_messages={
+            "required": "El token es obligatorio.",
+            "blank": "El token es obligatorio.",
+        }
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages={
+            "required": "La nueva contraseña es obligatoria.",
+            "blank": "La nueva contraseña es obligatoria.",
+            "min_length": "La contraseña debe tener al menos 8 caracteres.",
+        },
+    )
+
+    def validate_new_password(self, value: str) -> str:
+        validate_password(value)
+        return value
 
 
 class TokenPairSerializer(serializers.Serializer):

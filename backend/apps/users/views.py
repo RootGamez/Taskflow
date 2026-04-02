@@ -13,19 +13,28 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.serializers import (
+	ChangePasswordSerializer,
 	LoginSerializer,
+	PasswordResetConfirmSerializer,
+	PasswordResetRequestSerializer,
 	RefreshSerializer,
 	RegisterCodeRequestSerializer,
 	RegisterValidateCodeSerializer,
 	RegisterVerifyCodeSerializer,
-	UserSerializer,
-	UserUpdateSerializer,
-	ChangePasswordSerializer,
-	UserSessionSerializer,
 	UserPreferencesSerializer,
+	UserSerializer,
+	UserSessionSerializer,
+	UserUpdateSerializer,
 	issue_tokens_for_user,
 )
-from apps.users.services import create_or_refresh_email_verification, send_verification_email
+from apps.users.services import (
+	build_password_reset_link,
+	consume_password_reset_token,
+	create_or_refresh_email_verification,
+	create_password_reset_token,
+	send_password_reset_email,
+	send_verification_email,
+)
 from apps.users.storage import upload_user_avatar
 
 User = get_user_model()
@@ -111,6 +120,73 @@ class RegisterValidateCodeView(APIView):
 
 class RegisterView(RegisterRequestCodeView):
 	"""Alias retrocompatible de /auth/register/ para solicitar codigo."""
+
+
+class PasswordResetRequestView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = PasswordResetRequestSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo procesar la solicitud."
+			raise ValidationError({"detail": message})
+
+		email = serializer.validated_data["email"]
+		user = User.objects.filter(email__iexact=email, is_active=True).first()
+		if user is not None:
+			token = create_password_reset_token(user)
+			reset_link = build_password_reset_link(token)
+			send_password_reset_email(user.email, reset_link)
+
+		# Siempre respuesta generica para evitar enumeracion de cuentas.
+		return Response(
+			{
+				"detail": (
+					"Si el correo existe, te enviamos un enlace para restablecer la contraseña."
+				)
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
+class PasswordResetConfirmView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = PasswordResetConfirmSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo restablecer la contraseña."
+			raise ValidationError({"detail": message})
+
+		token = serializer.validated_data["token"]
+		new_password = serializer.validated_data["new_password"]
+		reset_token = consume_password_reset_token(token)
+		if reset_token is None:
+			raise ValidationError({"detail": "El enlace es invalido o ha expirado."})
+
+		user = reset_token.user
+		user.set_password(new_password)
+		user.save(update_fields=["password"])
+
+		# Invalida refresh tokens anteriores por seguridad.
+		from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+		OutstandingToken.objects.filter(user=user).delete()
+
+		return Response(
+			{"detail": "Contraseña restablecida correctamente."},
+			status=status.HTTP_200_OK,
+		)
 
 
 class LoginView(APIView):

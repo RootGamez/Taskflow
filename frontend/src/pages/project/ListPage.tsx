@@ -202,6 +202,7 @@ export default function ListPage() {
     priority?: "urgent" | "high" | "medium" | "low" | "none";
     due_date?: string | null;
     column_id?: string;
+    assignee_ids?: string[];
   }) => {
     if (!canMutate || !selectedTicketId) {
       return;
@@ -214,6 +215,7 @@ export default function ListPage() {
       });
     } catch (error) {
       toast.error(getApiErrorMessage(error, "No se pudo actualizar el ticket"));
+      throw error;
     }
   };
 

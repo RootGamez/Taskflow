@@ -1,18 +1,17 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Select, SelectItem } from "@heroui/react";
-import { AlertTriangle, ArrowDown, ArrowUp, Calendar, Check, Minus, User2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus } from "lucide-react";
+import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/shadcn/button";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/shadcn/dialog";
 import { Input } from "@/components/ui/shadcn/input";
-import { Label } from "@/components/ui/shadcn/label";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
+import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
+import { TicketCalendarPicker } from "./TicketCalendarPicker";
 import { useCollaborativeField } from "../hooks/useCollaborativeField";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { Column } from "@/features/projects/types/project.types";
@@ -32,6 +31,7 @@ interface TicketDraft {
   due_date: string;
   column_id: string;
   description: string;
+  assignees: string[];
 }
 
 type EditableField = keyof TicketDraft;
@@ -45,6 +45,7 @@ interface TicketPatchPayload {
   due_date: string | null;
   column_id: string;
   description: string;
+  assignee_ids?: string[];
 }
 
 interface TicketDetailProps {
@@ -165,6 +166,8 @@ function buildDraft(ticket: Ticket): TicketDraft {
     due_date: toDateInput(ticket.due_date),
     column_id: ticket.column_id,
     description: mergedDescription,
+    // Sort IDs for consistent set comparison — server may return them in any order
+    assignees: (ticket.assignees?.map(a => a.id) || []).slice().sort(),
   };
 }
 
@@ -175,6 +178,7 @@ function toPatchPayload(draft: TicketDraft): TicketPatchPayload {
     due_date: toApiDate(draft.due_date),
     column_id: draft.column_id,
     description: draft.description,
+    assignee_ids: draft.assignees,
   };
 }
 
@@ -188,6 +192,12 @@ function getDiff(prev: TicketPatchPayload, next: TicketPatchPayload): Partial<Ti
   if (prev.description !== next.description) {
     payload.description = next.description;
   }
+  // Compare as sorted sets to avoid false positives from server returning IDs in different order
+  const prevIds = (prev.assignee_ids ?? []).slice().sort().join(",");
+  const nextIds = (next.assignee_ids ?? []).slice().sort().join(",");
+  if (prevIds !== nextIds) {
+    payload.assignee_ids = next.assignee_ids;
+  }
 
   return payload;
 }
@@ -199,7 +209,8 @@ type DraftAction =
   | { type: "SET_PRIORITY"; value: Priority }
   | { type: "SET_COLUMN"; value: string }
   | { type: "SET_DUE_DATE"; value: string }
-  | { type: "SET_DESCRIPTION"; value: string };
+  | { type: "SET_DESCRIPTION"; value: string }
+  | { type: "SET_ASSIGNEES"; value: string[] };
 
 const initialDraft: TicketDraft = {
   title: "",
@@ -207,6 +218,7 @@ const initialDraft: TicketDraft = {
   due_date: "",
   column_id: "",
   description: "",
+  assignees: [],
 };
 
 function draftReducer(state: TicketDraft, action: DraftAction): TicketDraft {
@@ -225,6 +237,8 @@ function draftReducer(state: TicketDraft, action: DraftAction): TicketDraft {
       return { ...state, due_date: action.value };
     case "SET_DESCRIPTION":
       return { ...state, description: action.value };
+    case "SET_ASSIGNEES":
+      return { ...state, assignees: action.value.slice().sort() };
     default:
       return state;
   }
@@ -244,6 +258,7 @@ export function TicketDetail({
     column_id: null,
     description: null,
     progress_notes: null,
+    assignees: null,
   },
   remoteLiveValues,
   onOpenChange,
@@ -260,7 +275,7 @@ export function TicketDetail({
   const [isHydrated, setIsHydrated] = useState(false);
   const [immediateSaveNonce, setImmediateSaveNonce] = useState(0);
 
-  const { title, priority, due_date, column_id, description } = draftState;
+  const { title, priority, due_date, column_id, description, assignees } = draftState;
   const hydratedTicketIdRef = useRef<string | null>(null);
   const activeFieldRef = useRef<CollaborativeField | null>(null);
   const skipNextAutosaveRef = useRef(false);
@@ -268,6 +283,7 @@ export function TicketDetail({
   const lastSyncedRef = useRef<TicketPatchPayload | null>(null);
   const flushInFlightRef = useRef(false);
   const queuedDraftRef = useRef<TicketPatchPayload | null>(null);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
 
   const markFieldPending = (field: EditableField) => {
     pendingFieldsRef.current.add(field);
@@ -299,6 +315,14 @@ export function TicketDetail({
 
     if (pending.has("description") && serverDraft.description === description) {
       pending.delete("description");
+    }
+
+    if (pending.has("assignees")) {
+      const serverIds = (serverDraft.assignee_ids ?? []).slice().sort().join(",");
+      const localIds = assignees.slice().sort().join(",");
+      if (serverIds === localIds) {
+        pending.delete("assignees");
+      }
     }
 
   };
@@ -431,6 +455,7 @@ export function TicketDetail({
       if (canSyncField("due_date")) nextFromServer.due_date = serverDraft.due_date;
       if (canSyncField("column_id")) nextFromServer.column_id = serverDraft.column_id;
       if (canSyncField("description")) nextFromServer.description = serverDraft.description;
+      if (canSyncField("assignees")) nextFromServer.assignees = serverDraft.assignees;
 
       if (Object.keys(nextFromServer).length > 0) {
         dispatch({ type: "MERGE", value: nextFromServer });
@@ -470,6 +495,8 @@ export function TicketDetail({
 
     flushInFlightRef.current = true;
 
+    let hasSaveError = false;
+
     try {
       while (queuedDraftRef.current) {
         const candidate = queuedDraftRef.current;
@@ -488,17 +515,24 @@ export function TicketDetail({
         try {
           await onPatch(payload);
           for (const key of Object.keys(payload)) {
-            pendingFieldsRef.current.delete(key as EditableField);
+            const pendingKey = key === "assignee_ids" ? "assignees" : key;
+            pendingFieldsRef.current.delete(pendingKey as EditableField);
           }
           lastSyncedRef.current = {
             ...baseline,
             ...payload,
           };
         } catch {
+          hasSaveError = true;
+          queuedDraftRef.current = candidate;
+          break;
         }
       }
 
-      if (!queuedDraftRef.current) {
+      if (hasSaveError) {
+        toast.error("No se pudo guardar el ticket. Reintenta.");
+        setHasLocalChanges(true);
+      } else if (!queuedDraftRef.current) {
         setHasLocalChanges(false);
       }
     } finally {
@@ -557,13 +591,20 @@ export function TicketDetail({
       return false;
     }
 
-    return Boolean(target.closest("[data-ticket-editor-floating='true']"));
+    return Boolean(
+      target.closest("[data-ticket-editor-floating='true']") ||
+        target.closest("[role='listbox']") ||
+        target.closest("[role='option']") ||
+        target.closest("[data-slot='listbox']") ||
+        target.closest("[data-slot='popover']"),
+    );
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent
-        className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-none border-l border-zinc-200 p-0 data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800"
+        ref={dialogContentRef}
+        className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E]"
         onInteractOutside={(event) => {
           if (shouldKeepDialogOpen(event.target)) {
             event.preventDefault();
@@ -575,187 +616,181 @@ export function TicketDetail({
           }
         }}
       >
-        <DialogHeader className="border-b border-zinc-200 px-6 py-4 dark:border-zinc-800">
-          <DialogTitle className="text-base">Ticket</DialogTitle>
-          <DialogDescription className="flex items-center gap-2 text-xs">
-            <span className="rounded-full bg-zinc-100 px-2 py-1 font-mono text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-              #{ticket?.id?.slice(0, 8) ?? "---"}
-            </span>
-          </DialogDescription>
-        </DialogHeader>
+        <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
+          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+            <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
+            {titleField.isLockedByOther && (
+              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                {fieldLocks.title?.userName} editando...
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <Check className="h-4 w-4" />
+            <span>Guardado automático</span>
+          </div>
+        </div>
 
-        <div className="flex min-h-[calc(100dvh-88px)] flex-col">
-          <section className="space-y-4 border-b border-zinc-200 px-6 py-5 dark:border-zinc-800">
-            <div className="space-y-2">
-              <Label htmlFor="ticket-title">Nombre</Label>
-              {titleField.isLockedByOther ? (
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {fieldLocks.title?.userName} esta editando, por favor espera.
-                </p>
-              ) : null}
-              <Input
-                id="ticket-title"
-                value={title}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  markLocalChange("title");
-                  dispatch({ type: "SET_TITLE", value: next });
-                  onTypingField?.("title", next);
-                }}
-                onFocus={titleField.onFocus}
-                onBlur={titleField.onBlur}
-                placeholder="Escribe un titulo claro"
-                disabled={isLoading || !canEdit || titleField.isLockedByOther}
-              />
-            </div>
+        <div className="flex min-h-[calc(100dvh-53px)] flex-col px-8 py-6">
+          <div className="mb-8 space-y-4">
+            <Input
+              id="ticket-title"
+              value={title}
+              onChange={(event) => {
+                const next = event.target.value;
+                markLocalChange("title");
+                dispatch({ type: "SET_TITLE", value: next });
+                onTypingField?.("title", next);
+              }}
+              onFocus={titleField.onFocus}
+              onBlur={titleField.onBlur}
+              placeholder="Título del ticket"
+              className="h-auto border-none bg-transparent px-0 py-1 text-3xl font-semibold tracking-tight shadow-none focus-visible:ring-0 md:text-4xl dark:placeholder:text-zinc-700"
+              disabled={isLoading || !canEdit || titleField.isLockedByOther}
+            />
 
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="ticket-priority">Prioridad</Label>
-                {priorityField.isLockedByOther ? (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {fieldLocks.priority?.userName} esta editando, por favor espera.
-                  </p>
-                ) : null}
-                <Select
-                  aria-label="Prioridad"
-                  selectedKeys={[priority]}
-                  onSelectionChange={(keys) => {
-                    if (keys === "all") return;
-                    const selectedPriority = String(Array.from(keys)[0] ?? "none") as Priority;
-                    markLocalChange("priority");
-                    dispatch({ type: "SET_PRIORITY", value: selectedPriority });
-                    scheduleImmediateSave();
-                  }}
-                  onFocus={priorityField.onFocus}
-                  onBlur={priorityField.onBlur}
-                  className="w-full"
-                  isDisabled={isLoading || !canEdit || priorityField.isLockedByOther}
-                >
-                  {PRIORITY_OPTIONS.map((option) => (
-                    <SelectItem key={option.value}>{option.label}</SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ticket-column">Estado</Label>
-                {columnField.isLockedByOther ? (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {fieldLocks.column_id?.userName} esta editando, por favor espera.
-                  </p>
-                ) : null}
-                <Select
-                  aria-label="Estado"
-                  selectedKeys={column_id ? [column_id] : []}
-                  placeholder={columns.length === 0 ? "Sin columnas" : "Selecciona estado"}
-                  onSelectionChange={(keys) => {
-                    if (keys === "all") return;
-                    const selectedColumn = String(Array.from(keys)[0] ?? "");
-                    markLocalChange("column_id");
-                    dispatch({ type: "SET_COLUMN", value: selectedColumn });
-                    scheduleImmediateSave();
-                  }}
-                  onFocus={columnField.onFocus}
-                  onBlur={columnField.onBlur}
-                  className="w-full"
-                  isDisabled={isLoading || !canEdit || columnField.isLockedByOther || columns.length === 0}
-                >
-                  {columns.map((column) => (
-                    <SelectItem key={column.id}>
-                      {column.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ticket-due-date">Fecha limite</Label>
-                {dueDateField.isLockedByOther ? (
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {fieldLocks.due_date?.userName} esta editando, por favor espera.
-                  </p>
-                ) : null}
-                <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
-                  <Input
-                    id="ticket-due-date"
-                    type="date"
-                    value={due_date}
-                    onChange={(event) => {
-                      markLocalChange("due_date");
-                      dispatch({ type: "SET_DUE_DATE", value: event.target.value });
+            <div className="flex flex-col gap-3 py-4 text-sm">
+              {/* Asignados */}
+              <div className="flex items-center gap-4">
+                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Responsables</span>
+                <div className="flex-1">
+                  <TicketAssigneeSelect
+                    assigneeIds={assignees}
+                    onChange={(ids) => {
+                      markLocalChange("assignees");
+                      dispatch({ type: "SET_ASSIGNEES", value: ids });
                       scheduleImmediateSave();
                     }}
-                    onFocus={dueDateField.onFocus}
-                    onBlur={dueDateField.onBlur}
-                    className="pl-9"
+                    disabled={isLoading || !canEdit}
+                  />
+                </div>
+              </div>
+
+              {/* Estado */}
+              <div className="flex items-center gap-4">
+                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Estado</span>
+                <div className="flex-1">
+                  <Select
+                    aria-label="Estado"
+                    selectionMode="single"
+                    selectedKeys={column_id ? new Set([column_id]) : new Set()}
+                    popoverProps={{ portalContainer: dialogContentRef.current ?? undefined }}
+                    placeholder={columns.length === 0 ? "Sin columnas" : "Selecciona estado"}
+                    onChange={(event) => {
+                      const selectedColumn = event.target.value;
+                      if (!selectedColumn) return;
+                      markLocalChange("column_id");
+                      dispatch({ type: "SET_COLUMN", value: selectedColumn });
+                      scheduleImmediateSave();
+                    }}
+                    onFocus={columnField.onFocus}
+                    onBlur={columnField.onBlur}
+                    className="w-48"
+                    classNames={{
+                      trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
+                      value: "text-xs font-medium"
+                    }}
+                    isDisabled={isLoading || !canEdit || columnField.isLockedByOther || columns.length === 0}
+                  >
+                    {columns.map((column) => (
+                      <SelectItem key={column.id}>{column.name}</SelectItem>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              {/* Prioridad */}
+              <div className="flex items-center gap-4">
+                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Prioridad</span>
+                <div className="flex-1">
+                  <Select
+                    aria-label="Prioridad"
+                    selectionMode="single"
+                    selectedKeys={new Set([priority])}
+                    popoverProps={{ portalContainer: dialogContentRef.current ?? undefined }}
+                    onChange={(event) => {
+                      const selectedPriority = (event.target.value || "none") as Priority;
+                      markLocalChange("priority");
+                      dispatch({ type: "SET_PRIORITY", value: selectedPriority });
+                      scheduleImmediateSave();
+                    }}
+                    onFocus={priorityField.onFocus}
+                    onBlur={priorityField.onBlur}
+                    className="w-48"
+                    classNames={{
+                      trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
+                      value: "text-xs font-medium"
+                    }}
+                    isDisabled={isLoading || !canEdit || priorityField.isLockedByOther}
+                  >
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </Select>
+                </div>
+              </div>
+
+              {/* Fecha Limite */}
+              <div className="flex items-center gap-4">
+                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Fecha límite</span>
+                <div className="flex-1">
+                  <TicketCalendarPicker
+                    value={due_date ? new Date(`${due_date}T00:00:00Z`).toISOString() : null}
+                    onChange={(isoDate) => {
+                      markLocalChange("due_date");
+                      const simpleDate = isoDate ? isoDate.split("T")[0] : "";
+                      dispatch({ type: "SET_DUE_DATE", value: simpleDate });
+                      scheduleImmediateSave();
+                    }}
                     disabled={isLoading || !canEdit || dueDateField.isLockedByOther}
                   />
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-              <div className="flex items-center gap-2">
-                <User2 className="h-4 w-4" />
-                <span>
-                  Responsable: {ticket?.assignees?.[0]?.full_name || ticket?.assignees?.[0]?.email || "Sin asignar"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Check className="h-4 w-4" />
-                <span>Actualizacion en tiempo real</span>
-              </div>
-            </div>
-          </section>
-
-          <section className="flex-1 space-y-5 px-6 py-5">
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
-                Contenido
-              </p>
-              <TicketRichEditor
-                value={parseRichTextJson(description)}
-                placeholder="Describe el contexto, avances, decisiones y bloqueos del ticket"
-                disabled={isLoading || !canEdit}
-                isLocked={isUnifiedEditorLocked}
-                lockHint={
-                  unifiedEditorLockOwner
-                    ? `${unifiedEditorLockOwner} esta editando este ticket, por favor espera.`
-                    : undefined
+          <div className="flex-1 space-y-5 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
+            <TicketRichEditor
+              value={parseRichTextJson(description)}
+              placeholder="Describe el contexto, avances y decisiones del ticket..."
+              disabled={isLoading || !canEdit}
+              isLocked={isUnifiedEditorLocked}
+              lockHint={
+                unifiedEditorLockOwner
+                  ? `${unifiedEditorLockOwner} está editando, por favor espera.`
+                  : undefined
+              }
+              onUploadImage={onUploadImage}
+              onUploadVideo={onUploadVideo}
+              onChange={(next) => {
+                if (activeFieldRef.current !== "description") {
+                  return;
                 }
-                onUploadImage={onUploadImage}
-                onUploadVideo={onUploadVideo}
-                onChange={(next) => {
-                  if (activeFieldRef.current !== "description") {
-                    return;
-                  }
 
-                  const serialized = JSON.stringify(next);
+                const serialized = JSON.stringify(next);
 
-                  if (serialized === description) {
-                    return;
-                  }
+                if (serialized === description) {
+                  return;
+                }
 
-                  markLocalChange("description");
-                  dispatch({ type: "SET_DESCRIPTION", value: serialized });
-                  onTypingField?.("description", serialized);
-                }}
-                onFocus={descriptionField.onFocus}
-                onBlur={() => {
-                  descriptionField.onBlur();
-                  scheduleImmediateSave();
-                }}
-              />
-            </div>
+                markLocalChange("description");
+                dispatch({ type: "SET_DESCRIPTION", value: serialized });
+                onTypingField?.("description", serialized);
+              }}
+              onFocus={descriptionField.onFocus}
+              onBlur={() => {
+                descriptionField.onBlur();
+                scheduleImmediateSave();
+              }}
+            />
 
             {canEdit && onDelete ? (
-              <div className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+              <div className="mt-12 flex justify-start pb-4 pt-8">
                 <Button
-                  variant="destructive"
+                  variant="ghost"
+                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
                   onClick={async () => {
-                    if (window.confirm("Estas seguro? Esta accion no se puede deshacer.")) {
+                    if (window.confirm("¿Estás seguro? Esta acción no se puede deshacer.")) {
                       await onDelete();
                     }
                   }}
@@ -765,7 +800,7 @@ export function TicketDetail({
                 </Button>
               </div>
             ) : null}
-          </section>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

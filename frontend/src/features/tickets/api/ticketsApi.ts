@@ -19,6 +19,7 @@ interface UpdateTicketPayload {
   due_date?: string | null;
   column_id?: string;
   order?: number;
+  assignee_ids?: string[];
 }
 
 export interface UploadTicketImageResponse {

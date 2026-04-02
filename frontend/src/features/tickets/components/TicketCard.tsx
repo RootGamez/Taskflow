@@ -29,6 +29,12 @@ function PriorityIcon({ priority }: { priority: Priority }) {
 export function TicketCard({ ticket, onOpen }: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
+  const assigneeLabel =
+    ticket.assignees.length === 0
+      ? "Sin responsable"
+      : ticket.assignees.length === 1
+        ? ticket.assignees[0].full_name
+        : `${ticket.assignees[0].full_name} +${ticket.assignees.length - 1}`;
 
   return (
     <button
@@ -61,6 +67,9 @@ export function TicketCard({ ticket, onOpen }: TicketCardProps) {
           </span>
         ) : null}
       </div>
+      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+        Responsable: {assigneeLabel}
+      </p>
       <div className="mt-2 flex flex-wrap gap-1">
         {ticket.labels.slice(0, 2).map((label) => (
           <Chip key={label.id} size="sm" style={{ backgroundColor: `${label.color}20`, color: label.color }}>

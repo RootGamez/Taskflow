@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError, NotFound
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -14,7 +15,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.users.serializers import (
 	LoginSerializer,
 	RefreshSerializer,
-	RegisterSerializer,
+	RegisterCodeRequestSerializer,
+	RegisterValidateCodeSerializer,
+	RegisterVerifyCodeSerializer,
 	UserSerializer,
 	UserUpdateSerializer,
 	ChangePasswordSerializer,
@@ -22,26 +25,92 @@ from apps.users.serializers import (
 	UserPreferencesSerializer,
 	issue_tokens_for_user,
 )
+from apps.users.services import create_or_refresh_email_verification, send_verification_email
 from apps.users.storage import upload_user_avatar
 
 User = get_user_model()
 
 
-class RegisterView(APIView):
+class RegisterRequestCodeView(APIView):
 	permission_classes = [AllowAny]
 
 	def post(self, request: Request) -> Response:
-		serializer = RegisterSerializer(data=request.data)
+		serializer = RegisterCodeRequestSerializer(data=request.data)
 		if not serializer.is_valid():
 			errors = serializer.errors
 			first_error = next(iter(errors.values()), None)
 			if isinstance(first_error, list) and first_error:
 				message = str(first_error[0])
 			else:
-				message = "No se pudo registrar la cuenta."
+				message = "No se pudo solicitar el codigo de verificacion."
 			raise ValidationError({"detail": message})
-		user = serializer.save()
+
+		data = serializer.validated_data
+		code = create_or_refresh_email_verification(
+			email=data["email"],
+			full_name=data["full_name"],
+		)
+		send_verification_email(data["email"], code)
+
+		return Response(
+			{"detail": "Se envio un codigo de verificacion al correo."},
+			status=status.HTTP_200_OK,
+		)
+
+
+class RegisterVerifyCodeView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RegisterVerifyCodeSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			elif isinstance(first_error, dict) and "detail" in first_error:
+				message = str(first_error["detail"])
+			else:
+				message = "No se pudo completar el registro."
+			raise ValidationError({"detail": message})
+
+		verification = serializer.validated_data["verification"]
+		user = User.objects.create_user(
+			email=verification.email,
+			full_name=verification.full_name,
+			password=serializer.validated_data["password"],
+		)
+
+		verification.consumed_at = timezone.now()
+		verification.save(update_fields=["consumed_at", "updated_at"])
+
 		return Response(issue_tokens_for_user(user), status=status.HTTP_201_CREATED)
+
+
+class RegisterValidateCodeView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RegisterValidateCodeSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			elif isinstance(first_error, dict) and "detail" in first_error:
+				message = str(first_error["detail"])
+			else:
+				message = "No se pudo validar el codigo."
+			raise ValidationError({"detail": message})
+
+		return Response(
+			{"detail": "Codigo validado correctamente."},
+			status=status.HTTP_200_OK,
+		)
+
+
+class RegisterView(RegisterRequestCodeView):
+	"""Alias retrocompatible de /auth/register/ para solicitar codigo."""
 
 
 class LoginView(APIView):

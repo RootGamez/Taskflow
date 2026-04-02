@@ -1,5 +1,6 @@
 import uuid
 
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
@@ -86,3 +87,29 @@ class UserPreferences(models.Model):
 
 	def __str__(self):
 		return f"Preferences for {self.user.email}"
+
+
+class EmailVerification(models.Model):
+	email = models.EmailField(unique=True)
+	full_name = models.CharField(max_length=255)
+	code_hash = models.CharField(max_length=128)
+	expires_at = models.DateTimeField()
+	attempts_remaining = models.PositiveSmallIntegerField(default=5)
+	consumed_at = models.DateTimeField(null=True, blank=True)
+	created_at = models.DateTimeField(default=timezone.now)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["-created_at"]
+
+	def __str__(self):
+		return f"Verification for {self.email}"
+
+	def set_code(self, raw_code: str) -> None:
+		self.code_hash = make_password(raw_code)
+
+	def check_code(self, raw_code: str) -> bool:
+		return check_password(raw_code, self.code_hash)
+
+	def is_expired(self) -> bool:
+		return timezone.now() >= self.expires_at

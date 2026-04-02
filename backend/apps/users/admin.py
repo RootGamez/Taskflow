@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User
+from .models import EmailVerification, User
 
 
 @admin.register(User)
@@ -38,4 +38,16 @@ class UserAdmin(BaseUserAdmin):
 		),
 	)
 
-# Register your models here.
+
+@admin.register(EmailVerification)
+class EmailVerificationAdmin(admin.ModelAdmin):
+	list_display = (
+		"email",
+		"full_name",
+		"expires_at",
+		"attempts_remaining",
+		"consumed_at",
+		"created_at",
+	)
+	search_fields = ("email", "full_name")
+	ordering = ("-created_at",)

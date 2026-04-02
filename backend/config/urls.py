@@ -4,7 +4,16 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
 
-from apps.users.views import LoginView, LogoutView, MeView, RefreshView, RegisterView
+from apps.users.views import (
+    LoginView,
+    LogoutView,
+    MeView,
+    RefreshView,
+    RegisterRequestCodeView,
+    RegisterValidateCodeView,
+    RegisterVerifyCodeView,
+    RegisterView,
+)
 
 
 def health_check(_request):
@@ -14,6 +23,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/health/', health_check, name='health-check'),
     path('api/v1/auth/register/', RegisterView.as_view(), name='auth-register'),
+    path('api/v1/auth/register/request-code/', RegisterRequestCodeView.as_view(), name='auth-register-request-code'),
+    path('api/v1/auth/register/validate-code/', RegisterValidateCodeView.as_view(), name='auth-register-validate-code'),
+    path('api/v1/auth/register/verify-code/', RegisterVerifyCodeView.as_view(), name='auth-register-verify-code'),
     path('api/v1/auth/login/', LoginView.as_view(), name='auth-login'),
     path('api/v1/auth/refresh/', RefreshView.as_view(), name='auth-refresh'),
     path('api/v1/auth/logout/', LogoutView.as_view(), name='auth-logout'),

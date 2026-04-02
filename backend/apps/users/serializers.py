@@ -7,7 +7,7 @@ from rest_framework import exceptions, serializers
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.users.models import UserPreferences
+from apps.users.models import EmailVerification, UserPreferences
 from apps.users.storage import normalize_avatar_url
 
 User = get_user_model()
@@ -31,7 +31,7 @@ class UserSerializer(serializers.ModelSerializer):
         return normalize_avatar_url(obj.avatar_url)
 
 
-class RegisterSerializer(serializers.Serializer):
+class RegisterCodeRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(
         error_messages={
             "required": "El correo es obligatorio.",
@@ -46,6 +46,66 @@ class RegisterSerializer(serializers.Serializer):
             "blank": "El nombre completo es obligatorio.",
         },
     )
+    def validate_email(self, value: str) -> str:
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Ya existe una cuenta con este email.")
+        return value
+class RegisterValidateCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+    code = serializers.CharField(
+        min_length=6,
+        max_length=6,
+        error_messages={
+            "required": "El codigo es obligatorio.",
+            "blank": "El codigo es obligatorio.",
+            "min_length": "El codigo debe tener 6 digitos.",
+            "max_length": "El codigo debe tener 6 digitos.",
+        },
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        email = attrs["email"]
+
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({"detail": "Ya existe una cuenta con este email."})
+
+        verification = EmailVerification.objects.filter(email__iexact=email).first()
+        if verification is None:
+            raise serializers.ValidationError(
+                {"detail": "No hay un codigo activo para este correo."}
+            )
+
+        if verification.consumed_at is not None:
+            raise serializers.ValidationError(
+                {"detail": "El codigo ya fue utilizado. Solicita uno nuevo."}
+            )
+
+        if verification.is_expired():
+            raise serializers.ValidationError(
+                {"detail": "El codigo ha expirado. Solicita uno nuevo."}
+            )
+
+        if verification.attempts_remaining <= 0:
+            raise serializers.ValidationError(
+                {"detail": "Has agotado los intentos. Solicita un nuevo codigo."}
+            )
+
+        if not verification.check_code(attrs["code"]):
+            verification.attempts_remaining = max(verification.attempts_remaining - 1, 0)
+            verification.save(update_fields=["attempts_remaining", "updated_at"])
+            raise serializers.ValidationError({"detail": "Codigo invalido."})
+
+        attrs["verification"] = verification
+        return attrs
+
+
+class RegisterVerifyCodeSerializer(RegisterValidateCodeSerializer):
     password = serializers.CharField(
         write_only=True,
         min_length=8,
@@ -55,14 +115,6 @@ class RegisterSerializer(serializers.Serializer):
             "min_length": "La contraseña debe tener al menos 8 caracteres.",
         },
     )
-
-    def validate_email(self, value: str) -> str:
-        if User.objects.filter(email__iexact=value).exists():
-            raise serializers.ValidationError("Ya existe una cuenta con este email.")
-        return value
-
-    def create(self, validated_data: dict[str, Any]):
-        return User.objects.create_user(**validated_data)
 
 
 class TokenPairSerializer(serializers.Serializer):

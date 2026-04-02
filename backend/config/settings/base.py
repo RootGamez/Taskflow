@@ -190,3 +190,22 @@ MINIO_PUBLIC_BUCKET = os.getenv("MINIO_PUBLIC_BUCKET", MINIO_BUCKET)
 MINIO_PRIVATE_BUCKET = os.getenv("MINIO_PRIVATE_BUCKET", "private")
 MINIO_USE_SSL = env_bool("MINIO_USE_SSL", False)
 MINIO_AVATAR_MAX_SIZE_MB = int(os.getenv("MINIO_AVATAR_MAX_SIZE_MB", "5"))
+
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@taskflow.local")
+
+EMAIL_VERIFICATION_CODE_TTL_MINUTES = int(
+    os.getenv("EMAIL_VERIFICATION_CODE_TTL_MINUTES", "10")
+)
+EMAIL_VERIFICATION_MAX_ATTEMPTS = int(
+    os.getenv("EMAIL_VERIFICATION_MAX_ATTEMPTS", "5")
+)

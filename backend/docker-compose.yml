@@ -45,12 +45,12 @@ services:
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
       if ! mc ls local/public >/dev/null 2>&1; then
         mc mb -p local/public;
-        mc anonymous set download local/public;
       fi;
+      mc anonymous set download local/public;
       if ! mc ls local/private >/dev/null 2>&1; then
         mc mb -p local/private;
-        mc anonymous set none local/private;
       fi;
+      mc anonymous set none local/private;
       exit 0;
       "
 

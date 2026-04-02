@@ -18,6 +18,26 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface RegisterRequestCodePayload {
+  email: string;
+  full_name: string;
+}
+
+export interface RegisterVerifyCodePayload {
+  email: string;
+  code: string;
+  password: string;
+}
+
+export interface RegisterValidateCodePayload {
+  email: string;
+  code: string;
+}
+
+export interface DetailResponse {
+  detail: string;
+}
+
 export interface TokenResponse {
   access: string;
   refresh: string;

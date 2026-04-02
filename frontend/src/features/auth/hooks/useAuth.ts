@@ -1,7 +1,19 @@
 import { useMutation } from "@tanstack/react-query";
 
-import { getMe, login, logout, register } from "@/features/auth/api/authApi";
-import type { LoginPayload, RegisterPayload } from "@/features/auth/types/auth.types";
+import {
+  getMe,
+  login,
+  logout,
+  requestRegisterCode,
+  validateRegisterCode,
+  verifyRegisterCode,
+} from "@/features/auth/api/authApi";
+import type {
+  LoginPayload,
+  RegisterRequestCodePayload,
+  RegisterValidateCodePayload,
+  RegisterVerifyCodePayload,
+} from "@/features/auth/types/auth.types";
 import { useAuthStore } from "@/store/authStore";
 
 export function useAuth() {
@@ -20,14 +32,22 @@ export function useAuth() {
     },
   });
 
-  const registerMutation = useMutation({
-    mutationFn: async (payload: RegisterPayload) => {
-      const tokens = await register(payload);
+  const registerRequestCodeMutation = useMutation({
+    mutationFn: async (payload: RegisterRequestCodePayload) => requestRegisterCode(payload),
+  });
+
+  const registerVerifyCodeMutation = useMutation({
+    mutationFn: async (payload: RegisterVerifyCodePayload) => {
+      const tokens = await verifyRegisterCode(payload);
       setTokens(tokens.access, tokens.refresh);
       const user = await getMe();
       setUser(user);
       return tokens;
     },
+  });
+
+  const registerValidateCodeMutation = useMutation({
+    mutationFn: async (payload: RegisterValidateCodePayload) => validateRegisterCode(payload),
   });
 
   const logoutMutation = useMutation({
@@ -43,7 +63,9 @@ export function useAuth() {
 
   return {
     loginMutation,
-    registerMutation,
+    registerRequestCodeMutation,
+    registerValidateCodeMutation,
+    registerVerifyCodeMutation,
     logoutMutation,
   };
 }

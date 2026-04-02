@@ -19,6 +19,9 @@ interface RetryAxiosRequestConfig extends AxiosRequestConfig {
 const AUTH_ENDPOINTS_TO_BYPASS = [
   "/auth/login/",
   "/auth/register/",
+  "/auth/register/request-code/",
+  "/auth/register/validate-code/",
+  "/auth/register/verify-code/",
   "/auth/refresh/",
   "/auth/logout/",
 ];

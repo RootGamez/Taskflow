@@ -3,6 +3,7 @@ from __future__ import annotations
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -24,6 +25,7 @@ from apps.workspaces.serializers import (
 	WorkspaceSerializer,
 	WorkspaceUpdateSerializer,
 )
+from apps.workspaces.storage import upload_workspace_logo
 
 
 class WorkspaceListCreateView(APIView):
@@ -180,6 +182,49 @@ class WorkspaceDetailView(WorkspaceRoleAccessMixin, APIView):
 		)
 		workspace.delete()
 		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class WorkspaceLogoUploadView(WorkspaceRoleAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+	parser_classes = [MultiPartParser, FormParser]
+
+	EDITABLE_ROLES = {
+		WorkspaceMember.Role.OWNER,
+		WorkspaceMember.Role.ADMIN,
+	}
+
+	def post(self, request: Request, workspace_slug: str) -> Response:
+		membership = self.get_workspace_membership_for_user(request, workspace_slug=workspace_slug)
+		if membership.role not in self.EDITABLE_ROLES:
+			raise PermissionDenied("No tienes permisos para editar este espacio.")
+
+		logo = request.FILES.get("logo")
+		if logo is None:
+			raise ValidationError({"detail": "Debes seleccionar una imagen."})
+
+		try:
+			logo_url = upload_workspace_logo(logo, str(membership.workspace_id))
+		except ValueError as exc:
+			raise ValidationError({"detail": str(exc)}) from exc
+		except Exception as exc:
+			raise ValidationError({"detail": "No se pudo subir el logo del espacio."}) from exc
+
+		workspace = membership.workspace
+		workspace.logo_url = logo_url
+		workspace.save(update_fields=["logo_url"])
+
+		response_serializer = WorkspaceSerializer(
+			workspace,
+			context={"membership_by_workspace": {membership.workspace_id: membership}},
+		)
+
+		send_workspace_event(
+			str(workspace.id),
+			"workspace.updated",
+			{"workspace": response_serializer.data},
+		)
+
+		return Response(response_serializer.data, status=status.HTTP_200_OK)
 
 
 class WorkspaceMembersManageMixin(WorkspaceRoleAccessMixin):

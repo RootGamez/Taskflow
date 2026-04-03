@@ -2,7 +2,6 @@ import { Button } from "@heroui/react";
 import { ChevronLeft, ChevronRight, FolderKanban, KanbanSquare, LayoutDashboard, Settings, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
-import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
 import { useProjects } from "@/features/projects/hooks/useProjects";
 import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
 import { useUIStore } from "@/store/uiStore";
@@ -36,12 +35,6 @@ export function Sidebar() {
           {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
-
-      {!sidebarCollapsed ? (
-        <div className="px-3 pb-3">
-          <WorkspaceSwitcher />
-        </div>
-      ) : null}
 
       <div className="px-3">
         {!sidebarCollapsed ? <p className="mb-2 text-xs font-medium text-zinc-500">Proyectos</p> : null}

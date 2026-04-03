@@ -8,6 +8,8 @@ import { formatDueDateDayMonth, isDueDateOverdue } from "@/features/tickets/util
 interface TicketCardProps {
   ticket: Ticket;
   onOpen: (ticket: Ticket) => void;
+  tone?: "backlog" | "progress" | "done" | "default";
+  className?: string;
 }
 
 const PRIORITY_CONFIG: Record<Priority, { color: string; bg: string; label: string }> = {
@@ -26,7 +28,7 @@ function PriorityIcon({ priority }: { priority: Priority }) {
   return <Minus className="h-4 w-4 text-zinc-400" />;
 }
 
-export function TicketCard({ ticket, onOpen }: TicketCardProps) {
+export function TicketCard({ ticket, onOpen, tone = "default", className = "" }: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
   const assigneeLabel =
@@ -36,11 +38,18 @@ export function TicketCard({ ticket, onOpen }: TicketCardProps) {
         ? ticket.assignees[0].full_name
         : `${ticket.assignees[0].full_name} +${ticket.assignees.length - 1}`;
 
+  const toneCardClass: Record<"backlog" | "progress" | "done" | "default", string> = {
+    backlog: "bg-white/85 dark:bg-zinc-900/90",
+    progress: "bg-blue-50/75 dark:bg-blue-950/35",
+    done: "bg-emerald-50/75 dark:bg-emerald-950/35",
+    default: "bg-white/85 dark:bg-zinc-900/90",
+  };
+
   return (
     <button
       type="button"
       onClick={() => onOpen(ticket)}
-      className="w-full rounded-lg border border-zinc-200 bg-white p-3 text-left dark:border-zinc-800 dark:bg-zinc-900"
+      className={`w-full rounded-xl p-3 text-left transition-[box-shadow,background-color] duration-150 hover:shadow-md ${toneCardClass[tone]} ${className}`}
     >
       <p className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">{ticket.title}</p>
       <div className="mt-3 flex items-center justify-between">

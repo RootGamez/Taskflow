@@ -1,4 +1,4 @@
-import { Button, Select, SelectItem, Tab, Tabs } from "@heroui/react";
+import { Button, Tab, Tabs } from "@heroui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
@@ -332,12 +332,6 @@ export default function KanbanPage() {
             </Button>
           ) : null}
         </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Select aria-label="Filtro por asignado" placeholder="Asignado" className="w-40"><SelectItem key="all">Todos</SelectItem></Select>
-        <Select aria-label="Filtro por prioridad" placeholder="Prioridad" className="w-40"><SelectItem key="all">Todas</SelectItem></Select>
-        <Select aria-label="Filtro por etiqueta" placeholder="Etiqueta" className="w-40"><SelectItem key="all">Todas</SelectItem></Select>
       </div>
 
       <KanbanBoard

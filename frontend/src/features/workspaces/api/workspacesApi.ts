@@ -38,6 +38,22 @@ export async function updateWorkspace(
   return data;
 }
 
+export async function uploadWorkspaceLogo(
+  workspaceSlug: string,
+  file: File,
+): Promise<Workspace> {
+  const formData = new FormData();
+  formData.append("logo", file);
+
+  const { data } = await apiClient.post<Workspace>(`/workspaces/${workspaceSlug}/logo/`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return data;
+}
+
 export async function deleteWorkspace(workspaceSlug: string): Promise<void> {
   await apiClient.delete(`/workspaces/${workspaceSlug}/`);
 }

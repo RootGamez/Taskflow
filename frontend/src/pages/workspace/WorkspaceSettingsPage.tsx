@@ -1,5 +1,5 @@
 import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -7,6 +7,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import {
   useDeleteWorkspace,
+  useUploadWorkspaceLogo,
   useUpdateWorkspace,
   useWorkspaces,
 } from "@/features/workspaces/hooks/useWorkspaces";
@@ -21,6 +22,7 @@ export default function WorkspaceSettingsPage() {
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
 
   const updateWorkspaceMutation = useUpdateWorkspace(workspaceSlug);
+  const uploadWorkspaceLogoMutation = useUploadWorkspaceLogo(workspaceSlug);
   const deleteWorkspaceMutation = useDeleteWorkspace(workspaceSlug);
 
   const workspace = useMemo(
@@ -33,6 +35,7 @@ export default function WorkspaceSettingsPage() {
   const [logoUrl, setLogoUrl] = useState("");
   const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const logoFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const canEdit = workspace?.role === "owner" || workspace?.role === "admin";
   const canDelete = workspace?.role === "owner";
@@ -98,6 +101,32 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
+  const handleSelectLogo = () => {
+    logoFileInputRef.current?.click();
+  };
+
+  const handleLogoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !workspace) {
+      return;
+    }
+
+    try {
+      const updated = await uploadWorkspaceLogoMutation.mutateAsync(file);
+      setLogoUrl(updated.logo_url ?? "");
+      if (activeWorkspace?.id === updated.id) {
+        setActiveWorkspace(updated);
+      }
+      toast.success("Logo actualizado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo subir el logo"));
+    } finally {
+      if (logoFileInputRef.current) {
+        logoFileInputRef.current.value = "";
+      }
+    }
+  };
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -141,6 +170,36 @@ export default function WorkspaceSettingsPage() {
             isDisabled={!canEdit || updateWorkspaceMutation.isPending}
             placeholder="https://..."
           />
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Logo del espacio</p>
+            <div className="flex items-center gap-3">
+              <img
+                src={logoUrl || undefined}
+                alt="Logo del espacio"
+                className="h-12 w-12 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700"
+              />
+              <div className="space-y-1">
+                <input
+                  ref={logoFileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={handleSelectLogo}
+                  isDisabled={!canEdit}
+                  isLoading={uploadWorkspaceLogoMutation.isPending}
+                >
+                  Subir logo
+                </Button>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">JPG, PNG, WEBP o GIF. Max 5MB.</p>
+              </div>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-2">
             <Button

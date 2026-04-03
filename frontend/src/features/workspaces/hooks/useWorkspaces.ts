@@ -5,6 +5,7 @@ import {
   deleteWorkspace,
   getWorkspaces,
   selectActiveWorkspace,
+  uploadWorkspaceLogo,
   updateWorkspace,
 } from "@/features/workspaces/api/workspacesApi";
 import type { Workspace } from "@/features/workspaces/types/workspace.types";
@@ -57,6 +58,17 @@ export function useDeleteWorkspace(workspaceSlug: string) {
 
   return useMutation({
     mutationFn: () => deleteWorkspace(workspaceSlug),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+    },
+  });
+}
+
+export function useUploadWorkspaceLogo(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => uploadWorkspaceLogo(workspaceSlug, file),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["workspaces"] });
     },

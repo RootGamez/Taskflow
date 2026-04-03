@@ -1,6 +1,6 @@
 import { Button } from "@heroui/react";
 import type { ReactNode } from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -18,11 +18,23 @@ export function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate();
   const { workspaceSlug = "" } = useParams();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
-  const { refetch: refetchWorkspaces } = useWorkspaces();
+  const { data: workspaces = [], refetch: refetchWorkspaces } = useWorkspaces();
 
   const [deletedWorkspaceName, setDeletedWorkspaceName] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  useEffect(() => {
+    if (!workspaceSlug) {
+      return;
+    }
+
+    const routeWorkspace = workspaces.find((workspace) => workspace.slug === workspaceSlug);
+    if (routeWorkspace && activeWorkspace?.id !== routeWorkspace.id) {
+      setActiveWorkspace(routeWorkspace);
+    }
+  }, [activeWorkspace?.id, setActiveWorkspace, workspaceSlug, workspaces]);
 
   const closeModal = useCallback(() => {
     setDeletedWorkspaceName(null);

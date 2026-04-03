@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { ChevronLeft, ChevronRight, KanbanSquare, LayoutDashboard, Settings, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderKanban, KanbanSquare, LayoutDashboard, Settings, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
@@ -61,6 +61,7 @@ export function Sidebar() {
 
       <nav className="mt-4 space-y-1 px-3">
         {[
+          { to: "/workspaces", icon: FolderKanban, label: "Workspaces" },
           { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
           ...(workspaceSlug
             ? [

@@ -1,4 +1,5 @@
 import { Button, Tab, Tabs } from "@heroui/react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
@@ -314,7 +315,23 @@ export default function KanbanPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h1>
+        <div className="min-w-0 space-y-2">
+          <Button
+            size="sm"
+            variant="light"
+            className="text-zinc-600 dark:text-zinc-300"
+            startContent={<ArrowLeft className="h-4 w-4" />}
+            onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
+          >
+            Volver al workspace
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {activeWorkspace?.name ?? workspaceSlug} · {projectColumns.length} columnas
+            </p>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <Tabs selectedKey="board" onSelectionChange={(key) => {
             if (key === "list") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/list`);

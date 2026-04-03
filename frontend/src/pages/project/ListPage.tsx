@@ -1,4 +1,5 @@
-import { Tab, Tabs } from "@heroui/react";
+import { Button, Tab, Tabs } from "@heroui/react";
+import { ArrowLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
@@ -248,13 +249,32 @@ export default function ListPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-          Lista de tickets {project ? `- ${project.name}` : ""}
-        </h1>
-        <Tabs selectedKey="list" onSelectionChange={(key) => {
-          if (key === "board") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/board`);
-        }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 space-y-2">
+          <Button
+            size="sm"
+            variant="light"
+            className="text-zinc-600 dark:text-zinc-300"
+            startContent={<ArrowLeft className="h-4 w-4" />}
+            onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
+          >
+            Volver al workspace
+          </Button>
+          <div>
+            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+              Lista de tickets {project ? `- ${project.name}` : ""}
+            </h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              {activeWorkspace?.name ?? workspaceSlug} · {projectColumns.length} columnas
+            </p>
+          </div>
+        </div>
+        <Tabs
+          selectedKey="list"
+          onSelectionChange={(key) => {
+            if (key === "board") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/board`);
+          }}
+        >
           <Tab key="board" title="Tablero" />
           <Tab key="list" title="Lista" />
         </Tabs>

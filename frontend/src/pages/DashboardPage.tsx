@@ -96,6 +96,13 @@ export default function DashboardPage() {
     })),
   }) as Array<{ data?: Ticket[] }>;
 
+  const recentWorkspaces = useMemo(() => {
+    const prioritized = currentWorkspace
+      ? [currentWorkspace, ...workspaces.filter((workspace) => workspace.id !== currentWorkspace.id)]
+      : workspaces;
+    return prioritized.slice(0, 4);
+  }, [currentWorkspace, workspaces]);
+
   const recentTickets = useMemo<RecentTicketEntry[]>(() => {
     return ticketQueries
       .flatMap((query, index) => {
@@ -300,35 +307,31 @@ export default function DashboardPage() {
 
         <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <CardBody className="space-y-4 p-5">
-            <div>
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Tus workspaces</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Cambia de contexto sin perder tus proyectos recientes.</p>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Workspaces recientes</h2>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">Acceso rápido y vista completa en una página dedicada.</p>
+              </div>
+              <Button size="sm" variant="light" onPress={() => navigate("/workspaces")}>Ver todos</Button>
             </div>
 
-            {workspaces.length > 0 ? (
-              <div className="space-y-3">
-                {workspaces.map((workspace) => {
-                  const isCurrent = workspaceSlug === workspace.slug;
-                  return (
-                    <Link
-                      key={workspace.id}
-                      to={`/workspaces/${workspace.slug}`}
-                      className={`flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${isCurrent ? "border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"}`}
-                    >
-                      <div>
-                        <p className={`font-medium ${isCurrent ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-900 dark:text-zinc-50"}`}>
-                          {workspace.name}
-                        </p>
-                        <p className={`text-xs ${isCurrent ? "text-zinc-600 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400"}`}>
-                          {workspace.slug}
-                        </p>
-                      </div>
-                      <span className={`text-xs uppercase tracking-wider ${isCurrent ? "text-zinc-600 dark:text-zinc-300" : "text-zinc-400"}`}>
-                        {isCurrent ? "Actual" : workspace.role}
-                      </span>
-                    </Link>
-                  );
-                })}
+            {recentWorkspaces.length > 0 ? (
+              <div className="space-y-2">
+                {recentWorkspaces.map((workspace) => (
+                  <Link
+                    key={workspace.id}
+                    to={`/workspaces/${workspace.slug}`}
+                    className="flex items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{workspace.name}</p>
+                      <p className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{workspace.role}</p>
+                    </div>
+                    {workspaceSlug === workspace.slug ? (
+                      <span className="text-xs font-medium text-brand-600">Actual</span>
+                    ) : null}
+                  </Link>
+                ))}
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-zinc-300 p-5 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
@@ -337,6 +340,7 @@ export default function DashboardPage() {
             )}
           </CardBody>
         </Card>
+
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">

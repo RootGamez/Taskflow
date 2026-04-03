@@ -61,6 +61,16 @@ export default function DashboardPage() {
     }
   }, [activeWorkspace?.id, currentWorkspace, setActiveWorkspace]);
 
+  useEffect(() => {
+    const isDark = document.documentElement.classList.contains("dark");
+    console.info("[Dashboard] theme/workspace", {
+      theme: isDark ? "dark" : "light",
+      workspaceSlug,
+      workspaces: workspaces.length,
+      currentWorkspace: currentWorkspace?.name ?? null,
+    });
+  }, [workspaceSlug, workspaces.length, currentWorkspace?.name]);
+
   const projectsQuery = useProjects(workspaceSlug);
   const projects = (projectsQuery.data ?? []) as Project[];
   const createProjectMutation = useCreateProject();
@@ -231,13 +241,17 @@ export default function DashboardPage() {
                     <Link
                       key={workspace.id}
                       to={`/workspaces/${workspace.slug}`}
-                      className={`flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${isCurrent ? "border-brand-300 bg-brand-50 dark:border-brand-800 dark:bg-brand-950/30" : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"}`}
+                      className={`flex items-center justify-between rounded-2xl border px-4 py-3 transition-colors ${isCurrent ? "border-zinc-300 bg-zinc-100 text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100" : "border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"}`}
                     >
                       <div>
-                        <p className="font-medium text-zinc-900 dark:text-zinc-50">{workspace.name}</p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{workspace.slug}</p>
+                        <p className={`font-medium ${isCurrent ? "text-zinc-900 dark:text-zinc-100" : "text-zinc-900 dark:text-zinc-50"}`}>
+                          {workspace.name}
+                        </p>
+                        <p className={`text-xs ${isCurrent ? "text-zinc-600 dark:text-zinc-300" : "text-zinc-500 dark:text-zinc-400"}`}>
+                          {workspace.slug}
+                        </p>
                       </div>
-                      <span className="text-xs uppercase tracking-wider text-zinc-400">
+                      <span className={`text-xs uppercase tracking-wider ${isCurrent ? "text-zinc-600 dark:text-zinc-300" : "text-zinc-400"}`}>
                         {isCurrent ? "Actual" : workspace.role}
                       </span>
                     </Link>

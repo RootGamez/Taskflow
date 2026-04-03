@@ -690,6 +690,7 @@ export function CreateTicketModal({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
+        showCloseButton={false}
         className="flex max-h-[92vh] w-full max-w-[860px] flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200/80 p-0 shadow-2xl dark:border-zinc-800"
         onKeyDown={handleKeyDown}
       >

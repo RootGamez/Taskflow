@@ -9,6 +9,7 @@ import ForgotPasswordPage from "@/pages/auth/ForgotPasswordPage";
 import LoginPage from "@/pages/auth/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import ResetPasswordPage from "@/pages/auth/ResetPasswordPage";
+import DashboardPage from "@/pages/DashboardPage";
 import WorkspaceDashboardPage from "@/pages/workspace/WorkspaceDashboardPage";
 import WorkspaceMembersPage from "@/pages/workspace/WorkspaceMembersPage";
 import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
@@ -54,11 +55,15 @@ export const router = createBrowserRouter([
   },
   {
     path: "/",
-    element: <Navigate to="/workspaces/ws-demo" replace />,
+    element: <Navigate to="/dashboard" replace />,
   },
   {
     element: <ProtectedLayout />,
     children: [
+      {
+        path: "/dashboard",
+        element: <DashboardPage />,
+      },
       {
         path: "/workspaces/:workspaceSlug",
         element: <WorkspaceDashboardPage />,

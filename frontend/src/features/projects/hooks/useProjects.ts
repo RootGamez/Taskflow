@@ -6,9 +6,10 @@ import {
   getProjectsByWorkspace,
 } from "@/features/projects/api/projectsApi";
 import { projectQueryKeys } from "@/features/projects/lib/projectQueryKeys";
+import type { Project } from "@/features/projects/types/project.types";
 
 export function useProjects(workspaceSlug: string) {
-  return useQuery({
+  return useQuery<Project[]>({
     queryKey: projectQueryKeys.list(workspaceSlug),
     queryFn: () => getProjectsByWorkspace(workspaceSlug),
     enabled: Boolean(workspaceSlug),

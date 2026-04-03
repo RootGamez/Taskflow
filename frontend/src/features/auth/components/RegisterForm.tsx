@@ -99,7 +99,7 @@ export function RegisterForm() {
         password: state.password,
       });
       toast.success("Cuenta creada correctamente");
-      navigate("/workspaces/ws-demo");
+      navigate("/dashboard");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "No se pudo verificar el codigo"));
     }

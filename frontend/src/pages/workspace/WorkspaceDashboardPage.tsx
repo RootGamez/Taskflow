@@ -16,7 +16,7 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export default function WorkspaceDashboardPage() {
   const navigate = useNavigate();
-  const { workspaceSlug = "ws-demo" } = useParams();
+  const { workspaceSlug = "" } = useParams();
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
   const { data: projects = [] } = useProjects(workspaceSlug);
   const createProjectMutation = useCreateProject();
@@ -61,7 +61,7 @@ export default function WorkspaceDashboardPage() {
           action={canMutate ? { label: "Nuevo proyecto", onClick: () => setCreateModalOpen(true) } : undefined}
         />
       ) : (
-        <ProjectList projects={projects} />
+        <ProjectList projects={projects} workspaceSlug={workspaceSlug} />
       )}
 
       <CreateProjectModal

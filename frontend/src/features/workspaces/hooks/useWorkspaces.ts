@@ -7,9 +7,10 @@ import {
   selectActiveWorkspace,
   updateWorkspace,
 } from "@/features/workspaces/api/workspacesApi";
+import type { Workspace } from "@/features/workspaces/types/workspace.types";
 
 export function useWorkspaces() {
-  return useQuery({
+  return useQuery<Workspace[]>({
     queryKey: ["workspaces"],
     queryFn: getWorkspaces,
     staleTime: 0,

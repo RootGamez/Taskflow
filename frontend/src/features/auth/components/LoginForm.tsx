@@ -20,7 +20,7 @@ export function LoginForm() {
   const { loginMutation } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from ?? "/workspaces/ws-demo";
+  const from = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

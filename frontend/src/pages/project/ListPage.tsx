@@ -20,7 +20,7 @@ type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "des
 
 export default function ListPage() {
   const navigate = useNavigate();
-  const { workspaceSlug = "ws-demo", projectId = "p-1" } = useParams();
+  const { workspaceSlug = "", projectId = "" } = useParams();
   const { data: project } = useProjectSuspense(workspaceSlug, projectId);
   const { data: tickets } = useTicketsSuspense(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);

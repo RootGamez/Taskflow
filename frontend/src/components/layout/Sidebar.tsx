@@ -4,12 +4,17 @@ import { Link, useLocation, useParams } from "react-router-dom";
 
 import { WorkspaceSwitcher } from "@/features/workspaces/components/WorkspaceSwitcher";
 import { useProjects } from "@/features/projects/hooks/useProjects";
+import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
 import { useUIStore } from "@/store/uiStore";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const location = useLocation();
-  const { workspaceSlug = "ws-demo" } = useParams();
+  const params = useParams();
+  const { data: workspaces = [] } = useWorkspaces();
+  const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
+  const workspaceSlug = params.workspaceSlug ?? activeWorkspace?.slug ?? workspaces.find((workspace) => workspace.is_active)?.slug ?? workspaces[0]?.slug ?? "";
   const { data: projects = [] } = useProjects(workspaceSlug);
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
@@ -56,9 +61,13 @@ export function Sidebar() {
 
       <nav className="mt-4 space-y-1 px-3">
         {[
-          { to: `/workspaces/${workspaceSlug}`, icon: LayoutDashboard, label: "Dashboard" },
-          { to: `/workspaces/${workspaceSlug}/members`, icon: Users, label: "Miembros" },
-          { to: `/workspaces/${workspaceSlug}/settings`, icon: Settings, label: "Configuracion" },
+          { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+          ...(workspaceSlug
+            ? [
+                { to: `/workspaces/${workspaceSlug}/members`, icon: Users, label: "Miembros" },
+                { to: `/workspaces/${workspaceSlug}/settings`, icon: Settings, label: "Configuracion" },
+              ]
+            : []),
         ].map((item) => {
           const active = location.pathname === item.to;
           return (

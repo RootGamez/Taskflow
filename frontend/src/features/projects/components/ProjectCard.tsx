@@ -1,16 +1,16 @@
 import { Button, Card, CardBody, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
 import { MoreHorizontal } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import type { Project } from "@/features/projects/types/project.types";
 
 interface ProjectCardProps {
   project: Project;
+  workspaceSlug: string;
 }
 
-export function ProjectCard({ project }: ProjectCardProps) {
+export function ProjectCard({ project, workspaceSlug }: ProjectCardProps) {
   const navigate = useNavigate();
-  const { workspaceSlug = "ws-demo" } = useParams();
 
   return (
     <Card

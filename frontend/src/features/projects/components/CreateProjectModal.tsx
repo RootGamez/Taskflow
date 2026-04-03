@@ -29,26 +29,43 @@ interface CreateProjectModalProps {
   isOpen: boolean;
   isLoading?: boolean;
   onClose: () => void;
-  onCreate: (input: { name: string; description?: string; color?: string }) => Promise<void>;
+  onSubmit: (input: { name: string; description?: string; color?: string }) => Promise<void>;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  initialValues?: {
+    name: string;
+    description: string;
+    color: string;
+  };
 }
 
 export function CreateProjectModal({
   isOpen,
   isLoading = false,
   onClose,
-  onCreate,
+  onSubmit,
+  title = "Nuevo proyecto",
+  description = "Crea un proyecto y te configuramos columnas iniciales automaticamente.",
+  submitLabel = "Crear proyecto",
+  initialValues,
 }: CreateProjectModalProps) {
   const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
   const [color, setColor] = useState("#2563EB");
 
   useEffect(() => {
-    if (!isOpen) {
-      setName("");
-      setDescription("");
-      setColor("#2563EB");
+    if (isOpen) {
+      setName(initialValues?.name ?? "");
+      setProjectDescription(initialValues?.description ?? "");
+      setColor(initialValues?.color ?? "#2563EB");
+      return;
     }
-  }, [isOpen]);
+
+    setName("");
+    setProjectDescription("");
+    setColor("#2563EB");
+  }, [initialValues?.color, initialValues?.description, initialValues?.name, isOpen]);
 
   const handleSubmit = async () => {
     const trimmedName = name.trim();
@@ -56,26 +73,32 @@ export function CreateProjectModal({
       return;
     }
 
-    await onCreate({
+    await onSubmit({
       name: trimmedName,
-      description: description.trim() || undefined,
+      description: projectDescription.trim() || undefined,
       color,
     });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[640px]">
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        onClose();
+      }
+    }}>
+      <DialogContent
+        className="sm:max-w-[640px]"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
               <FolderKanban className="h-5 w-5" />
             </div>
-            <DialogTitle>Nuevo proyecto</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
           </div>
-          <DialogDescription>
-            Crea un proyecto y te configuramos columnas iniciales automaticamente.
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-6 py-2 md:grid-cols-[1.4fr_1fr]">
@@ -88,7 +111,6 @@ export function CreateProjectModal({
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 disabled={isLoading}
-                autoFocus
               />
             </div>
 
@@ -97,8 +119,8 @@ export function CreateProjectModal({
               <Textarea
                 id="project-description"
                 placeholder="Alcance inicial del proyecto"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
+                value={projectDescription}
+                onChange={(event) => setProjectDescription(event.target.value)}
                 disabled={isLoading}
               />
             </div>
@@ -156,7 +178,7 @@ export function CreateProjectModal({
                 </p>
               </div>
               <p className="mt-2 line-clamp-2 text-xs text-zinc-500">
-                {description.trim() || "La descripcion del proyecto aparecera aqui."}
+                {projectDescription.trim() || "La descripcion del proyecto aparecera aqui."}
               </p>
             </div>
           </div>
@@ -167,7 +189,7 @@ export function CreateProjectModal({
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={isLoading || !name.trim()}>
-            {isLoading ? "Creando..." : "Crear proyecto"}
+            {isLoading ? "Guardando..." : submitLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

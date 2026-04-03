@@ -7,8 +7,15 @@ import toast from "react-hot-toast";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
+import { ProjectDeleteDialog } from "@/features/projects/components/ProjectDeleteDialog";
 import { ProjectList } from "@/features/projects/components/ProjectList";
-import { useCreateProject, useProjects } from "@/features/projects/hooks/useProjects";
+import {
+  useCreateProject,
+  useDeleteProject,
+  useProjects,
+  useToggleProjectArchive,
+  useUpdateProject,
+} from "@/features/projects/hooks/useProjects";
 import type { Project } from "@/features/projects/types/project.types";
 import { getTicketsByProject } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -50,6 +57,8 @@ export default function DashboardPage() {
   const createWorkspaceMutation = useCreateWorkspace();
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
   const currentWorkspace = activeWorkspace ?? workspaces.find((workspace) => workspace.is_active) ?? workspaces[0] ?? null;
   const workspaceSlug = currentWorkspace?.slug ?? "";
@@ -74,6 +83,9 @@ export default function DashboardPage() {
   const projectsQuery = useProjects(workspaceSlug);
   const projects = (projectsQuery.data ?? []) as Project[];
   const createProjectMutation = useCreateProject();
+  const updateProjectMutation = useUpdateProject();
+  const deleteProjectMutation = useDeleteProject();
+  const toggleProjectArchiveMutation = useToggleProjectArchive();
 
   const ticketQueries = useQueries({
     queries: projects.map((project) => ({
@@ -162,6 +174,59 @@ export default function DashboardPage() {
     }
   };
 
+  const handleUpdateProject = async (input: {
+    name: string;
+    description?: string;
+    color?: string;
+  }) => {
+    if (!workspaceSlug || !projectToEdit) {
+      return;
+    }
+
+    try {
+      await updateProjectMutation.mutateAsync({
+        workspaceSlug,
+        projectId: projectToEdit.id,
+        ...input,
+      });
+      setProjectToEdit(null);
+      toast.success("Proyecto actualizado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo actualizar el proyecto"));
+    }
+  };
+
+  const handleToggleArchiveProject = async (project: Project) => {
+    if (!workspaceSlug) {
+      return;
+    }
+
+    try {
+      await toggleProjectArchiveMutation.mutateAsync({
+        workspaceSlug,
+        projectId: project.id,
+        isArchived: !project.is_archived,
+      });
+      toast.success(project.is_archived ? "Proyecto desarchivado" : "Proyecto archivado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo actualizar el estado del proyecto"));
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!workspaceSlug) {
+      return;
+    }
+
+    try {
+      await deleteProjectMutation.mutateAsync({ workspaceSlug, projectId });
+      setProjectToDelete(null);
+      toast.success("Proyecto eliminado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo eliminar el proyecto"));
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -213,7 +278,14 @@ export default function DashboardPage() {
             </div>
 
             {workspaceSlug && projects.length > 0 ? (
-              <ProjectList projects={projects} workspaceSlug={workspaceSlug} />
+              <ProjectList
+                projects={projects}
+                workspaceSlug={workspaceSlug}
+                onEdit={setProjectToEdit}
+                onToggleArchive={handleToggleArchiveProject}
+                onDelete={setProjectToDelete}
+                isActionLoading={updateProjectMutation.isPending || deleteProjectMutation.isPending || toggleProjectArchiveMutation.isPending}
+              />
             ) : isLoadingWorkspaces ? (
               <p className="text-sm text-zinc-500">Cargando workspaces...</p>
             ) : (
@@ -361,8 +433,31 @@ export default function DashboardPage() {
       <CreateProjectModal
         isOpen={isCreateProjectOpen && canMutate && Boolean(workspaceSlug)}
         onClose={() => setIsCreateProjectOpen(false)}
-        onCreate={handleCreateProject}
+        onSubmit={handleCreateProject}
         isLoading={createProjectMutation.isPending}
+      />
+
+      <CreateProjectModal
+        isOpen={Boolean(projectToEdit) && canMutate && Boolean(workspaceSlug)}
+        onClose={() => setProjectToEdit(null)}
+        onSubmit={handleUpdateProject}
+        isLoading={updateProjectMutation.isPending}
+        title="Editar proyecto"
+        description="Actualiza el nombre, la descripcion y el color del proyecto."
+        submitLabel="Guardar cambios"
+        initialValues={projectToEdit ? {
+          name: projectToEdit.name,
+          description: projectToEdit.description ?? "",
+          color: projectToEdit.color,
+        } : undefined}
+      />
+
+      <ProjectDeleteDialog
+        project={projectToDelete}
+        isOpen={Boolean(projectToDelete) && canMutate && Boolean(workspaceSlug)}
+        onClose={() => setProjectToDelete(null)}
+        onDelete={handleDeleteProject}
+        isLoading={deleteProjectMutation.isPending}
       />
     </div>
   );

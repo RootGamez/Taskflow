@@ -72,7 +72,7 @@ export function AppShell({ children }: AppShellProps) {
         return;
       }
 
-      setDeletedWorkspaceName(data.payload?.workspace_name ?? "este workspace");
+      setDeletedWorkspaceName(data.payload?.workspace_name ?? "este espacio");
     } catch {
       return;
     }
@@ -99,7 +99,7 @@ export function AppShell({ children }: AppShellProps) {
       {deletedWorkspaceName ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/45 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
-            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Workspace eliminado</h3>
+            <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Espacio eliminado</h3>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
               {deletedWorkspaceName} fue eliminado.
             </p>
@@ -116,7 +116,7 @@ export function AppShell({ children }: AppShellProps) {
                 onPress={() => void redirectToFallbackWorkspace()}
                 isLoading={isRedirecting}
               >
-                Ir a otro workspace
+                Ir a otro espacio
               </Button>
             </div>
           </div>

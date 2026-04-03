@@ -258,7 +258,7 @@ export default function ListPage() {
             startContent={<ArrowLeft className="h-4 w-4" />}
             onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
           >
-            Volver al workspace
+            Volver al espacio
           </Button>
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">

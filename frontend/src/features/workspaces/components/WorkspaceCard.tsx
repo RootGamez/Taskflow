@@ -22,7 +22,7 @@ export function WorkspaceCard({ workspace, members = [], isCurrent = false }: Wo
       <CardBody className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">Workspace</p>
+            <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">Espacio</p>
             <h3 className="truncate text-base font-semibold text-zinc-900 dark:text-zinc-50">{workspace.name}</h3>
             <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{workspace.slug}</p>
           </div>

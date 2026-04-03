@@ -50,7 +50,7 @@ export function CreateWorkspaceModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Crear Workspace</DialogTitle>
+          <DialogTitle>Crear espacio de trabajo</DialogTitle>
           <DialogDescription>
             Dale un nombre al espacio de trabajo para empezar.
           </DialogDescription>

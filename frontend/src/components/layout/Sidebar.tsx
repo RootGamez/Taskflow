@@ -61,7 +61,7 @@ export function Sidebar() {
 
       <nav className="mt-4 space-y-1 px-3">
         {[
-          { to: "/workspaces", icon: FolderKanban, label: "Workspaces" },
+          { to: "/workspaces", icon: FolderKanban, label: "Espacios" },
           { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
           ...(workspaceSlug
             ? [

@@ -46,20 +46,20 @@ export default function WorkspacesPage() {
       setActiveWorkspace(workspace);
       setIsCreateWorkspaceOpen(false);
       navigate(`/workspaces/${workspace.slug}`);
-      toast.success("Workspace creado");
+      toast.success("Espacio de trabajo creado");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo crear el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo crear el espacio de trabajo"));
     }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Todos los workspaces"
+        title="Todos los espacios de trabajo"
         subtitle="Explora tus espacios de trabajo y abre cualquiera en un clic."
         actions={
           <Button color="primary" onPress={() => setIsCreateWorkspaceOpen(true)}>
-            Crear workspace
+            Crear espacio
           </Button>
         }
       />
@@ -67,7 +67,7 @@ export default function WorkspacesPage() {
       {isLoading ? (
         <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <CardBody>
-            <p className="text-sm text-zinc-500">Cargando workspaces...</p>
+            <p className="text-sm text-zinc-500">Cargando espacios de trabajo...</p>
           </CardBody>
         </Card>
       ) : workspacePreviews.length > 0 ? (
@@ -84,7 +84,7 @@ export default function WorkspacesPage() {
       ) : (
         <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <CardBody>
-            <p className="text-sm text-zinc-500">No tienes workspaces aún. Crea el primero para comenzar.</p>
+            <p className="text-sm text-zinc-500">No tienes espacios aún. Crea el primero para comenzar.</p>
           </CardBody>
         </Card>
       )}

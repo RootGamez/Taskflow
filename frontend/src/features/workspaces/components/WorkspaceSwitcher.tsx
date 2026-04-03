@@ -35,7 +35,7 @@ export function WorkspaceSwitcher() {
 
   useEffect(() => {
     if (isError) {
-      toast.error(getApiErrorMessage(error, "No se pudieron cargar los workspaces"));
+      toast.error(getApiErrorMessage(error, "No se pudieron cargar los espacios de trabajo"));
     }
   }, [isError, error]);
 
@@ -50,7 +50,7 @@ export function WorkspaceSwitcher() {
       setActiveWorkspace(active);
       navigate(`/workspaces/${active.slug}`);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo cambiar el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo cambiar el espacio de trabajo"));
     }
   };
 
@@ -59,10 +59,10 @@ export function WorkspaceSwitcher() {
       const workspace = await createWorkspaceMutation.mutateAsync(name);
       setActiveWorkspace(workspace);
       navigate(`/workspaces/${workspace.slug}`);
-      toast.success("Workspace creado");
+      toast.success("Espacio de trabajo creado");
       setCreateModalOpen(false);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo crear el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo crear el espacio de trabajo"));
     }
   };
 
@@ -87,9 +87,9 @@ export function WorkspaceSwitcher() {
         <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Workspace actual</p>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Espacio actual</p>
               <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-                {activeWorkspace?.name ?? (isLoading ? "Cargando workspaces..." : "Sin workspace seleccionado")}
+                {activeWorkspace?.name ?? (isLoading ? "Cargando espacios..." : "Sin espacio seleccionado")}
               </p>
               <p className="truncate text-xs capitalize text-zinc-500 dark:text-zinc-400">
                 {activeWorkspace?.role ?? "Crea o selecciona uno"}
@@ -110,7 +110,7 @@ export function WorkspaceSwitcher() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">Cambiar workspace</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">Cambiar espacio</p>
             <span className="text-xs text-zinc-400">{workspaces.length}</span>
           </div>
 
@@ -157,14 +157,14 @@ export function WorkspaceSwitcher() {
               })
             ) : (
               <p className="rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                Aún no tienes workspaces.
+                Aún no tienes espacios de trabajo.
               </p>
             )}
           </div>
 
           {hasMoreWorkspaces ? (
             <p className="px-1 text-[11px] text-zinc-400">
-              Mostrando {visibleWorkspaces.length} de {workspaces.length} workspaces.
+              Mostrando {visibleWorkspaces.length} de {workspaces.length} espacios.
             </p>
           ) : null}
         </div>
@@ -177,7 +177,7 @@ export function WorkspaceSwitcher() {
             startContent={<Plus className="h-4 w-4" />}
             onPress={handleOpenCreateModal}
           >
-            Crear workspace
+            Crear espacio
           </Button>
           <Button
             type="button"

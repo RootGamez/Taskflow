@@ -42,7 +42,7 @@ export default function WorkspaceDashboardPage() {
     color?: string;
   }) => {
     if (!canMutate) {
-      toast.error("No tienes permisos para crear proyectos en este workspace");
+      toast.error("No tienes permisos para crear proyectos en este espacio");
       return;
     }
 
@@ -115,8 +115,8 @@ export default function WorkspaceDashboardPage() {
   return (
     <div>
       <PageHeader
-        title="Workspace Dashboard"
-        subtitle={`Workspace: ${workspaceSlug}`}
+        title="Panel del espacio"
+        subtitle={`Espacio: ${workspaceSlug}`}
         actions={canMutate ? <Button color="primary" onPress={() => setCreateModalOpen(true)}>Nuevo proyecto</Button> : undefined}
       />
       {projects.length === 0 ? (

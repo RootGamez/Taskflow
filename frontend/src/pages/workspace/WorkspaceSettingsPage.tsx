@@ -66,9 +66,9 @@ export default function WorkspaceSettingsPage() {
         navigate(`/workspaces/${updated.slug}/settings`);
       }
 
-      toast.success("Workspace actualizado");
+      toast.success("Espacio de trabajo actualizado");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo actualizar el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo actualizar el espacio de trabajo"));
     }
   };
 
@@ -90,11 +90,11 @@ export default function WorkspaceSettingsPage() {
         navigate("/");
       }
 
-      toast.success("Workspace eliminado");
+      toast.success("Espacio de trabajo eliminado");
       setDeleteDialogOpen(false);
       setDeleteConfirmation("");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo eliminar el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo eliminar el espacio de trabajo"));
     }
   };
 
@@ -105,10 +105,10 @@ export default function WorkspaceSettingsPage() {
   if (!workspace) {
     return (
       <div>
-        <PageHeader title="Configuracion del workspace" />
+        <PageHeader title="Configuracion del espacio" />
         <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
           <CardBody>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">Workspace no encontrado.</p>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">Espacio no encontrado.</p>
           </CardBody>
         </Card>
       </div>
@@ -117,7 +117,7 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Configuracion del workspace" subtitle="Edita datos generales y administra opciones criticas" />
+      <PageHeader title="Configuracion del espacio" subtitle="Edita datos generales y administra opciones criticas" />
 
       <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <CardBody className="space-y-4">
@@ -132,7 +132,7 @@ export default function WorkspaceSettingsPage() {
             value={slug}
             onValueChange={setSlug}
             isDisabled={!canEdit || updateWorkspaceMutation.isPending}
-            description="URL publica del workspace"
+            description="URL publica del espacio"
           />
           <Input
             label="Logo URL"
@@ -165,7 +165,7 @@ export default function WorkspaceSettingsPage() {
         <CardBody className="space-y-3">
           <p className="text-sm font-semibold text-red-700 dark:text-red-300">Zona de peligro</p>
           <p className="text-sm text-zinc-700 dark:text-zinc-300">
-            Eliminar un workspace borra proyectos, tickets y configuraciones asociadas.
+            Eliminar un espacio borra proyectos, tickets y configuraciones asociadas.
           </p>
           <Button
             color="danger"
@@ -173,10 +173,10 @@ export default function WorkspaceSettingsPage() {
             isDisabled={!canDelete}
             onPress={() => setDeleteDialogOpen(true)}
           >
-            Eliminar workspace
+            Eliminar espacio
           </Button>
           {!canDelete ? (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Solo el owner puede eliminar este workspace.</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Solo el owner puede eliminar este espacio.</p>
           ) : null}
         </CardBody>
       </Card>
@@ -191,7 +191,7 @@ export default function WorkspaceSettingsPage() {
         }}
       >
         <ModalContent>
-          <ModalHeader>Eliminar workspace</ModalHeader>
+          <ModalHeader>Eliminar espacio</ModalHeader>
           <ModalBody>
             <p className="text-sm text-zinc-600 dark:text-zinc-300">
               Esta accion no se puede deshacer. Escribe <strong>{workspace.name}</strong> para confirmar.
@@ -219,7 +219,7 @@ export default function WorkspaceSettingsPage() {
               isLoading={deleteWorkspaceMutation.isPending}
               onPress={() => {
                 if (deleteConfirmation.trim() !== workspace.name) {
-                  toast.error("El nombre no coincide. No se elimino el workspace.");
+                  toast.error("El nombre no coincide. No se elimino el espacio.");
                   return;
                 }
                 void handleDelete();

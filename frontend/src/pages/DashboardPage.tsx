@@ -122,16 +122,16 @@ export default function DashboardPage() {
 
   const workspaceStats = [
     {
-      label: "Workspaces",
+      label: "Espacios",
       value: workspaces.length,
       icon: Users,
-      helper: currentWorkspace ? `Activo: ${currentWorkspace.name}` : "Sin workspace activo",
+      helper: currentWorkspace ? `Activo: ${currentWorkspace.name}` : "Sin espacio activo",
     },
     {
       label: "Proyectos",
       value: projects.length,
       icon: FolderOpen,
-      helper: workspaceSlug ? `En ${currentWorkspace?.name ?? "tu workspace"}` : "Crea o selecciona un workspace",
+      helper: workspaceSlug ? `En ${currentWorkspace?.name ?? "tu espacio"}` : "Crea o selecciona un espacio de trabajo",
     },
     {
       label: "Tickets recientes",
@@ -147,9 +147,9 @@ export default function DashboardPage() {
       setActiveWorkspace(workspace);
       setIsCreateWorkspaceOpen(false);
       navigate(`/workspaces/${workspace.slug}`);
-      toast.success("Workspace creado");
+      toast.success("Espacio de trabajo creado");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo crear el workspace"));
+      toast.error(getApiErrorMessage(error, "No se pudo crear el espacio de trabajo"));
     }
   };
 
@@ -159,12 +159,12 @@ export default function DashboardPage() {
     color?: string;
   }) => {
     if (!workspaceSlug) {
-      toast.error("Selecciona o crea un workspace primero");
+      toast.error("Selecciona o crea un espacio de trabajo primero");
       return;
     }
 
     if (!canMutate) {
-      toast.error("No tienes permisos para crear proyectos en este workspace");
+      toast.error("No tienes permisos para crear proyectos en este espacio");
       return;
     }
 
@@ -238,11 +238,11 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dashboard"
-        subtitle={currentWorkspace ? `Workspace actual: ${currentWorkspace.name}` : "Empieza creando tu primer workspace o acepta una invitación"}
+        subtitle={currentWorkspace ? `Espacio actual: ${currentWorkspace.name}` : "Empieza creando tu primer espacio o acepta una invitación"}
         actions={
           <div className="flex flex-wrap gap-2">
             <Button variant="light" onPress={() => setIsCreateWorkspaceOpen(true)}>
-              Crear workspace
+              Crear espacio
             </Button>
             <Button color="primary" onPress={() => setIsCreateProjectOpen(true)} isDisabled={!workspaceSlug || !canMutate}>
               Nuevo proyecto
@@ -299,7 +299,7 @@ export default function DashboardPage() {
               <div className="rounded-2xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                 {currentWorkspace
                   ? "No hay proyectos todavía. Crea el primero para empezar a organizar tickets."
-                  : "No tienes workspaces todavía. Crea uno para empezar o acepta una invitación pendiente."}
+                  : "No tienes espacios todavía. Crea uno para empezar o acepta una invitación pendiente."}
               </div>
             )}
           </CardBody>
@@ -309,7 +309,7 @@ export default function DashboardPage() {
           <CardBody className="space-y-4 p-5">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Workspaces recientes</h2>
+                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Espacios recientes</h2>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">Acceso rápido y vista completa en una página dedicada.</p>
               </div>
               <Button size="sm" variant="light" onPress={() => navigate("/workspaces")}>Ver todos</Button>
@@ -335,7 +335,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-zinc-300 p-5 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                No tienes workspaces aún.
+                No tienes espacios de trabajo aún.
               </div>
             )}
           </CardBody>
@@ -391,12 +391,12 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {[
                 {
-                  title: "1. Crea tu primer workspace",
-                  description: "Usa el botón de crear workspace para abrir un espacio propio del equipo.",
+                  title: "1. Crea tu primer espacio",
+                  description: "Usa el botón de crear espacio para abrir un entorno propio del equipo.",
                 },
                 {
                   title: "2. Crea un proyecto",
-                  description: "Dentro del workspace agrega un proyecto para empezar a organizar tickets y columnas.",
+                  description: "Dentro del espacio agrega un proyecto para empezar a organizar tickets y columnas.",
                 },
                 {
                   title: "3. Invita o acepta invitaciones",
@@ -412,7 +412,7 @@ export default function DashboardPage() {
 
             <div className="flex flex-wrap gap-2 pt-2">
               <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={() => setIsCreateWorkspaceOpen(true)}>
-                Crear workspace
+                Crear espacio
               </Button>
               <Button
                 variant="light"
@@ -420,7 +420,7 @@ export default function DashboardPage() {
                 onPress={() => workspaceSlug ? navigate(`/workspaces/${workspaceSlug}`) : undefined}
                 isDisabled={!workspaceSlug}
               >
-                Ir al workspace actual
+                Ir al espacio actual
               </Button>
             </div>
           </CardBody>

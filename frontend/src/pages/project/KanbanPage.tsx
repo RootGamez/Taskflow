@@ -217,7 +217,7 @@ export default function KanbanPage() {
     assignee_ids?: string[];
   }) => {
     if (!canMutate) {
-      toast.error("No tienes permisos para crear tickets en este workspace");
+      toast.error("No tienes permisos para crear tickets en este espacio");
       return;
     }
 
@@ -248,7 +248,7 @@ export default function KanbanPage() {
     toOrder: number;
   }) => {
     if (!canMutate) {
-      toast.error("No tienes permisos para mover tickets en este workspace");
+      toast.error("No tienes permisos para mover tickets en este espacio");
       return;
     }
 
@@ -323,7 +323,7 @@ export default function KanbanPage() {
             startContent={<ArrowLeft className="h-4 w-4" />}
             onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
           >
-            Volver al workspace
+            Volver al espacio
           </Button>
           <div>
             <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h1>

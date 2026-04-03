@@ -101,7 +101,7 @@ export default function WorkspaceMembersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Miembros del workspace"
+        title="Miembros del espacio"
         subtitle="Invita personas y administra sus roles"
       />
 

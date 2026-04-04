@@ -7,6 +7,7 @@ export { TicketDetail } from "@/features/tickets/components/TicketDetail";
 export { TicketForm } from "@/features/tickets/components/TicketForm";
 export {
 	useCreateTicket,
+	useDeleteTicket,
 	useTicket,
 	useTickets,
 	useUpdateTicket,

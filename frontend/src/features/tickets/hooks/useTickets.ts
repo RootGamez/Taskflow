@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tansta
 
 import {
   createTicket,
+  deleteTicket,
   getTicketById,
   getTicketsByProject,
   updateTicket,
@@ -110,6 +111,42 @@ export function useUpdateTicket(projectId: string) {
       queryClient.setQueryData(ticketQueryKeys.detail(ticket.id), ticket);
       void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.list(projectId) });
       void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.detail(ticket.id) });
+    },
+  });
+}
+
+export function useDeleteTicket(projectId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (ticketId: string) => deleteTicket(projectId, ticketId),
+
+    onMutate: async (ticketId) => {
+      await queryClient.cancelQueries({ queryKey: ticketQueryKeys.list(projectId) });
+
+      const previousTickets = queryClient.getQueryData<Ticket[]>(ticketQueryKeys.list(projectId));
+      const previousTicket = queryClient.getQueryData<Ticket>(ticketQueryKeys.detail(ticketId));
+
+      queryClient.setQueryData<Ticket[]>(ticketQueryKeys.list(projectId), (current) => {
+        if (!current) return current;
+        return current.filter((ticket) => ticket.id !== ticketId);
+      });
+      queryClient.removeQueries({ queryKey: ticketQueryKeys.detail(ticketId), exact: true });
+
+      return { previousTickets, previousTicket, ticketId };
+    },
+
+    onError: (_error, ticketId, context) => {
+      if (!context) return;
+      queryClient.setQueryData(ticketQueryKeys.list(projectId), context.previousTickets);
+      if (context.previousTicket) {
+        queryClient.setQueryData(ticketQueryKeys.detail(ticketId), context.previousTicket);
+      }
+    },
+
+    onSuccess: (_data, ticketId) => {
+      void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.list(projectId) });
+      void queryClient.removeQueries({ queryKey: ticketQueryKeys.detail(ticketId), exact: true });
     },
   });
 }

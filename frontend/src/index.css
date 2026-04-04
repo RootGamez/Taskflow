@@ -57,6 +57,30 @@ body {
   min-height: 100vh;
 }
 
+/* Global override for HeroUI Input focus halo */
+[data-focus="true"] [data-slot="input-wrapper"],
+[data-focus-visible="true"] [data-slot="input-wrapper"],
+[data-slot="input-wrapper"]:focus-within {
+  box-shadow: none !important;
+  outline: none !important;
+  border-color: inherit !important;
+}
+
+[data-focus="true"] [data-slot="input-wrapper"]::after,
+[data-focus-visible="true"] [data-slot="input-wrapper"]::after,
+[data-slot="input-wrapper"]:focus-within::after {
+  opacity: 0 !important;
+  transform: scaleX(0) !important;
+}
+
+[data-slot="input"]:focus,
+[data-slot="input"]:focus-visible,
+[data-slot="input-wrapper"] input:focus,
+[data-slot="input-wrapper"] input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .ticket-rich-editor p {
   margin: 0;
 }

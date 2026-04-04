@@ -68,6 +68,10 @@ export async function updateTicket(
   return data;
 }
 
+export async function deleteTicket(projectId: string, ticketId: string): Promise<void> {
+  await apiClient.delete(`/projects/${projectId}/tickets/${ticketId}/`);
+}
+
 /**
  * Sube una imagen al ticket y devuelve la URL pública de MinIO.
  * Úsala para insertar imágenes en el rich editor antes de serializar el JSON.

@@ -12,6 +12,7 @@ import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/tic
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import {
   useCreateTicket,
+  useDeleteTicket,
   useTicketsSuspense,
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
@@ -33,6 +34,7 @@ export default function KanbanPage() {
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const createTicketMutation = useCreateTicket(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);
+  const deleteTicketMutation = useDeleteTicket(projectId);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
 
@@ -284,6 +286,21 @@ export default function KanbanPage() {
     });
   };
 
+  const handleDeleteSelectedTicket = async () => {
+    if (!canMutate || !selectedTicketId) {
+      return;
+    }
+
+    try {
+      await deleteTicketMutation.mutateAsync(selectedTicketId);
+      setSelectedTicketId(null);
+      toast.success("Ticket eliminado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo eliminar el ticket"));
+      throw error;
+    }
+  };
+
   const handleLockField = useCallback((field: CollaborativeField) => {
     sendSocketMessage({ action: "lock_field", field });
   }, [sendSocketMessage]);
@@ -373,6 +390,7 @@ export default function KanbanPage() {
         onTypingField={handleTypingField}
         onUploadImage={canMutate ? handleUploadImage : undefined}
         onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />
       <CreateTicketModal

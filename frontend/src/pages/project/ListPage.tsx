@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
 import { ListView } from "@/features/tickets/components/ListView";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
-import { useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import { useDeleteTicket, useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -25,6 +25,7 @@ export default function ListPage() {
   const { data: project } = useProjectSuspense(workspaceSlug, projectId);
   const { data: tickets } = useTicketsSuspense(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);
+  const deleteTicketMutation = useDeleteTicket(projectId);
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const accessToken = useAuthStore((state) => state.accessToken);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
@@ -223,6 +224,21 @@ export default function ListPage() {
     }
   };
 
+  const handleDeleteSelectedTicket = async () => {
+    if (!canMutate || !selectedTicketId) {
+      return;
+    }
+
+    try {
+      await deleteTicketMutation.mutateAsync(selectedTicketId);
+      setSelectedTicketId(null);
+      toast.success("Ticket eliminado");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo eliminar el ticket"));
+      throw error;
+    }
+  };
+
   const handleLockField = useCallback((field: CollaborativeField) => {
     sendSocketMessage({ action: "lock_field", field });
   }, [sendSocketMessage]);
@@ -294,6 +310,7 @@ export default function ListPage() {
         onTypingField={handleTypingField}
         onUploadImage={canMutate ? handleUploadImage : undefined}
         onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />
     </div>

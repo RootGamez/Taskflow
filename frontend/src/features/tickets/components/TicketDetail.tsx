@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Select, SelectItem } from "@heroui/react";
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus } from "lucide-react";
+import { Input, Select, SelectItem } from "@heroui/react";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/shadcn/button";
@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
@@ -276,6 +277,9 @@ export function TicketDetail({
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [immediateSaveNonce, setImmediateSaveNonce] = useState(0);
+  const [isDeleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { title, priority, due_date, column_id, description, assignees } = draftState;
   const hydratedTicketIdRef = useRef<string | null>(null);
@@ -611,46 +615,96 @@ export function TicketDetail({
     );
   };
 
+  const deleteKeyword = (ticket?.title ?? "").trim();
+  const canConfirmDelete =
+    deleteKeyword.length > 0 &&
+    deleteConfirmation.trim().toLowerCase() === deleteKeyword.toLowerCase();
+
+  const openDeleteDialog = () => {
+    setDeleteConfirmation("");
+    setDeleteDialogOpen(true);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) {
+      return;
+    }
+
+    setDeleteDialogOpen(false);
+    setDeleteConfirmation("");
+  };
+
+  const confirmDelete = async () => {
+    if (!onDelete || !canConfirmDelete || isDeleting) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      setDeleteDialogOpen(false);
+      setDeleteConfirmation("");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent
-        ref={dialogContentRef}
-        className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E]"
-        onInteractOutside={(event) => {
-          if (shouldKeepDialogOpen(event.target)) {
-            event.preventDefault();
-          }
-        }}
-        onPointerDownOutside={(event) => {
-          if (shouldKeepDialogOpen(event.target)) {
-            event.preventDefault();
-          }
-        }}
-      >
-        <DialogHeader className="sr-only">
-          <DialogTitle>Detalle del ticket</DialogTitle>
-          <DialogDescription>
-            Panel lateral para editar el ticket, sus responsables, prioridad y descripción.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent
+          ref={dialogContentRef}
+          className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E]"
+          onInteractOutside={(event) => {
+            if (shouldKeepDialogOpen(event.target)) {
+              event.preventDefault();
+            }
+          }}
+          onPointerDownOutside={(event) => {
+            if (shouldKeepDialogOpen(event.target)) {
+              event.preventDefault();
+            }
+          }}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>Detalle del ticket</DialogTitle>
+            <DialogDescription>
+              Panel lateral para editar el ticket, sus responsables, prioridad y descripción.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
-          <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
-            {titleField.isLockedByOther && (
-              <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-                {fieldLocks.title?.userName} editando...
-              </span>
-            )}
+          <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
+            <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
+              {titleField.isLockedByOther && (
+                <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                  {fieldLocks.title?.userName} editando...
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {canEdit && onDelete ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                  onClick={openDeleteDialog}
+                  disabled={isLoading || isDeleting}
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  Eliminar
+                </Button>
+              ) : null}
+              <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <Check className="h-4 w-4" />
+                <span>Guardado automático</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-zinc-400">
-            <Check className="h-4 w-4" />
-            <span>Guardado automático</span>
-          </div>
-        </div>
 
-        <div className="flex min-h-[calc(100dvh-53px)] flex-col px-8 py-6">
-          <div className="mb-8 space-y-4">
+          <div className="flex min-h-[calc(100dvh-53px)] flex-col px-8 py-6">
+            <div className="mb-8 space-y-4">
             <div className="mb-2">
               <textarea
                 ref={titleTextareaRef}
@@ -786,60 +840,87 @@ export function TicketDetail({
             </div>
           </div>
 
-          <div className="flex-1 space-y-5 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
-            <TicketRichEditor
-              value={parseRichTextJson(description)}
-              placeholder="Describe el contexto, avances y decisiones del ticket..."
-              disabled={isLoading || !canEdit}
-              isLocked={isUnifiedEditorLocked}
-              lockHint={
-                unifiedEditorLockOwner
-                  ? `${unifiedEditorLockOwner} está editando, por favor espera.`
-                  : undefined
-              }
-              onUploadImage={onUploadImage}
-              onUploadVideo={onUploadVideo}
-              onChange={(next) => {
-                if (activeFieldRef.current !== "description") {
-                  return;
+            <div className="flex-1 space-y-5 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
+              <TicketRichEditor
+                value={parseRichTextJson(description)}
+                placeholder="Describe el contexto, avances y decisiones del ticket..."
+                disabled={isLoading || !canEdit}
+                isLocked={isUnifiedEditorLocked}
+                lockHint={
+                  unifiedEditorLockOwner
+                    ? `${unifiedEditorLockOwner} está editando, por favor espera.`
+                    : undefined
                 }
+                onUploadImage={onUploadImage}
+                onUploadVideo={onUploadVideo}
+                onChange={(next) => {
+                  if (activeFieldRef.current !== "description") {
+                    return;
+                  }
 
-                const serialized = JSON.stringify(next);
+                  const serialized = JSON.stringify(next);
 
-                if (serialized === description) {
-                  return;
-                }
+                  if (serialized === description) {
+                    return;
+                  }
 
-                markLocalChange("description");
-                dispatch({ type: "SET_DESCRIPTION", value: serialized });
-                onTypingField?.("description", serialized);
-              }}
-              onFocus={descriptionField.onFocus}
-              onBlur={() => {
-                descriptionField.onBlur();
-                scheduleImmediateSave();
-              }}
-            />
-
-            {canEdit && onDelete ? (
-              <div className="mt-12 flex justify-start pb-4 pt-8">
-                <Button
-                  variant="ghost"
-                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
-                  onClick={async () => {
-                    if (window.confirm("¿Estás seguro? Esta acción no se puede deshacer.")) {
-                      await onDelete();
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  Eliminar ticket
-                </Button>
-              </div>
-            ) : null}
+                  markLocalChange("description");
+                  dispatch({ type: "SET_DESCRIPTION", value: serialized });
+                  onTypingField?.("description", serialized);
+                }}
+                onFocus={descriptionField.onFocus}
+                onBlur={() => {
+                  descriptionField.onBlur();
+                  scheduleImmediateSave();
+                }}
+              />
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDeleteDialogOpen} onOpenChange={closeDeleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar ticket</DialogTitle>
+            <DialogDescription>
+              Esta acción es permanente y quitará el ticket del tablero y de la lista.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              Para confirmar, escribe el título exacto del ticket.
+            </p>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Título: <span className="font-semibold text-zinc-800 dark:text-zinc-100">{deleteKeyword || "(sin título)"}</span>
+            </p>
+            <Input
+              aria-label="Confirmación de eliminación"
+              placeholder="Escribe el título del ticket"
+              value={deleteConfirmation}
+              onValueChange={setDeleteConfirmation}
+              isDisabled={isDeleting}
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={isDeleting}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                void confirmDelete();
+              }}
+              disabled={!canConfirmDelete || isDeleting}
+            >
+              {isDeleting ? "Eliminando..." : "Eliminar ticket"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

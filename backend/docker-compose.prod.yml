@@ -1,3 +1,5 @@
+name: taskflow-prod
+
 services:
   postgres:
     image: postgres:15

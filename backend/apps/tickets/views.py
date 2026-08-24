@@ -15,6 +15,7 @@ from rest_framework.views import APIView
 
 from apps.projects.models import Project
 from apps.tickets.consumers import TicketConsumer
+from apps.tickets.filters import apply_ticket_date_filters, parse_ticket_date_filters
 from apps.tickets.models import Ticket, TicketFieldLock, TicketImage, TicketVideo
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
 from apps.tickets.storage import upload_ticket_image, upload_ticket_video
@@ -26,11 +27,10 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 
 	def get(self, request: Request, project_id: str) -> Response:
 		project = self.get_project_for_user(request, project_id)
-		tickets = (
-			project.tickets.select_related("column", "created_by")
-			.prefetch_related("assignees")
-			.order_by("column__order", "order", "created_at")
-		)
+		date_filters = parse_ticket_date_filters(request.query_params)
+		tickets = project.tickets.select_related("column", "created_by").prefetch_related("assignees")
+		tickets = apply_ticket_date_filters(tickets, date_filters)
+		tickets = tickets.order_by("column__order", "order", "created_at")
 		return Response(TicketSerializer(tickets, many=True).data, status=status.HTTP_200_OK)
 
 	def post(self, request: Request, project_id: str) -> Response:

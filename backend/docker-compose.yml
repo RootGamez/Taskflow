@@ -1,3 +1,10 @@
+# Nombre explícito del proyecto: sin esto, Docker Compose usa el nombre del
+# directorio ("backend") para prefijar los volúmenes (ej. backend_postgres_data).
+# Eso colisiona con cualquier otro proyecto en la misma máquina que también
+# tenga una carpeta "backend" con Postgres, reusando un volumen con
+# credenciales de otro proyecto y rompiendo la autenticación en silencio.
+name: taskflow
+
 services:
   postgres:
     image: postgres:15

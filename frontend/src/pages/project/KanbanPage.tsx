@@ -7,8 +7,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
 import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
 import { CreateTicketModal } from "@/features/tickets/components/CreateTicketModal";
+import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
+import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import {
   useCreateTicket,
@@ -17,6 +19,7 @@ import {
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
+import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -37,6 +40,15 @@ export default function KanbanPage() {
   const deleteTicketMutation = useDeleteTicket(projectId);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
+  const dateFilter = useTicketFilterStore((state) => state.dateFilter);
+  const clearDateFilter = useTicketFilterStore((state) => state.clear);
+
+  // El store de filtro de fecha es global (a propósito, no persiste entre
+  // proyectos). Sin este reset, un filtro activo en el Proyecto A se queda
+  // aplicado silenciosamente al navegar al Proyecto B.
+  useEffect(() => {
+    clearDateFilter();
+  }, [projectId, clearDateFilter]);
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [createColumnId, setCreateColumnId] = useState<string | null>(null);
@@ -67,9 +79,17 @@ export default function KanbanPage() {
     progress_notes?: string;
   }>({});
 
+  // El modal de detalle busca el ticket seleccionado en la lista SIN
+  // filtrar: si buscara en filteredTickets, el modal se cerraría solo al
+  // editar un due_date que sacara al ticket del filtro activo.
   const selectedTicket = useMemo(
     () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
     [selectedTicketId, tickets],
+  );
+
+  const filteredTickets = useMemo(
+    () => filterTicketsByDate(tickets, dateFilter),
+    [tickets, dateFilter],
   );
 
   const projectColumns = useMemo(
@@ -350,6 +370,7 @@ export default function KanbanPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <TicketDateFilter />
           <Tabs selectedKey="board" onSelectionChange={(key) => {
             if (key === "list") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/list`);
           }}>
@@ -370,7 +391,8 @@ export default function KanbanPage() {
 
       <KanbanBoard
         columns={projectColumns}
-        tickets={tickets}
+        tickets={filteredTickets}
+        allTickets={tickets}
         canMutate={canMutate}
         onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
         onCreateTicket={(columnId) => setCreateColumnId(columnId)}

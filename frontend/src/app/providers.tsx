@@ -4,9 +4,9 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 import { getMe } from "@/features/auth/api/authApi";
+import { useThemeMode } from "@/hooks/useThemeMode";
 import { queryClient } from "@/lib/queryClient";
 import { useAuthStore } from "@/store/authStore";
-import { useUIStore } from "@/store/uiStore";
 
 interface AppProvidersProps extends PropsWithChildren {
   router: {
@@ -15,15 +15,10 @@ interface AppProvidersProps extends PropsWithChildren {
 }
 
 function ThemeProvider({ children }: PropsWithChildren) {
-  const theme = useUIStore((state) => state.theme);
-
-  useEffect(() => {
-    const root = document.documentElement;
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const shouldDark = theme === "dark" || (theme === "system" && prefersDark);
-
-    root.classList.toggle("dark", shouldDark);
-  }, [theme]);
+  // useThemeMode ya aplica/quita la clase "dark" en document.documentElement
+  // y reacciona en vivo a cambios de localStorage y de prefers-color-scheme
+  // del SO (modo "system"). No hace falta duplicar esa logica aca.
+  useThemeMode();
 
   return <>{children}</>;
 }

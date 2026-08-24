@@ -11,8 +11,31 @@
       rel="stylesheet"
     />
     <title>TaskFlow</title>
+    <script>
+      // Anti-FOUC: aplica la clase "dark" de forma sincrona, antes de que se
+      // pinte el primer frame y antes de que cargue el bundle de React, para
+      // que no haya un flash del tema incorrecto al recargar la pagina.
+      // Solo lee localStorage (dato local del propio usuario) y hace un
+      // classList.toggle; no interpola nada dinamico ni datos de red.
+      (function () {
+        try {
+          // Debe coincidir siempre con THEME_STORAGE_KEY en
+          // src/store/uiStore.ts. Este script es HTML estático fuera del
+          // bundle, no puede importar esa constante: si renombrás una, renombrá
+          // la otra a mano o el anti-FOUC deja de funcionar en silencio.
+          var STORAGE_KEY = "taskflow.theme";
+          var stored = window.localStorage.getItem(STORAGE_KEY);
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var shouldDark = stored === "dark" || (stored !== "light" && prefersDark);
+          document.documentElement.classList.toggle("dark", shouldDark);
+        } catch (error) {
+          // localStorage/matchMedia no disponibles (modo privado, etc.):
+          // se deja el tema por defecto del navegador, sin romper la carga.
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-50">
+  <body class="bg-background text-foreground">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

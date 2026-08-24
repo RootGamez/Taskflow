@@ -1,0 +1,7 @@
+# Fuerza LF en archivos que se ejecutan dentro de contenedores Linux,
+# sin importar el core.autocrlf del checkout local (Windows por defecto
+# usa CRLF, lo que rompe el shebang de estos scripts dentro de Docker con
+# un "exec: no such file or directory" engañoso).
+*.sh text eol=lf
+Dockerfile* text eol=lf
+*.py text eol=lf

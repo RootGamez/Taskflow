@@ -1,8 +1,9 @@
 import { Chip } from "@heroui/react";
-import { AlertCircle, ArrowDown, ArrowUp, Minus, Paperclip } from "lucide-react";
+import { Paperclip } from "lucide-react";
 
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
-import type { Priority, Ticket } from "@/features/tickets/types/ticket.types";
+import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
+import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { formatDueDateDayMonth, isDueDateOverdue } from "@/features/tickets/utils/dueDate";
 
 interface TicketCardProps {
@@ -12,25 +13,11 @@ interface TicketCardProps {
   className?: string;
 }
 
-const PRIORITY_CONFIG: Record<Priority, { color: string; bg: string; label: string }> = {
-  urgent: { color: "text-red-600", bg: "bg-red-50", label: "Urgente" },
-  high: { color: "text-orange-600", bg: "bg-orange-50", label: "Alta" },
-  medium: { color: "text-yellow-600", bg: "bg-yellow-50", label: "Media" },
-  low: { color: "text-blue-600", bg: "bg-blue-50", label: "Baja" },
-  none: { color: "text-zinc-400", bg: "bg-zinc-100", label: "Sin prioridad" },
-};
-
-function PriorityIcon({ priority }: { priority: Priority }) {
-  if (priority === "urgent") return <AlertCircle className="h-4 w-4 text-red-600" />;
-  if (priority === "high") return <ArrowUp className="h-4 w-4 text-orange-600" />;
-  if (priority === "medium") return <Minus className="h-4 w-4 text-yellow-600" />;
-  if (priority === "low") return <ArrowDown className="h-4 w-4 text-blue-600" />;
-  return <Minus className="h-4 w-4 text-zinc-400" />;
-}
-
 export function TicketCard({ ticket, onOpen, tone = "default", className = "" }: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
+  const priorityStyle = PRIORITY_STYLES[ticket.priority];
+  const PriorityIcon = priorityStyle.Icon;
   const assigneeLabel =
     ticket.assignees.length === 0
       ? "Sin responsable"
@@ -53,9 +40,9 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
     >
       <p className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">{ticket.title}</p>
       <div className="mt-3 flex items-center justify-between">
-        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${PRIORITY_CONFIG[ticket.priority].bg} ${PRIORITY_CONFIG[ticket.priority].color}`}>
-          <PriorityIcon priority={ticket.priority} />
-          {PRIORITY_CONFIG[ticket.priority].label}
+        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${priorityStyle.bgClass} ${priorityStyle.textClass}`}>
+          <PriorityIcon className="h-4 w-4" />
+          {priorityStyle.label}
         </div>
         <Paperclip className="h-4 w-4 text-zinc-400" />
       </div>
@@ -71,7 +58,7 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
           ) : null}
         </div>
         {ticket.due_date ? (
-          <span className={`text-xs ${isOverdue ? "text-red-600" : "text-zinc-500"}`}>
+          <span className={`text-xs ${isOverdue ? "text-destructive" : "text-zinc-500"}`}>
             {dueDateLabel}
           </span>
         ) : null}

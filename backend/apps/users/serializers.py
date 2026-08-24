@@ -1,0 +1,264 @@
+from __future__ import annotations
+
+from typing import Any
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import validate_password
+from rest_framework import exceptions, serializers
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.users.models import EmailVerification, UserPreferences
+from apps.users.storage import normalize_avatar_url
+
+User = get_user_model()
+
+
+class UserSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "email",
+            "full_name",
+            "avatar_url",
+            "is_active",
+            "created_at",
+        )
+
+    def get_avatar_url(self, obj):
+        return normalize_avatar_url(obj.avatar_url)
+
+
+class RegisterCodeRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+    full_name = serializers.CharField(
+        max_length=255,
+        error_messages={
+            "required": "El nombre completo es obligatorio.",
+            "blank": "El nombre completo es obligatorio.",
+        },
+    )
+    def validate_email(self, value: str) -> str:
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Ya existe una cuenta con este email.")
+        return value
+class RegisterValidateCodeSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+    code = serializers.CharField(
+        min_length=6,
+        max_length=6,
+        error_messages={
+            "required": "El codigo es obligatorio.",
+            "blank": "El codigo es obligatorio.",
+            "min_length": "El codigo debe tener 6 digitos.",
+            "max_length": "El codigo debe tener 6 digitos.",
+        },
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, Any]:
+        email = attrs["email"]
+
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError({"detail": "Ya existe una cuenta con este email."})
+
+        verification = EmailVerification.objects.filter(email__iexact=email).first()
+        if verification is None:
+            raise serializers.ValidationError(
+                {"detail": "No hay un codigo activo para este correo."}
+            )
+
+        if verification.consumed_at is not None:
+            raise serializers.ValidationError(
+                {"detail": "El codigo ya fue utilizado. Solicita uno nuevo."}
+            )
+
+        if verification.is_expired():
+            raise serializers.ValidationError(
+                {"detail": "El codigo ha expirado. Solicita uno nuevo."}
+            )
+
+        if verification.attempts_remaining <= 0:
+            raise serializers.ValidationError(
+                {"detail": "Has agotado los intentos. Solicita un nuevo codigo."}
+            )
+
+        if not verification.check_code(attrs["code"]):
+            verification.attempts_remaining = max(verification.attempts_remaining - 1, 0)
+            verification.save(update_fields=["attempts_remaining", "updated_at"])
+            raise serializers.ValidationError({"detail": "Codigo invalido."})
+
+        attrs["verification"] = verification
+        return attrs
+
+
+class RegisterVerifyCodeSerializer(RegisterValidateCodeSerializer):
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages={
+            "required": "La contraseña es obligatoria.",
+            "blank": "La contraseña es obligatoria.",
+            "min_length": "La contraseña debe tener al menos 8 caracteres.",
+        },
+    )
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(
+        error_messages={
+            "required": "El token es obligatorio.",
+            "blank": "El token es obligatorio.",
+        }
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages={
+            "required": "La nueva contraseña es obligatoria.",
+            "blank": "La nueva contraseña es obligatoria.",
+            "min_length": "La contraseña debe tener al menos 8 caracteres.",
+        },
+    )
+
+    def validate_new_password(self, value: str) -> str:
+        validate_password(value)
+        return value
+
+
+class TokenPairSerializer(serializers.Serializer):
+    access = serializers.CharField()
+    refresh = serializers.CharField()
+
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(
+        error_messages={
+            "required": "El correo es obligatorio.",
+            "blank": "El correo es obligatorio.",
+            "invalid": "Ingresa un correo valido.",
+        }
+    )
+    password = serializers.CharField(
+        write_only=True,
+        error_messages={
+            "required": "La contraseña es obligatoria.",
+            "blank": "La contraseña es obligatoria.",
+        },
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, str]:
+        email = attrs["email"]
+        password = attrs["password"]
+
+        user = User.objects.filter(email__iexact=email).first()
+        if user is None:
+            raise exceptions.AuthenticationFailed("Correo no registrado.")
+
+        if not user.check_password(password):
+            raise exceptions.AuthenticationFailed("Contraseña incorrecta.")
+
+        if not user.is_active:
+            raise exceptions.AuthenticationFailed("Tu cuenta esta inactiva.")
+
+        return issue_tokens_for_user(user)
+
+
+class RefreshSerializer(serializers.Serializer):
+    refresh = serializers.CharField(
+        error_messages={
+            "required": "El refresh token es obligatorio.",
+            "blank": "El refresh token es obligatorio.",
+        }
+    )
+
+    def validate(self, attrs: dict[str, Any]) -> dict[str, str]:
+        refresh_token = attrs["refresh"]
+
+        try:
+            token = RefreshToken(refresh_token)
+            return {
+                "access": str(token.access_token),
+                "refresh": str(token),
+            }
+        except TokenError as exc:
+            raise exceptions.AuthenticationFailed("Refresh token invalido o expirado.") from exc
+
+
+def issue_tokens_for_user(user: Any) -> dict[str, str]:
+    refresh = RefreshToken.for_user(user)
+    return {
+        "access": str(refresh.access_token),
+        "refresh": str(refresh),
+    }
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ("full_name",)
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(
+        write_only=True,
+        error_messages={
+            "required": "La contraseña actual es obligatoria.",
+            "blank": "La contraseña actual es obligatoria.",
+        },
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        error_messages={
+            "required": "La nueva contraseña es obligatoria.",
+            "blank": "La nueva contraseña es obligatoria.",
+            "min_length": "La contraseña debe tener al menos 8 caracteres.",
+        },
+    )
+
+    def validate_current_password(self, value: str) -> str:
+        user = self.context["request"].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Contraseña actual incorrecta.")
+        return value
+
+
+class UserSessionSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    user_agent = serializers.CharField()
+    ip_address = serializers.CharField()
+    last_activity = serializers.DateTimeField()
+    created_at = serializers.DateTimeField()
+    is_current = serializers.BooleanField()
+
+
+class UserPreferencesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserPreferences
+        fields = ("email_notifications", "push_notifications")
+

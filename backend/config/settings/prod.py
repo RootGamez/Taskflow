@@ -1,0 +1,7 @@
+from .base import *  # noqa: F403,F401
+
+DEBUG = False
+
+SECURE_SL_REDIRECT = True
+SESSION_CSOOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True

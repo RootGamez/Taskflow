@@ -1,0 +1,385 @@
+from __future__ import annotations
+
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from rest_framework import status
+from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.request import Request
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from apps.users.serializers import (
+	ChangePasswordSerializer,
+	LoginSerializer,
+	PasswordResetConfirmSerializer,
+	PasswordResetRequestSerializer,
+	RefreshSerializer,
+	RegisterCodeRequestSerializer,
+	RegisterValidateCodeSerializer,
+	RegisterVerifyCodeSerializer,
+	UserPreferencesSerializer,
+	UserSerializer,
+	UserSessionSerializer,
+	UserUpdateSerializer,
+	issue_tokens_for_user,
+)
+from apps.users.services import (
+	build_password_reset_link,
+	consume_password_reset_token,
+	create_or_refresh_email_verification,
+	create_password_reset_token,
+	send_password_reset_email,
+	send_verification_email,
+)
+from apps.users.storage import upload_user_avatar
+
+User = get_user_model()
+
+
+class RegisterRequestCodeView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RegisterCodeRequestSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo solicitar el codigo de verificacion."
+			raise ValidationError({"detail": message})
+
+		data = serializer.validated_data
+		code = create_or_refresh_email_verification(
+			email=data["email"],
+			full_name=data["full_name"],
+		)
+		send_verification_email(data["email"], code)
+
+		return Response(
+			{"detail": "Se envio un codigo de verificacion al correo."},
+			status=status.HTTP_200_OK,
+		)
+
+
+class RegisterVerifyCodeView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RegisterVerifyCodeSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			elif isinstance(first_error, dict) and "detail" in first_error:
+				message = str(first_error["detail"])
+			else:
+				message = "No se pudo completar el registro."
+			raise ValidationError({"detail": message})
+
+		verification = serializer.validated_data["verification"]
+		user = User.objects.create_user(
+			email=verification.email,
+			full_name=verification.full_name,
+			password=serializer.validated_data["password"],
+		)
+
+		verification.consumed_at = timezone.now()
+		verification.save(update_fields=["consumed_at", "updated_at"])
+
+		return Response(issue_tokens_for_user(user), status=status.HTTP_201_CREATED)
+
+
+class RegisterValidateCodeView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RegisterValidateCodeSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			elif isinstance(first_error, dict) and "detail" in first_error:
+				message = str(first_error["detail"])
+			else:
+				message = "No se pudo validar el codigo."
+			raise ValidationError({"detail": message})
+
+		return Response(
+			{"detail": "Codigo validado correctamente."},
+			status=status.HTTP_200_OK,
+		)
+
+
+class RegisterView(RegisterRequestCodeView):
+	"""Alias retrocompatible de /auth/register/ para solicitar codigo."""
+
+
+class PasswordResetRequestView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = PasswordResetRequestSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo procesar la solicitud."
+			raise ValidationError({"detail": message})
+
+		email = serializer.validated_data["email"]
+		user = User.objects.filter(email__iexact=email, is_active=True).first()
+		if user is not None:
+			token = create_password_reset_token(user)
+			reset_link = build_password_reset_link(token)
+			send_password_reset_email(user.email, reset_link)
+
+		# Siempre respuesta generica para evitar enumeracion de cuentas.
+		return Response(
+			{
+				"detail": (
+					"Si el correo existe, te enviamos un enlace para restablecer la contraseña."
+				)
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
+class PasswordResetConfirmView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = PasswordResetConfirmSerializer(data=request.data)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo restablecer la contraseña."
+			raise ValidationError({"detail": message})
+
+		token = serializer.validated_data["token"]
+		new_password = serializer.validated_data["new_password"]
+		reset_token = consume_password_reset_token(token)
+		if reset_token is None:
+			raise ValidationError({"detail": "El enlace es invalido o ha expirado."})
+
+		user = reset_token.user
+		user.set_password(new_password)
+		user.save(update_fields=["password"])
+
+		# Invalida refresh tokens anteriores por seguridad.
+		from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+		OutstandingToken.objects.filter(user=user).delete()
+
+		return Response(
+			{"detail": "Contraseña restablecida correctamente."},
+			status=status.HTTP_200_OK,
+		)
+
+
+class LoginView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = LoginSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+class RefreshView(APIView):
+	permission_classes = [AllowAny]
+
+	def post(self, request: Request) -> Response:
+		serializer = RefreshSerializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+
+class LogoutView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		refresh_token = request.data.get("refresh")
+		if not refresh_token:
+			return Response(
+				{"detail": "El refresh token es obligatorio."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			token = RefreshToken(refresh_token)
+			token.blacklist()
+		except TokenError:
+			return Response(
+				{"detail": "Refresh token invalido o expirado."},
+				status=status.HTTP_400_BAD_REQUEST,
+			)
+
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class MeView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request) -> Response:
+		return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+
+	def patch(self, request: Request) -> Response:
+		serializer = UserUpdateSerializer(
+			request.user,
+			data=request.data,
+			partial=True,
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo actualizar el perfil."
+			raise ValidationError({"detail": message})
+
+		serializer.save()
+		return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		serializer = ChangePasswordSerializer(
+			data=request.data,
+			context={"request": request},
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo cambiar la contraseña."
+			raise ValidationError({"detail": message})
+
+		request.user.set_password(serializer.validated_data["new_password"])
+		request.user.save()
+		
+		# Retornar nuevos tokens
+		return Response(issue_tokens_for_user(request.user), status=status.HTTP_200_OK)
+
+
+class UserSessionListView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request) -> Response:
+		from apps.users.models import UserSession
+		sessions = UserSession.objects.filter(user=request.user)
+		
+		data = []
+		for session in sessions:
+			session_data = {
+				"id": str(session.id),
+				"user_agent": session.user_agent,
+				"ip_address": session.ip_address,
+				"last_activity": session.last_activity.isoformat(),
+				"created_at": session.created_at.isoformat(),
+				"is_current": False,  # Simplificado
+			}
+			data.append(session_data)
+		
+		return Response(data, status=status.HTTP_200_OK)
+
+
+class UserSessionDetailView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def delete(self, request: Request, session_id: str) -> Response:
+		from apps.users.models import UserSession
+		
+		try:
+			session = UserSession.objects.get(id=session_id, user=request.user)
+			session.delete()
+			return Response(status=status.HTTP_204_NO_CONTENT)
+		except UserSession.DoesNotExist:
+			raise NotFound("Sesión no encontrada.")
+
+
+class UserSessionRevokeOthersView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		from apps.users.models import UserSession
+
+		# Sin identificador de sesión actual, se revocan todas las sesiones registradas.
+		UserSession.objects.filter(user=request.user).delete()
+		
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserPreferencesView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def patch(self, request: Request) -> Response:
+		from apps.users.models import UserPreferences
+		
+		preferences, created = UserPreferences.objects.get_or_create(user=request.user)
+		
+		serializer = UserPreferencesSerializer(
+			preferences,
+			data=request.data,
+			partial=True,
+		)
+		if not serializer.is_valid():
+			errors = serializer.errors
+			first_error = next(iter(errors.values()), None)
+			if isinstance(first_error, list) and first_error:
+				message = str(first_error[0])
+			else:
+				message = "No se pudo actualizar preferencias."
+			raise ValidationError({"detail": message})
+
+		serializer.save()
+		return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class UserDeactivateView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request: Request) -> Response:
+		request.user.is_active = False
+		request.user.save()
+		
+		# Retornar una respuesta vacía
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserAvatarUploadView(APIView):
+	permission_classes = [IsAuthenticated]
+	parser_classes = [MultiPartParser, FormParser]
+
+	def post(self, request: Request) -> Response:
+		avatar = request.FILES.get("avatar")
+		if avatar is None:
+			raise ValidationError({"detail": "Debes seleccionar una imagen."})
+
+		try:
+			avatar_url = upload_user_avatar(avatar, str(request.user.id))
+		except ValueError as exc:
+			raise ValidationError({"detail": str(exc)}) from exc
+		except Exception as exc:
+			raise ValidationError({"detail": "No se pudo subir la imagen de perfil."}) from exc
+
+		request.user.avatar_url = avatar_url
+		request.user.save(update_fields=["avatar_url"])
+		return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)

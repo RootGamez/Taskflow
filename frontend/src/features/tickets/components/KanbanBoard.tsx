@@ -21,10 +21,18 @@ import type { Column } from "@/features/projects/types/project.types";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import { TicketCard } from "@/features/tickets/components/TicketCard";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
+import { resolveDropOrder } from "@/features/tickets/utils/resolveDropOrder";
 
 interface KanbanBoardProps {
   columns: Column[];
+  /** Tickets a renderizar (puede venir filtrado, ej. por fecha). */
   tickets: Ticket[];
+  /**
+   * Lista SIN filtrar. Se usa para calcular el destino real de un drag
+   * (order real, largo real de columna) para que un filtro activo nunca
+   * corrompa el order de tickets ocultos por ese filtro.
+   */
+  allTickets: Ticket[];
   canMutate: boolean;
   onOpenTicket: (ticket: Ticket) => void;
   onCreateTicket: (columnId: string) => void;
@@ -152,6 +160,7 @@ function TicketCell({
   columnTickets,
   canMutate,
   tone,
+  isFilteredEmpty,
   onOpenTicket,
   onCreateTicket,
 }: {
@@ -160,6 +169,8 @@ function TicketCell({
   columnTickets: Ticket[];
   canMutate: boolean;
   tone: ColumnTone;
+  /** true cuando esta celda no tiene tickets visibles SOLO por el filtro de fecha activo. */
+  isFilteredEmpty: boolean;
   onOpenTicket: (ticket: Ticket) => void;
   onCreateTicket: (columnId: string) => void;
 }) {
@@ -204,6 +215,11 @@ function TicketCell({
               onOpen={onOpenTicket}
             />
           ))}
+          {isFilteredEmpty ? (
+            <p className="rounded-lg border border-dashed border-zinc-300 px-2 py-3 text-center text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              Ningún ticket coincide con el filtro de fecha
+            </p>
+          ) : null}
         </div>
       </SortableContext>
 
@@ -223,6 +239,7 @@ function TicketCell({
 export function KanbanBoard({
   columns,
   tickets,
+  allTickets,
   canMutate,
   onOpenTicket,
   onCreateTicket,
@@ -236,10 +253,14 @@ export function KanbanBoard({
     [columns],
   );
 
+  // Deriva de allTickets (sin filtrar): las filas de colaborador no deben
+  // desaparecer solo porque el filtro de fecha oculta todos los tickets
+  // visibles de esa persona en este momento — para ese caso está el placeholder
+  // de "ningún ticket coincide" por celda, no la desaparición de la fila entera.
   const collaboratorLanes = useMemo(() => {
     const mapping = new Map<string, CollaboratorLane>();
 
-    for (const ticket of tickets) {
+    for (const ticket of allTickets) {
       for (const assignee of ticket.assignees) {
         if (!mapping.has(assignee.id)) {
           mapping.set(assignee.id, {
@@ -255,13 +276,13 @@ export function KanbanBoard({
       a.name.localeCompare(b.name, "es"),
     );
 
-    const hasUnassigned = tickets.some((ticket) => ticket.assignees.length === 0);
+    const hasUnassigned = allTickets.some((ticket) => ticket.assignees.length === 0);
     if (hasUnassigned) {
       lanes.push({ id: UNASSIGNED_LANE_ID, name: "Sin asignar", user: null });
     }
 
     return lanes;
-  }, [tickets]);
+  }, [allTickets]);
 
   const ticketsByLaneAndColumn = useMemo(() => {
     const mapping = new Map<string, Map<string, Ticket[]>>();
@@ -301,12 +322,15 @@ export function KanbanBoard({
     return mapping;
   }, [collaboratorLanes, orderedColumns, tickets]);
 
+  // Deriva SIEMPRE de allTickets (sin filtrar): se usa para calcular el
+  // destino real de un drag (ver resolveDropOrder), que no debe verse
+  // afectado por un filtro de fecha activo en `tickets`.
   const ticketsByColumn = useMemo(() => {
     const mapping = new Map<string, Ticket[]>();
     for (const column of orderedColumns) {
       mapping.set(column.id, []);
     }
-    for (const ticket of tickets) {
+    for (const ticket of allTickets) {
       if (!mapping.has(ticket.column_id)) {
         mapping.set(ticket.column_id, []);
       }
@@ -319,12 +343,43 @@ export function KanbanBoard({
       );
     }
     return mapping;
-  }, [orderedColumns, tickets]);
+  }, [orderedColumns, allTickets]);
 
+  // Idem: deriva de allTickets para resolver el ticket bajo el cursor con su
+  // order real, sin importar si está oculto por el filtro activo.
   const ticketById = useMemo(
-    () => new Map(tickets.map((ticket) => [ticket.id, ticket])),
-    [tickets],
+    () => new Map(allTickets.map((ticket) => [ticket.id, ticket])),
+    [allTickets],
   );
+
+  // Conteo FILTRADO por columna, para el badge del header (debe reflejar lo
+  // que el usuario está viendo, no el total real).
+  const filteredCountByColumn = useMemo(() => {
+    const mapping = new Map<string, number>();
+    for (const ticket of tickets) {
+      mapping.set(ticket.column_id, (mapping.get(ticket.column_id) ?? 0) + 1);
+    }
+    return mapping;
+  }, [tickets]);
+
+  // Conteo SIN filtrar por lane+columna, para distinguir en cada celda si
+  // está vacía porque nunca hubo tickets ahí o porque el filtro de fecha
+  // ocultó los que sí había.
+  const allTicketsCountByLaneColumn = useMemo(() => {
+    const mapping = new Map<string, number>();
+    for (const ticket of allTickets) {
+      const targetLaneIds =
+        ticket.assignees.length === 0
+          ? [UNASSIGNED_LANE_ID]
+          : ticket.assignees.map((assignee) => assignee.id);
+
+      for (const laneId of targetLaneIds) {
+        const key = `${laneId}::${ticket.column_id}`;
+        mapping.set(key, (mapping.get(key) ?? 0) + 1);
+      }
+    }
+    return mapping;
+  }, [allTickets]);
 
   const laneTotals = useMemo(() => {
     const totals = new Map<string, number>();
@@ -386,15 +441,12 @@ export function KanbanBoard({
       return;
     }
 
-    let toOrder = 1;
-    if (overData?.ticketId) {
-      const destinationTickets = ticketsByColumn.get(toColumnId) ?? [];
-      const overIndex = destinationTickets.findIndex((ticket) => ticket.id === overData.ticketId);
-      toOrder = overIndex >= 0 ? overIndex + 1 : destinationTickets.length + 1;
-    } else {
-      const destinationTickets = ticketsByColumn.get(toColumnId) ?? [];
-      toOrder = destinationTickets.length + 1;
-    }
+    const toOrder = resolveDropOrder({
+      overTicketId: overData?.ticketId,
+      toColumnId,
+      ticketsByColumn,
+      ticketById,
+    });
 
     const activeTicket = ticketById.get(ticketId);
     if (!activeTicket) {
@@ -448,7 +500,7 @@ export function KanbanBoard({
             </div>
             {orderedColumns.map((column) => {
               const tone = getColumnTone(column.name);
-              const count = ticketsByColumn.get(column.id)?.length ?? 0;
+              const count = filteredCountByColumn.get(column.id) ?? 0;
 
               return (
                 <div
@@ -492,6 +544,9 @@ export function KanbanBoard({
                 {orderedColumns.map((column) => {
                   const tone = getColumnTone(column.name);
                   const columnTickets = laneColumns?.get(column.id) ?? [];
+                  const hadTicketsBeforeFilter =
+                    (allTicketsCountByLaneColumn.get(`${lane.id}::${column.id}`) ?? 0) > 0;
+                  const isFilteredEmpty = columnTickets.length === 0 && hadTicketsBeforeFilter;
 
                   return (
                     <TicketCell
@@ -501,6 +556,7 @@ export function KanbanBoard({
                       columnTickets={columnTickets}
                       canMutate={canMutate}
                       tone={tone}
+                      isFilteredEmpty={isFilteredEmpty}
                       onOpenTicket={onOpenTicket}
                       onCreateTicket={onCreateTicket}
                     />

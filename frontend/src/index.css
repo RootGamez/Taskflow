@@ -1,0 +1,218 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 40.4%;
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --ring: 217.2 91.2% 59.8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 3.6%;
+    --foreground: 0 0% 98.2%;
+    --card: 0 0% 3.6%;
+    --card-foreground: 0 0% 98.2%;
+    --popover: 0 0% 3.6%;
+    --popover-foreground: 0 0% 98.2%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 86% 97.1%;
+    --destructive-foreground: 0 62.8% 30.6%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98.2%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+:root {
+  font-family: Inter, system-ui, sans-serif;
+}
+
+body {
+  min-height: 100vh;
+}
+
+/* Global override for HeroUI Input focus halo */
+[data-focus="true"] [data-slot="input-wrapper"],
+[data-focus-visible="true"] [data-slot="input-wrapper"],
+[data-slot="input-wrapper"]:focus-within {
+  box-shadow: none !important;
+  outline: none !important;
+  border-color: inherit !important;
+}
+
+[data-focus="true"] [data-slot="input-wrapper"]::after,
+[data-focus-visible="true"] [data-slot="input-wrapper"]::after,
+[data-slot="input-wrapper"]:focus-within::after {
+  opacity: 0 !important;
+  transform: scaleX(0) !important;
+}
+
+[data-slot="input"]:focus,
+[data-slot="input"]:focus-visible,
+[data-slot="input-wrapper"] input:focus,
+[data-slot="input-wrapper"] input:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.ticket-rich-editor p {
+  margin: 0;
+}
+
+.ticket-rich-editor p + p,
+.ticket-rich-editor h2 + p,
+.ticket-rich-editor h3 + p,
+.ticket-rich-editor ul + p,
+.ticket-rich-editor ol + p,
+.ticket-rich-editor pre + p {
+  margin-top: 0.65rem;
+}
+
+.ticket-rich-editor h2,
+.ticket-rich-editor h3 {
+  margin-top: 1rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ticket-rich-editor h2 {
+  font-size: 1.125rem;
+}
+
+.ticket-rich-editor h3 {
+  font-size: 1rem;
+}
+
+.ticket-rich-editor ul,
+.ticket-rich-editor ol {
+  margin: 0.65rem 0;
+  padding-left: 1.2rem;
+}
+
+.ticket-rich-editor li {
+  margin: 0.2rem 0;
+}
+
+.ticket-rich-editor blockquote {
+  margin: 0.7rem 0;
+  border-left: 3px solid rgb(212 212 216);
+  padding-left: 0.85rem;
+  color: rgb(82 82 91);
+}
+
+.ticket-rich-editor ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li > label {
+  margin-top: 0.15rem;
+}
+
+.ticket-rich-editor ul[data-type="taskList"] li > div {
+  flex: 1;
+}
+
+.ticket-rich-editor pre {
+  margin-top: 0.8rem;
+  overflow-x: auto;
+  border-radius: 0.55rem;
+  background: rgb(24 24 27);
+  padding: 0.7rem 0.9rem;
+  color: rgb(228 228 231);
+  font-size: 0.82rem;
+}
+
+.ticket-rich-editor code {
+  border-radius: 0.35rem;
+  background: rgb(244 244 245);
+  padding: 0.1rem 0.3rem;
+  font-size: 0.82em;
+}
+
+.ticket-rich-editor .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: rgb(161 161 170);
+}
+
+.dark .ticket-rich-editor code {
+  background: rgb(39 39 42);
+}
+
+.dark .ticket-rich-editor blockquote {
+  border-left-color: rgb(63 63 70);
+  color: rgb(161 161 170);
+}
+
+.ticket-rich-editor .ProseMirror {
+  min-height: 100%;
+}
+
+.ticket-rich-editor {
+  cursor: text;
+}
+
+.taskflow-toast-container {
+  top: 0.9rem !important;
+  left: 17rem !important;
+  right: auto !important;
+}
+
+.taskflow-toast-container > div {
+  min-width: 22rem;
+  max-width: 28rem;
+}
+
+@media (max-width: 1024px) {
+  .taskflow-toast-container {
+    left: 5rem !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .taskflow-toast-container {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+  }
+
+  .taskflow-toast-container > div {
+    min-width: unset;
+    max-width: 100%;
+  }
+}

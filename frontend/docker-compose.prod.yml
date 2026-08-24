@@ -1,0 +1,15 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=${VITE_API_URL:?VITE_API_URL is required}
+    container_name: taskflow_frontend_prod
+    restart: unless-stopped
+    networks:
+      - proxy_network
+
+networks:
+  proxy_network:
+    external: true

@@ -92,7 +92,7 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 			ticket,
 			data=request.data,
 			partial=True,
-			context={"project": project},
+			context={"project": project, "actor": request.user},
 		)
 		if not serializer.is_valid():
 			errors = serializer.errors

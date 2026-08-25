@@ -20,7 +20,10 @@ class NotificationListView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request) -> Response:
-		notifications = Notification.objects.filter(recipient=request.user)
+		notifications = (
+			Notification.objects.filter(recipient=request.user)
+			.select_related("actor")[:50]
+		)
 		serializer = NotificationSerializer(notifications, many=True)
 		return Response(serializer.data, status=status.HTTP_200_OK)
 

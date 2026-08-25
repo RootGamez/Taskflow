@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import logging
+
 from django.db import transaction
 from django.db.models import F, Max
 from rest_framework import serializers
 
+import apps.activities.services as activities_services
+import apps.notifications.services as notifications_services
+from apps.activities.models import Activity
 from apps.projects.models import ProjectColumn
 from apps.tickets.models import Ticket
 from apps.users.serializers import UserSerializer
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_ticket_positions(ticket: Ticket, target_column: ProjectColumn, requested_order: int | None) -> tuple[ProjectColumn, int]:
@@ -140,7 +147,22 @@ class TicketCreateSerializer(serializers.Serializer):
             if "assignee_ids" in validated_data:
                 ticket.assignees.set(validated_data["assignee_ids"])
 
-            return ticket
+        # Fuera de la transacción: el único evento `created` de este ticket,
+        # nunca acompañado de status_changed/assigned por los valores
+        # iniciales (esos no son "cambios", son el estado inicial).
+        #
+        # Envuelto en try/except a propósito: el ticket YA se guardó (la
+        # transacción de arriba ya cerró). Un bug en el registro de
+        # actividad es un problema de observabilidad, no debe convertirse en
+        # un 500 sobre una creación de ticket que en realidad funcionó.
+        request = self.context.get("request")
+        actor = request.user if request is not None else None
+        try:
+            activities_services.record_ticket_created(ticket, actor)
+        except Exception:
+            logger.exception("No se pudo registrar la actividad 'created' del ticket %s", ticket.id)
+
+        return ticket
 
 
 class TicketUpdateSerializer(serializers.Serializer):
@@ -166,6 +188,11 @@ class TicketUpdateSerializer(serializers.Serializer):
         return value
 
     def update(self, instance: Ticket, validated_data: dict) -> Ticket:
+        # Snapshot ANTES de mutar nada — incluido antes del `.set()` de
+        # assignees más abajo — para poder diffear contra el estado
+        # post-guardado en `record_ticket_changes`.
+        snapshot = activities_services.take_snapshot(instance)
+
         # Build update_fields dynamically — only touch what was actually sent in the PATCH
         scalar_fields = ("title", "description", "progress_notes", "priority", "due_date")
         fields_to_save: list[str] = []
@@ -187,5 +214,27 @@ class TicketUpdateSerializer(serializers.Serializer):
             # Set M2M assignees inside the same transaction for atomicity
             if "assignee_ids" in validated_data:
                 instance.assignees.set(validated_data["assignee_ids"])
+
+        # Fuera de la transacción: si algo de esto fallara no queremos
+        # actividades/notificaciones huérfanas de un update que se revirtió.
+        # `actor` viene en el context desde los dos call sites compartidos
+        # (TicketDetailView.patch y TicketConsumer._patch_ticket).
+        #
+        # Envuelto en try/except a propósito: el update del ticket YA se
+        # guardó (la transacción de arriba ya cerró). Este bloque es
+        # actividad/notificaciones, un efecto secundario — no debe poder
+        # tumbar la respuesta HTTP ni, peor, cortar la conexión de
+        # WebSocket del panel de detalle (TicketConsumer no envuelve
+        # `_patch_ticket` en try/except, así que una excepción acá se
+        # propagaría hasta el consumer).
+        actor = self.context.get("actor")
+        try:
+            changes = activities_services.record_ticket_changes(instance, actor, snapshot)
+            added_ids = [
+                activity.to_value["id"] for activity in changes if activity.action == Activity.Action.ASSIGNED
+            ]
+            notifications_services.notify_ticket_assigned(instance, actor, added_ids)
+        except Exception:
+            logger.exception("No se pudo registrar actividad/notificar cambios del ticket %s", instance.id)
 
         return instance

@@ -5,5 +5,23 @@ export {
 	useMarkNotificationRead,
 	useNotificationAction,
 	useNotifications,
+	useNotificationsRealtime,
 } from "@/features/notifications/hooks/useNotifications";
-export type { NotificationItem, NotificationType } from "@/features/notifications/types/notification.types";
+export {
+	groupNotificationsByRecency,
+} from "@/features/notifications/lib/groupNotificationsByRecency";
+export type {
+	NotificationRecencyGroup,
+	NotificationRecencyLabel,
+} from "@/features/notifications/lib/groupNotificationsByRecency";
+export { notificationPresentation } from "@/features/notifications/lib/notificationPresentation";
+export type { NotificationPresentation } from "@/features/notifications/lib/notificationPresentation";
+export type {
+	KnownNotificationType,
+	NotificationAction,
+	NotificationItem,
+	NotificationType,
+	TicketNotificationData,
+	WorkspaceDeletedData,
+	WorkspaceInvitationData,
+} from "@/features/notifications/types/notification.types";

@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
+import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
@@ -875,6 +876,10 @@ export function TicketDetail({
                 }}
               />
             </div>
+
+            {ticket ? (
+              <TicketDiscussion ticketId={ticket.id} projectId={ticket.project_id} canComment={Boolean(canEdit)} />
+            ) : null}
           </div>
         </DialogContent>
       </Dialog>

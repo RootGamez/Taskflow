@@ -16,6 +16,8 @@ import WorkspaceMembersPage from "@/pages/workspace/WorkspaceMembersPage";
 import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
 import KanbanPage from "@/pages/project/KanbanPage";
 import ListPage from "@/pages/project/ListPage";
+import CalendarPage from "@/pages/project/CalendarPage";
+import MyTasksPage from "@/pages/mytasks/MyTasksPage";
 import TicketDetailPage from "@/pages/ticket/TicketDetailPage";
 import { UserProfilePage } from "@/pages/user/UserProfilePage";
 import { UserSecurityPage } from "@/pages/user/UserSecurityPage";
@@ -94,6 +96,22 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingSpinner />}>
             <ListPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/workspaces/:workspaceSlug/projects/:projectId/calendar",
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <CalendarPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/my-tasks",
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <MyTasksPage />
           </Suspense>
         ),
       },

@@ -22,6 +22,9 @@ const COVERED_PATHS = [
   // porque todavía no estaba cuando arrancó su trabajo — única excepción
   // acordada a "no tocar este archivo" en el resto de la Fase 2.
   "src/features/calendar/**",
+  "src/features/sprints/**",
+  "src/features/mytasks/**",
+  "src/features/labels/**",
 ];
 
 export default defineConfig({

@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   useComments,
@@ -41,6 +41,13 @@ function createWrapper() {
   }
   return { client, Wrapper };
 }
+
+beforeEach(() => {
+  // Sin esto, los mocks arrastran llamadas de un test al siguiente (el mock
+  // es un módulo compartido entre todos los `it()` del archivo) — el test
+  // "does not fetch..." fallaba porque veía la llamada del test anterior.
+  vi.clearAllMocks();
+});
 
 describe("useComments", () => {
   it("fetches comments for the given project/ticket", async () => {

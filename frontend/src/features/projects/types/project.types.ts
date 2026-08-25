@@ -2,6 +2,7 @@ export interface Project {
   id: string;
   workspace_id: string;
   name: string;
+  key: string | null;
   description: string | null;
   color: string;
   is_archived: boolean;

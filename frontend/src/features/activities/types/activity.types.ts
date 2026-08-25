@@ -5,9 +5,11 @@
  * `backend/apps/activities/services.py`):
  *
  * - `created` / `commented`: sin valores (`null`).
- * - `status_changed` / `priority_changed` / `title_changed`: forma fija
- *   `{ id, label }` en ambos lados (referencian una entidad denormalizada:
- *   columna, prioridad o el título anterior/nuevo).
+ * - `status_changed` / `priority_changed` / `title_changed` /
+ *   `sprint_changed`: forma fija `{ id, label }` en ambos lados
+ *   (referencian una entidad denormalizada: columna, prioridad, el título
+ *   anterior/nuevo, o el sprint -- `id: null, label: "Backlog"` cuando el
+ *   ticket no tiene sprint asignado).
  * - `assigned`: solo `to_value` (se "agrega" un asignado, no hay "from").
  * - `unassigned`: solo `from_value` (se "quita" un asignado, no hay "to").
  * - `due_date_changed`: caso especial — no hay una entidad con `id`
@@ -79,6 +81,12 @@ export interface CommentedActivity extends BaseActivity {
   to_value: null;
 }
 
+export interface SprintChangedActivity extends BaseActivity {
+  action: "sprint_changed";
+  from_value: ActivityValue;
+  to_value: ActivityValue;
+}
+
 export type Activity =
   | TicketCreatedActivity
   | StatusChangedActivity
@@ -87,6 +95,7 @@ export type Activity =
   | UnassignedActivity
   | DueDateChangedActivity
   | TitleChangedActivity
-  | CommentedActivity;
+  | CommentedActivity
+  | SprintChangedActivity;
 
 export type ActivityAction = Activity["action"];

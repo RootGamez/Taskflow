@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.test.utils import CaptureQueriesContext
+from django.db import connection
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from apps.activities.models import Activity
+from apps.labels.models import Label
 from apps.projects.models import Project, ProjectColumn
+from apps.sprints.models import Sprint
 from apps.tickets.models import Ticket
 from apps.workspaces.models import Workspace, WorkspaceMember
 
@@ -334,3 +339,185 @@ class TicketDateFilterTests(APITestCase):
 		response = self._list({"overdue": "true"})
 
 		self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class TicketSprintLabelReferenceTests(APITestCase):
+	def setUp(self) -> None:
+		self.user = User.objects.create_user(
+			email="owner@example.com",
+			full_name="Owner",
+			password="Passw0rd!123",
+		)
+		login_response = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "owner@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+		self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		self.project = Project.objects.create(workspace=self.workspace, name="Core Platform", key="KEY")
+		self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
+		self.sprint = Sprint.objects.create(
+			project=self.project,
+			name="Sprint 1",
+			start_date=date(2026, 1, 1),
+			end_date=date(2026, 1, 14),
+		)
+		self.label = Label.objects.create(project=self.project, name="Bug", color="#DC2626")
+
+		self.other_workspace = Workspace.objects.create(name="Otro", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=self.other_workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		self.other_project = Project.objects.create(workspace=self.other_workspace, name="Otro proyecto")
+		ProjectColumn.objects.create(project=self.other_project, name="Backlog", order=1)
+		self.other_sprint = Sprint.objects.create(
+			project=self.other_project,
+			name="Sprint ajeno",
+			start_date=date(2026, 1, 1),
+			end_date=date(2026, 1, 14),
+		)
+		self.other_label = Label.objects.create(project=self.other_project, name="Ajena", color="#2563EB")
+
+	def _create_ticket(self, **overrides) -> dict:
+		payload = {"title": "Ticket base", "column_id": str(self.backlog.id), **overrides}
+		response = self.client.post(f"/api/v1/projects/{self.project.id}/tickets/", payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		return response.data
+
+	def test_reference_uses_project_key_and_ticket_number(self) -> None:
+		ticket = self._create_ticket()
+
+		self.assertEqual(ticket["reference"], "KEY-1")
+		self.assertEqual(ticket["number"], 1)
+
+	def test_reference_is_null_when_project_has_no_key(self) -> None:
+		project_without_key = Project.objects.create(workspace=self.workspace, name="Sin key")
+		Project.objects.filter(id=project_without_key.id).update(key=None)
+		column = ProjectColumn.objects.create(project=project_without_key, name="Backlog", order=1)
+
+		response = self.client.post(
+			f"/api/v1/projects/{project_without_key.id}/tickets/",
+			{"title": "Ticket sin key", "column_id": str(column.id)},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+		self.assertIsNone(response.data["reference"])
+
+	def test_patch_sprint_id_moves_ticket_and_records_sprint_changed_activity(self) -> None:
+		ticket = self._create_ticket()
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"sprint_id": str(self.sprint.id)},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["sprint_id"], str(self.sprint.id))
+		self.assertTrue(
+			Activity.objects.filter(
+				ticket_id=ticket["id"],
+				action=Activity.Action.SPRINT_CHANGED,
+			).exists()
+		)
+
+	def test_patch_sprint_id_null_sends_ticket_back_to_backlog(self) -> None:
+		ticket = self._create_ticket(sprint_id=str(self.sprint.id))
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"sprint_id": None},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertIsNone(response.data["sprint_id"])
+
+	def test_sprint_from_another_project_returns_400(self) -> None:
+		ticket = self._create_ticket()
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"sprint_id": str(self.other_sprint.id)},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_changing_sprint_does_not_alter_order(self) -> None:
+		ticket = self._create_ticket()
+		self._create_ticket(title="Segundo ticket")
+		order_before = Ticket.objects.get(id=ticket["id"]).order
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"sprint_id": str(self.sprint.id)},
+			format="json",
+		)
+
+		order_after = Ticket.objects.get(id=ticket["id"]).order
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(order_before, order_after)
+
+	def test_label_ids_from_another_project_returns_400(self) -> None:
+		ticket = self._create_ticket()
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"label_ids": [str(self.other_label.id)]},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_create_with_label_ids_from_another_project_returns_400(self) -> None:
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con label ajena",
+				"column_id": str(self.backlog.id),
+				"label_ids": [str(self.other_label.id)],
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+	def test_listing_tickets_with_many_labels_does_not_scale_queries(self) -> None:
+		extra_labels = [
+			Label.objects.create(project=self.project, name=f"Label {i}", color="#2563EB") for i in range(5)
+		]
+		for i in range(20):
+			ticket_id = self._create_ticket(title=f"Ticket {i}")["id"]
+			ticket = Ticket.objects.get(id=ticket_id)
+			ticket.labels.set(extra_labels)
+
+		with CaptureQueriesContext(connection) as small_batch:
+			response_small = self.client.get(f"/api/v1/projects/{self.project.id}/tickets/")
+		self.assertEqual(response_small.status_code, status.HTTP_200_OK)
+
+		for i in range(20, 25):
+			ticket_id = self._create_ticket(title=f"Ticket {i}")["id"]
+			ticket = Ticket.objects.get(id=ticket_id)
+			ticket.labels.set(extra_labels)
+
+		with CaptureQueriesContext(connection) as bigger_batch:
+			response_big = self.client.get(f"/api/v1/projects/{self.project.id}/tickets/")
+		self.assertEqual(response_big.status_code, status.HTTP_200_OK)
+
+		# El listado no debe escalar linealmente con la cantidad de tickets
+		# ni de labels por ticket (anti N+1, seccion 0.9): la cantidad de
+		# queries con 25 tickets no debe ser mayor que con 20.
+		self.assertLessEqual(len(bigger_batch.captured_queries), len(small_batch.captured_queries))

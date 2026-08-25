@@ -17,6 +17,7 @@ class Activity(models.Model):
         DUE_DATE_CHANGED = "due_date_changed", "Due date changed"
         TITLE_CHANGED = "title_changed", "Title changed"
         COMMENTED = "commented", "Commented"
+        SPRINT_CHANGED = "sprint_changed", "Sprint changed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ticket = models.ForeignKey("tickets.Ticket", on_delete=models.CASCADE, related_name="activities")

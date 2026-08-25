@@ -1,5 +1,6 @@
 from django.urls import path
 
+from apps.tickets.my_tasks import MyTasksView
 from apps.tickets.views import TicketDetailView, TicketImageUploadView, TicketVideoUploadView, TicketListCreateView, TicketSingleView
 
 urlpatterns = [
@@ -22,6 +23,15 @@ urlpatterns = [
         "projects/<uuid:project_id>/tickets/<uuid:ticket_id>/videos/",
         TicketVideoUploadView.as_view(),
         name="ticket-video-upload",
+    ),
+    # Declarada ANTES de "tickets/<uuid:ticket_id>/" a proposito, aunque no
+    # es estrictamente necesario: el converter `uuid` no matchea el string
+    # literal "mine", asi que Django nunca la confundiria con un ticket_id
+    # (ver test_my_tasks.py). El orden explicito es documentacion.
+    path(
+        "tickets/mine/",
+        MyTasksView.as_view(),
+        name="ticket-my-tasks",
     ),
     path(
         "tickets/<uuid:ticket_id>/",

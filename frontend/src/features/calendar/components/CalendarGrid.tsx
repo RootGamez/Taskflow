@@ -5,7 +5,7 @@ import { CalendarDayCell } from "@/features/calendar/components/CalendarDayCell"
 import { CalendarToolbar } from "@/features/calendar/components/CalendarToolbar";
 import { buildMonthGrid } from "@/features/calendar/utils/buildMonthGrid";
 import { formatCalendarDayKey, groupTicketsByDay } from "@/features/calendar/utils/groupTicketsByDay";
-import { resolveCalendarDrop } from "@/features/calendar/utils/resolveCalendarDrop";
+import { resolveCalendarDrop, type CalendarDropResult } from "@/features/calendar/utils/resolveCalendarDrop";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 
 const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -22,6 +22,33 @@ function shiftMonth(cursor: MonthCursor, delta: 1 | -1): MonthCursor {
     year: Math.floor(totalMonths / 12),
     month: ((totalMonths % 12) + 12) % 12,
   };
+}
+
+/**
+ * Lógica de `onDragEnd` extraída como función standalone (mismo espíritu que
+ * `resolveCalendarDrop`): solo necesita `active.id`/`over.id` del evento de
+ * dnd-kit, así se puede testear con un evento "falso" mínimo en vez de tener
+ * que simular un drag real con Testing Library.
+ */
+export function handleCalendarDragEnd(
+  event: Pick<DragEndEvent, "active" | "over">,
+  options: {
+    canMutate: boolean;
+    onDropTicket: (result: CalendarDropResult) => void | Promise<void>;
+  },
+): void {
+  if (!options.canMutate) {
+    return;
+  }
+
+  const result = resolveCalendarDrop({
+    activeId: String(event.active.id),
+    overId: event.over ? String(event.over.id) : null,
+  });
+
+  if (result) {
+    void options.onDropTicket(result);
+  }
 }
 
 interface CalendarGridProps {
@@ -59,18 +86,7 @@ export function CalendarGrid({ tickets, canMutate, onOpenTicket, onDropTicket, n
   const handleToday = () => setCursor({ year: now.getUTCFullYear(), month: now.getUTCMonth() });
 
   const handleDragEnd = (event: DragEndEvent) => {
-    if (!canMutate) {
-      return;
-    }
-
-    const result = resolveCalendarDrop({
-      activeId: String(event.active.id),
-      overId: event.over ? String(event.over.id) : null,
-    });
-
-    if (result) {
-      void onDropTicket(result);
-    }
+    handleCalendarDragEnd(event, { canMutate, onDropTicket });
   };
 
   return (

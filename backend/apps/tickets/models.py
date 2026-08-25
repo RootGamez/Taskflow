@@ -80,6 +80,31 @@ class Ticket(models.Model):
 		return self.title
 
 
+class TicketNumberSequence(models.Model):
+	"""Contador persistente de `Ticket.number` por proyecto.
+
+	Desviacion deliberada sobre la formula original ("Max(number) + 1"):
+	un `Max()` calculado solo sobre las filas de `Ticket` vivas en un
+	momento dado NO garantiza "los numeros nunca se reutilizan" cuando se
+	borra justo el ticket con el numero mas alto -- el siguiente `Max()`
+	cae al numero anterior y lo repite. Este contador vive fuera de la
+	tabla `Ticket` a proposito: sobrevive al borrado de cualquier ticket,
+	incluido el de numero mas alto. Ver `apps.tickets.numbering` para el
+	uso atomico (con el lock explicito sobre `Project` que pide la
+	especificacion) y el resumen de la tanda para el detalle completo.
+	"""
+
+	project = models.OneToOneField(
+		"projects.Project",
+		on_delete=models.CASCADE,
+		related_name="ticket_number_sequence",
+	)
+	last_value = models.PositiveIntegerField(default=0)
+
+	def __str__(self) -> str:
+		return f"{self.project_id}:{self.last_value}"
+
+
 class TicketFieldLock(models.Model):
 	ticket = models.ForeignKey(
 		Ticket,

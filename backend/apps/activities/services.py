@@ -20,8 +20,10 @@ Decisiones de implementación (ver resumen de la tanda para más contexto):
 - `due_date_changed` es la única acción cuyo `from_value`/`to_value` NO usa
   la forma `{"id", "label"}` de D4: al no haber una entidad referenciada
   (no hay un "id" de fecha), se guarda directamente el string ISO o `None`.
-  El resto de las acciones (title/priority/status/assigned/unassigned) sí
-  usa la forma fija `{"id": str | None, "label": str}`.
+  El resto de las acciones (title/priority/status/assigned/unassigned/
+  sprint_changed) sí usa la forma fija `{"id": str | None, "label": str}`.
+  `sprint_changed` sigue el mismo patrón que `status_changed`: `id=None`
+  y `label="Backlog"` cuando el ticket no tiene sprint asignado.
 """
 
 from __future__ import annotations
@@ -60,6 +62,8 @@ class TicketSnapshot:
     column_name: str
     due_date: object | None  # datetime | None
     assignee_ids: frozenset[UUID]
+    sprint_id: UUID | None
+    sprint_name: str
 
 
 def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
@@ -69,6 +73,18 @@ def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
     de mutar el instance. `assignee_ids` cuesta una query
     (`values_list("id", flat=True)`) que debe leerse antes de que el
     `.set()` de assignees se ejecute.
+
+    CRITICO: `take_snapshot()` corre FUERA del try/except del serializer
+    (ver `TicketUpdateSerializer.update()`) -- se llama antes de que
+    empiece la transaccion, no dentro del bloque protegido de
+    actividad/notificaciones. Un `AttributeError` aca devuelve 500 en el
+    PATCH del ticket y puede cortar la conexion de WebSocket del panel de
+    detalle (`TicketConsumer._patch_ticket` no tiene su propio
+    try/except). Por eso `sprint_id`/`sprint_name` se escriben access
+    directo a `ticket.sprint_id` (nunca dispara query, siempre presente
+    aunque sea `None`) en vez de `ticket.sprint.name`, que si `sprint_id`
+    es `None` lanzaria `AttributeError: 'NoneType' object has no attribute
+    'name'`.
     """
     return TicketSnapshot(
         title=ticket.title,
@@ -77,6 +93,8 @@ def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
         column_name=ticket.column.name,
         due_date=ticket.due_date,
         assignee_ids=frozenset(ticket.assignees.values_list("id", flat=True)),
+        sprint_id=ticket.sprint_id,
+        sprint_name=ticket.sprint.name if ticket.sprint_id else "Backlog",
     )
 
 
@@ -191,6 +209,20 @@ def record_ticket_changes(
                 action=Activity.Action.STATUS_CHANGED,
                 from_value={"id": str(snapshot.column_id), "label": snapshot.column_name},
                 to_value={"id": str(ticket.column_id), "label": ticket.column.name},
+            )
+        )
+
+    if snapshot.sprint_id != ticket.sprint_id:
+        to_create.append(
+            Activity(
+                ticket=ticket,
+                actor=actor,
+                action=Activity.Action.SPRINT_CHANGED,
+                from_value={"id": str(snapshot.sprint_id) if snapshot.sprint_id else None, "label": snapshot.sprint_name},
+                to_value={
+                    "id": str(ticket.sprint_id) if ticket.sprint_id else None,
+                    "label": ticket.sprint.name if ticket.sprint_id else "Backlog",
+                },
             )
         )
 

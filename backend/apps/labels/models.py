@@ -21,8 +21,16 @@ class Label(models.Model):
     class Meta:
         ordering = ["name"]
         constraints = [
+            # NOTA: `UniqueConstraint.fields` no acepta expresiones (solo
+            # nombres de campo). Para un unique constraint funcional
+            # (case-insensitive sobre `name`) Django exige la forma
+            # posicional `*expressions` en su lugar -- `fields=[...]` con
+            # `Lower("name")` adentro falla en migrate con
+            # `FieldDoesNotExist`. "project" como string se envuelve
+            # automaticamente en `F("project")`.
             models.UniqueConstraint(
-                fields=["project", Lower("name")],
+                "project",
+                Lower("name"),
                 name="unique_label_name_per_project",
             ),
         ]

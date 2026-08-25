@@ -1,6 +1,7 @@
-import { DndContext } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { PropsWithChildren } from "react";
 import { describe, expect, test, vi } from "vitest";
 
 import { CalendarDayCell } from "@/features/calendar/components/CalendarDayCell";
@@ -31,10 +32,19 @@ interface RenderOverrides {
   canMutate?: boolean;
 }
 
+function DndWrapper({ children }: PropsWithChildren) {
+  // Misma activationConstraint que CalendarGrid en producción: sin ella, el
+  // sensor por defecto de dnd-kit puede tragarse el evento de click de un
+  // `userEvent.click` (pointerdown+pointerup sin movimiento) al iniciar un
+  // drag antes de que el navegador dispare el "click" sintético.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  return <DndContext sensors={sensors}>{children}</DndContext>;
+}
+
 function renderCell(tickets: Ticket[], overrides: RenderOverrides = {}) {
   const onOpenTicket = vi.fn();
   render(
-    <DndContext>
+    <DndWrapper>
       <CalendarDayCell
         date={new Date(Date.UTC(2026, 7, 25))}
         isCurrentMonth={overrides.isCurrentMonth ?? true}
@@ -43,7 +53,7 @@ function renderCell(tickets: Ticket[], overrides: RenderOverrides = {}) {
         canMutate={overrides.canMutate ?? true}
         onOpenTicket={onOpenTicket}
       />
-    </DndContext>,
+    </DndWrapper>,
   );
   return { onOpenTicket };
 }
@@ -104,5 +114,13 @@ describe("CalendarDayCell", () => {
     renderCell([futureTicket]);
 
     expect(screen.getByText("Ticket future")).toHaveClass("bg-muted", "text-foreground");
+  });
+
+  test("renders chips as non-draggable (cursor-pointer) when canMutate is false", () => {
+    const ticket = buildTicket({ id: "readonly" });
+    renderCell([ticket], { canMutate: false });
+
+    expect(screen.getByText("Ticket readonly")).toHaveClass("cursor-pointer");
+    expect(screen.getByText("Ticket readonly")).not.toHaveClass("cursor-grab");
   });
 });

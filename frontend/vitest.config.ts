@@ -18,6 +18,10 @@ const COVERED_PATHS = [
   "src/features/activities/**",
   "src/features/notifications/lib/**",
   "src/features/notifications/components/**",
+  // Fase 2 (Calendario): agregado por el agente de la feature de calendario
+  // porque todavía no estaba cuando arrancó su trabajo — única excepción
+  // acordada a "no tocar este archivo" en el resto de la Fase 2.
+  "src/features/calendar/**",
 ];
 
 export default defineConfig({

@@ -1,8 +1,10 @@
+import type { DragEndEvent } from "@dnd-kit/core";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test, vi } from "vitest";
 
-import { CalendarGrid } from "@/features/calendar/components/CalendarGrid";
+import { CalendarGrid, handleCalendarDragEnd } from "@/features/calendar/components/CalendarGrid";
+import { getCalendarDayDropId, getCalendarTicketDragId } from "@/features/calendar/utils/resolveCalendarDrop";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 
 function buildTicket(overrides: Partial<Ticket> & { id: string }): Ticket {
@@ -108,5 +110,44 @@ describe("CalendarGrid", () => {
     await user.click(screen.getByText("Ticket a"));
 
     expect(onOpenTicket).toHaveBeenCalledWith(ticket);
+  });
+});
+
+describe("handleCalendarDragEnd", () => {
+  function buildEvent(activeId: string, overId: string | null): Pick<DragEndEvent, "active" | "over"> {
+    return {
+      active: { id: activeId } as DragEndEvent["active"],
+      over: overId ? ({ id: overId } as DragEndEvent["over"]) : null,
+    };
+  }
+
+  test("does nothing when canMutate is false, even for an otherwise valid drop", () => {
+    const onDropTicket = vi.fn();
+    const event = buildEvent(getCalendarTicketDragId("ticket-1"), getCalendarDayDropId("2026-08-25"));
+
+    handleCalendarDragEnd(event, { canMutate: false, onDropTicket });
+
+    expect(onDropTicket).not.toHaveBeenCalled();
+  });
+
+  test("calls onDropTicket with the resolved result for a valid drop when canMutate is true", () => {
+    const onDropTicket = vi.fn();
+    const event = buildEvent(getCalendarTicketDragId("ticket-1"), getCalendarDayDropId("2026-08-25"));
+
+    handleCalendarDragEnd(event, { canMutate: true, onDropTicket });
+
+    expect(onDropTicket).toHaveBeenCalledWith({
+      ticketId: "ticket-1",
+      dueDate: "2026-08-25T12:00:00.000Z",
+    });
+  });
+
+  test("does not call onDropTicket when dropped outside any valid cell", () => {
+    const onDropTicket = vi.fn();
+    const event = buildEvent(getCalendarTicketDragId("ticket-1"), null);
+
+    handleCalendarDragEnd(event, { canMutate: true, onDropTicket });
+
+    expect(onDropTicket).not.toHaveBeenCalled();
   });
 });

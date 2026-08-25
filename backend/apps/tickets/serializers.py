@@ -9,8 +9,10 @@ from rest_framework import serializers
 import apps.activities.services as activities_services
 import apps.notifications.services as notifications_services
 from apps.activities.models import Activity
+from apps.labels.serializers import LabelSerializer
 from apps.projects.models import ProjectColumn
 from apps.tickets.models import Ticket
+from apps.tickets.numbering import allocate_ticket_number
 from apps.users.serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
@@ -55,9 +57,12 @@ def normalize_ticket_positions(ticket: Ticket, target_column: ProjectColumn, req
 class TicketSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
     column_id = serializers.UUIDField(source="column.id", read_only=True)
+    sprint_id = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
     assignees = UserSerializer(many=True, read_only=True)
     labels = serializers.SerializerMethodField()
+    number = serializers.IntegerField(read_only=True)
+    reference = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
@@ -65,6 +70,7 @@ class TicketSerializer(serializers.ModelSerializer):
             "id",
             "project_id",
             "column_id",
+            "sprint_id",
             "created_by",
             "title",
             "description",
@@ -76,13 +82,26 @@ class TicketSerializer(serializers.ModelSerializer):
             "updated_at",
             "assignees",
             "labels",
+            "number",
+            "reference",
         )
 
     def get_created_by(self, obj: Ticket):
         return str(obj.created_by_id) if obj.created_by_id else None
 
-    def get_labels(self, _obj: Ticket):
-        return []
+    def get_sprint_id(self, obj: Ticket):
+        return str(obj.sprint_id) if obj.sprint_id else None
+
+    def get_labels(self, obj: Ticket):
+        return LabelSerializer(obj.labels.all(), many=True).data
+
+    def get_reference(self, obj: Ticket):
+        # Asume que `obj.project` ya viene con `select_related("project")`
+        # desde el call site (ver apps/tickets/views.py y
+        # apps/tickets/consumers.py) -- no dispara una query nueva aca.
+        if obj.project.key and obj.number:
+            return f"{obj.project.key}-{obj.number}"
+        return None
 
 
 class TicketCreateSerializer(serializers.Serializer):
@@ -104,6 +123,12 @@ class TicketCreateSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
+    sprint_id = serializers.UUIDField(required=False, allow_null=True)
+    label_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
 
     def validate_column_id(self, value):
         project = self.context["project"]
@@ -111,6 +136,21 @@ class TicketCreateSerializer(serializers.Serializer):
         if column is None:
             raise serializers.ValidationError("La columna no pertenece al proyecto.")
         self.context["column"] = column
+        return value
+
+    def validate_sprint_id(self, value):
+        if value is None:
+            return value
+        project = self.context["project"]
+        if not project.sprints.filter(id=value).exists():
+            raise serializers.ValidationError("El sprint no pertenece al proyecto.")
+        return value
+
+    def validate_label_ids(self, value):
+        project = self.context["project"]
+        valid_count = project.labels.filter(id__in=value).count()
+        if valid_count != len(set(value)):
+            raise serializers.ValidationError("Uno o mas labels no pertenecen al proyecto.")
         return value
 
     def create(self, validated_data: dict) -> Ticket:
@@ -142,10 +182,15 @@ class TicketCreateSerializer(serializers.Serializer):
                 priority=validated_data.get("priority", Ticket.Priority.NONE),
                 due_date=validated_data.get("due_date"),
                 order=target_order,
+                sprint_id=validated_data.get("sprint_id"),
+                number=allocate_ticket_number(project),
             )
 
             if "assignee_ids" in validated_data:
                 ticket.assignees.set(validated_data["assignee_ids"])
+
+            if "label_ids" in validated_data:
+                ticket.labels.set(validated_data["label_ids"])
 
         # Fuera de la transacción: el único evento `created` de este ticket,
         # nunca acompañado de status_changed/assigned por los valores
@@ -178,6 +223,12 @@ class TicketUpdateSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
+    sprint_id = serializers.UUIDField(required=False, allow_null=True)
+    label_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
 
     def validate_column_id(self, value):
         project = self.context["project"]
@@ -185,6 +236,21 @@ class TicketUpdateSerializer(serializers.Serializer):
         if column is None:
             raise serializers.ValidationError("La columna no pertenece al proyecto.")
         self.context["target_column"] = column
+        return value
+
+    def validate_sprint_id(self, value):
+        if value is None:
+            return value
+        project = self.context["project"]
+        if not project.sprints.filter(id=value).exists():
+            raise serializers.ValidationError("El sprint no pertenece al proyecto.")
+        return value
+
+    def validate_label_ids(self, value):
+        project = self.context["project"]
+        valid_count = project.labels.filter(id__in=value).count()
+        if valid_count != len(set(value)):
+            raise serializers.ValidationError("Uno o mas labels no pertenecen al proyecto.")
         return value
 
     def update(self, instance: Ticket, validated_data: dict) -> Ticket:
@@ -204,7 +270,19 @@ class TicketUpdateSerializer(serializers.Serializer):
         requested_order = validated_data.get("order")
         target_column = self.context.get("target_column", instance.column)
 
+        # `"sprint_id" in validated_data` (no `.get()`) a proposito: hay que
+        # distinguir "no lo mandaron" (no tocar el sprint) de "lo mandaron
+        # en null" (mandar el ticket a Backlog). Mismo patron ya usado para
+        # `assignee_ids` en este mismo metodo.
+        if "sprint_id" in validated_data:
+            fields_to_save.append("sprint")
+
         with transaction.atomic():
+            if "sprint_id" in validated_data:
+                # Cambiar de sprint nunca pasa por `normalize_ticket_positions`:
+                # no es un movimiento de columna, no debe tocar `order`.
+                instance.sprint_id = validated_data["sprint_id"]
+
             if fields_to_save:
                 instance.save(update_fields=[*fields_to_save, "updated_at"])
 
@@ -214,6 +292,9 @@ class TicketUpdateSerializer(serializers.Serializer):
             # Set M2M assignees inside the same transaction for atomicity
             if "assignee_ids" in validated_data:
                 instance.assignees.set(validated_data["assignee_ids"])
+
+            if "label_ids" in validated_data:
+                instance.labels.set(validated_data["label_ids"])
 
         # Fuera de la transacción: si algo de esto fallara no queremos
         # actividades/notificaciones huérfanas de un update que se revirtió.

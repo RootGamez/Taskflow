@@ -10,6 +10,8 @@ interface CreateTicketPayload {
   column_id?: string;
   order?: number;
   assignee_ids?: string[];
+  sprint_id?: string | null;
+  label_ids?: string[];
 }
 
 interface UpdateTicketPayload {
@@ -21,6 +23,8 @@ interface UpdateTicketPayload {
   column_id?: string;
   order?: number;
   assignee_ids?: string[];
+  sprint_id?: string | null;
+  label_ids?: string[];
 }
 
 export interface UploadTicketImageResponse {

@@ -2,10 +2,26 @@ import type { PropsWithChildren } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CommentItem } from "@/features/comments/components/CommentItem";
 import type { Comment } from "@/features/comments/types/comment.types";
+
+// jsdom no implementa ResizeObserver; el Dropdown de @heroui/react lo usa
+// para posicionar el overlay. Sin este stub, instanciarlo lanza y jsdom
+// reintenta en un loop que termina en un RangeError de stack overflow al
+// escribir por console.error (mismo patrón que NotificationBell.test.tsx,
+// CommentComposer.test.tsx y TicketDateFilter.test.tsx).
+beforeAll(() => {
+  if (typeof window.ResizeObserver === "undefined") {
+    class ResizeObserverStub {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    window.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+  }
+});
 
 const { updateMutateMock, deleteMutateMock, useUpdateCommentMock, useDeleteCommentMock } = vi.hoisted(() => {
   const updateMutate = vi.fn((_variables: unknown, options?: { onSuccess?: () => void }) => {

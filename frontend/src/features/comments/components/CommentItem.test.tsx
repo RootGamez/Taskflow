@@ -184,7 +184,8 @@ describe("CommentItem", () => {
       await user.click(screen.getByRole("button", { name: "Guardar" }));
 
       await waitFor(() => expect(updateMutateMock).toHaveBeenCalledTimes(1));
-      expect(updateMutateMock.mock.calls[0][0].payload.mention_user_ids).toEqual([]);
+      const call = updateMutateMock.mock.calls[0][0] as { payload: { mention_user_ids: string[] } };
+      expect(call.payload.mention_user_ids).toEqual([]);
     });
   });
 

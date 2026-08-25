@@ -1,4 +1,4 @@
-name: taskflow-prod
+name: taskflow-backend
 
 services:
   postgres:
@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-taskflow}
       POSTGRES_USER: ${DB_USER:-taskflow}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-taskflow_prod_password_change_me}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data
     networks:
@@ -35,7 +35,7 @@ services:
       - minio_data_prod:/data
     networks:
       - taskflow_internal
-      - proxy_network
+      - taskflow_external
 
   minio_init:
     image: minio/mc:latest
@@ -110,7 +110,7 @@ services:
     command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
     networks:
       - taskflow_internal
-      - proxy_network
+      - taskflow_external
 
   celery_worker:
     build:
@@ -148,8 +148,9 @@ services:
 networks:
   taskflow_internal:
     driver: bridge
-  proxy_network:
+  taskflow_external:
     external: true
+    name: taskflow_network
 
 volumes:
   postgres_data_prod:

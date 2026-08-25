@@ -1,3 +1,5 @@
+name: taskflow-frontend
+
 services:
   frontend:
     build:
@@ -8,8 +10,9 @@ services:
     container_name: taskflow_frontend_prod
     restart: unless-stopped
     networks:
-      - proxy_network
+      - taskflow_external
 
 networks:
-  proxy_network:
+  taskflow_external:
     external: true
+    name: taskflow_network

@@ -4,7 +4,13 @@ from django.db import transaction
 from django.db.models import F, Max
 from rest_framework import serializers
 
+from apps.projects.key_utils import derive_project_key
 from apps.projects.models import Project, ProjectColumn
+
+PROJECT_KEY_REGEX = r"^[A-Za-z][A-Za-z0-9]{0,9}$"
+PROJECT_KEY_ERROR_MESSAGES = {
+    "invalid": "El identificador debe empezar con una letra y tener hasta 10 caracteres alfanumericos.",
+}
 
 DEFAULT_PROJECT_COLUMNS = [
     {"name": "Backlog", "color": "#64748B", "order": 1},
@@ -31,6 +37,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "id",
             "workspace_id",
             "name",
+            "key",
             "description",
             "color",
             "is_archived",
@@ -54,16 +61,43 @@ class ProjectCreateSerializer(serializers.Serializer):
         required=False,
         error_messages={"invalid": "El color debe tener formato hexadecimal #RRGGBB."},
     )
+    key = serializers.RegexField(
+        regex=PROJECT_KEY_REGEX,
+        required=False,
+        error_messages=PROJECT_KEY_ERROR_MESSAGES,
+    )
+
+    def validate_key(self, value: str) -> str:
+        return value.upper()
 
     def create(self, validated_data: dict) -> Project:
         workspace = self.context["workspace"]
+        requested_key = validated_data.get("key")
 
         with transaction.atomic():
+            # Bloqueo implicito de lecturas repetibles dentro de la
+            # transaccion: se calcula `taken_keys` aca adentro (no antes en
+            # `validate_key`) para que la derivacion/validacion de unicidad
+            # vea el estado mas reciente posible antes del INSERT.
+            taken_keys = set(
+                Project.objects.filter(workspace=workspace, key__isnull=False).values_list("key", flat=True)
+            )
+
+            if requested_key:
+                if requested_key in taken_keys:
+                    raise serializers.ValidationError(
+                        {"key": "Ese identificador ya esta en uso en este workspace."}
+                    )
+                key = requested_key
+            else:
+                key = derive_project_key(validated_data["name"], taken_keys)
+
             project = Project.objects.create(
                 workspace=workspace,
                 name=validated_data["name"],
                 description=validated_data.get("description", ""),
                 color=validated_data.get("color", "#2563EB"),
+                key=key,
             )
             ProjectColumn.objects.bulk_create(
                 [
@@ -86,10 +120,26 @@ class ProjectUpdateSerializer(serializers.ModelSerializer):
         required=False,
         error_messages={"invalid": "El color debe tener formato hexadecimal #RRGGBB."},
     )
+    key = serializers.RegexField(
+        regex=PROJECT_KEY_REGEX,
+        required=False,
+        error_messages=PROJECT_KEY_ERROR_MESSAGES,
+    )
 
     class Meta:
         model = Project
-        fields = ("name", "description", "color", "is_archived")
+        fields = ("name", "description", "color", "is_archived", "key")
+
+    def validate_key(self, value: str) -> str:
+        normalized = value.upper()
+        already_taken = (
+            Project.objects.filter(workspace_id=self.instance.workspace_id, key=normalized)
+            .exclude(id=self.instance.id)
+            .exists()
+        )
+        if already_taken:
+            raise serializers.ValidationError("Ese identificador ya esta en uso en este workspace.")
+        return normalized
 
 
 class ProjectColumnCreateSerializer(serializers.Serializer):

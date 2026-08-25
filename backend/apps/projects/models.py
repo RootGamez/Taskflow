@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -16,12 +17,23 @@ class Project(models.Model):
 	name = models.CharField(max_length=255)
 	description = models.TextField(blank=True)
 	color = models.CharField(max_length=7, default="#2563EB")
+	# Identificador corto (ej. "TASK" en "TASK-123"). null=True de forma
+	# permanente, no transitoria: proyectos legacy sin backfillear o casos
+	# borde de derivacion son estados validos, no un TODO de migracion.
+	key = models.CharField(max_length=10, null=True, blank=True)
 	is_archived = models.BooleanField(default=False)
 	created_at = models.DateTimeField(default=timezone.now)
 	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
 		ordering = ["-created_at"]
+		constraints = [
+			models.UniqueConstraint(
+				fields=["workspace", "key"],
+				condition=Q(key__isnull=False),
+				name="unique_project_key_per_workspace",
+			),
+		]
 
 	def __str__(self) -> str:
 		return self.name

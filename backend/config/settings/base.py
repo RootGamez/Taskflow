@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     "apps.comments",
     "apps.activities",
     "apps.notifications",
+    "apps.sprints",
+    "apps.labels",
 ]
 
 MIDDLEWARE = [

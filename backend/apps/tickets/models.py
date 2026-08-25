@@ -4,6 +4,7 @@ import uuid
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -36,6 +37,26 @@ class Ticket(models.Model):
 		related_name="assigned_tickets",
 		blank=True,
 	)
+	# on_delete=SET_NULL no es negociable: borrar un sprint jamas debe
+	# borrar (ni desasignar en cascada de forma destructiva) sus tickets,
+	# solo mandarlos de vuelta a "Backlog" (sprint=None).
+	sprint = models.ForeignKey(
+		"sprints.Sprint",
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name="tickets",
+	)
+	labels = models.ManyToManyField(
+		"labels.Label",
+		blank=True,
+		related_name="tickets",
+	)
+	# Identificador secuencial por proyecto (ej. el "123" de "TASK-123").
+	# Nullable de forma permanente por el mismo motivo que `Project.key`:
+	# tickets legacy sin backfillear, o proyectos sin key propio, son
+	# estados validos.
+	number = models.PositiveIntegerField(null=True, blank=True)
 	title = models.CharField(max_length=255)
 	description = models.TextField(blank=True)
 	progress_notes = models.TextField(blank=True)
@@ -47,6 +68,13 @@ class Ticket(models.Model):
 
 	class Meta:
 		ordering = ["order", "created_at"]
+		constraints = [
+			models.UniqueConstraint(
+				fields=["project", "number"],
+				condition=Q(number__isnull=False),
+				name="unique_ticket_number_per_project",
+			),
+		]
 
 	def __str__(self) -> str:
 		return self.title

@@ -14,6 +14,10 @@ const COVERED_PATHS = [
   "src/features/tickets/components/TicketCard.tsx",
   "src/hooks/useThemeMode.ts",
   "src/store/uiStore.ts",
+  "src/features/comments/**",
+  "src/features/activities/**",
+  "src/features/notifications/lib/**",
+  "src/features/notifications/components/**",
 ];
 
 export default defineConfig({

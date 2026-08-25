@@ -11,6 +11,9 @@ class Notification(models.Model):
 	class Type(models.TextChoices):
 		WORKSPACE_INVITATION = "workspace_invitation", "Workspace invitation"
 		WORKSPACE_DELETED = "workspace_deleted", "Workspace deleted"
+		TICKET_ASSIGNED = "ticket_assigned", "Ticket assigned"
+		TICKET_MENTIONED = "ticket_mentioned", "Ticket mentioned"
+		TICKET_COMMENTED = "ticket_commented", "Ticket commented"
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	recipient = models.ForeignKey(
@@ -35,6 +38,7 @@ class Notification(models.Model):
 
 	class Meta:
 		ordering = ["-created_at"]
+		indexes = [models.Index(fields=["recipient", "-created_at"])]
 
 	def mark_as_read(self) -> None:
 		if self.is_read:

@@ -258,6 +258,32 @@ class TicketConsumer(BaseJWTConsumer):
             }
         )
 
+    # Handlers de comentarios y actividad (Fase 0 — contratos compartidos):
+    # se agregan aca antes que ningun emisor real exista, porque un
+    # `group_send` con un `type` sin metodo handler correspondiente hace
+    # que Channels tire ValueError y mate la conexion completa (incluidos
+    # los locks de campo). apps.comments/apps.activities emiten a este
+    # mismo grupo (`ticket_{id}`) via `send_comment_event`/
+    # `send_activity_event`, que todavia no existen pero van a reusar este
+    # contrato.
+    async def comment_created(self, event):
+        await self.send_json(
+            {"type": "comment.created", "comment": event.get("comment"), "source": event.get("source")}
+        )
+
+    async def comment_updated(self, event):
+        await self.send_json(
+            {"type": "comment.updated", "comment": event.get("comment"), "source": event.get("source")}
+        )
+
+    async def comment_deleted(self, event):
+        await self.send_json(
+            {"type": "comment.deleted", "comment_id": event.get("comment_id"), "source": event.get("source")}
+        )
+
+    async def activity_created(self, event):
+        await self.send_json({"type": "activity.created", "activity": event.get("activity")})
+
     async def _handle_lock_field(self, content: dict):
         field = content.get("field")
         if field not in self.EDITABLE_FIELDS:
@@ -350,7 +376,7 @@ class TicketConsumer(BaseJWTConsumer):
             ticket,
             data=payload,
             partial=True,
-            context={"project": ticket.project},
+            context={"project": ticket.project, "actor": self.user},
         )
         if not serializer.is_valid():
             errors = serializer.errors

@@ -5,20 +5,34 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
 import { NotificationList } from "@/features/notifications/components/NotificationList";
-import { useNotificationAction, useNotifications, useNotificationsRealtime } from "@/features/notifications/hooks/useNotifications";
+import {
+  useMarkNotificationRead,
+  useNotificationAction,
+  useNotifications,
+  useNotificationsRealtime,
+} from "@/features/notifications/hooks/useNotifications";
 import type { NotificationItem } from "@/features/notifications/types/notification.types";
 import { getApiErrorMessage } from "@/lib/errors";
+
+const MAX_UNREAD_BADGE_COUNT = 9;
 
 export function NotificationBell() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const actionMutation = useNotificationAction();
+  const markOneMutation = useMarkNotificationRead();
 
   useNotificationsRealtime();
   const { data = [] } = useNotifications();
   const unread = data.filter((item) => !item.is_read).length;
-  const unreadLabel = unread > 99 ? "99+" : String(unread);
+  const unreadLabel = unread > MAX_UNREAD_BADGE_COUNT ? "9+" : String(unread);
+
+  const handleNavigate = (notification: NotificationItem, href: string) => {
+    markOneMutation.mutate(notification.id);
+    navigate(href);
+    setIsOpen(false);
+  };
 
   const handleInvitationAction = async (
     notificationId: string,
@@ -62,6 +76,7 @@ export function NotificationBell() {
             setSelectedNotification(notification);
             setIsOpen(false);
           }}
+          onNavigate={handleNavigate}
         />
       </PopoverContent>
     </Popover>

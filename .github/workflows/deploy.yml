@@ -1,0 +1,42 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: taskflow-prod-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - name: Sync working copy with main
+        working-directory: /home/ubuntu/projects/screenia/taskflow/Taskflow
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          git clean -fd -e backend/.env -e frontend/.env
+
+      - name: Build backend image
+        working-directory: /home/ubuntu/projects/screenia/taskflow/Taskflow/backend
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Build frontend image
+        working-directory: /home/ubuntu/projects/screenia/taskflow/Taskflow/frontend
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Restart backend
+        working-directory: /home/ubuntu/projects/screenia/taskflow/Taskflow/backend
+        run: docker compose -f docker-compose.prod.yml up -d
+
+      - name: Restart frontend
+        working-directory: /home/ubuntu/projects/screenia/taskflow/Taskflow/frontend
+        run: docker compose -f docker-compose.prod.yml up -d
+
+      - name: Prune dangling images
+        run: docker image prune -f

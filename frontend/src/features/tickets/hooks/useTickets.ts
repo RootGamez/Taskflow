@@ -71,11 +71,17 @@ export function useUpdateTicket(projectId: string) {
       const previousTickets = queryClient.getQueryData<Ticket[]>(ticketQueryKeys.list(projectId));
       const previousTicket = queryClient.getQueryData<Ticket>(ticketQueryKeys.detail(ticketId));
 
-      // Separate assignee_ids from other fields — we cannot safely optimistic-update
-      // assignees without resolving User objects. We let onSuccess handle them via
-      // the real server response (which includes full User objects).
-      const { assignee_ids: _assigneeIds, ...scalarPayload } = payload as Record<string, unknown> & {
+      // Separate assignee_ids (and label_ids, D45) from other fields — we cannot
+      // safely optimistic-update assignees/labels without resolving them from ids
+      // to full objects (Ticket.assignees is User[], Ticket.labels is Label[]).
+      // We let onSuccess handle them via the real server response.
+      const {
+        assignee_ids: _assigneeIds,
+        label_ids: _labelIds,
+        ...scalarPayload
+      } = payload as Record<string, unknown> & {
         assignee_ids?: string[];
+        label_ids?: string[];
       };
 
       // Only apply optimistic update if there are scalar fields to update

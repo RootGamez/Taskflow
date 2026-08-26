@@ -1,5 +1,6 @@
 import { Table, TableBody, TableCell, TableColumn, TableHeader, TableRow } from "@heroui/react";
 
+import { LabelChip } from "@/features/labels/components/LabelChip";
 import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { formatDueDateDayMonth } from "@/features/tickets/utils/dueDate";
@@ -13,8 +14,10 @@ export function ListView({ tickets, onOpenTicket }: ListViewProps) {
   return (
     <Table aria-label="Listado de tickets">
       <TableHeader>
+        <TableColumn>Ref</TableColumn>
         <TableColumn>Titulo</TableColumn>
         <TableColumn>Prioridad</TableColumn>
+        <TableColumn>Labels</TableColumn>
         <TableColumn>Fecha limite</TableColumn>
       </TableHeader>
       <TableBody>
@@ -28,6 +31,9 @@ export function ListView({ tickets, onOpenTicket }: ListViewProps) {
               className={onOpenTicket ? "cursor-pointer" : ""}
               onClick={() => onOpenTicket?.(ticket)}
             >
+              <TableCell>
+                <span className="font-mono text-xs text-muted-foreground">{ticket.reference ?? "—"}</span>
+              </TableCell>
               <TableCell>{ticket.title}</TableCell>
               <TableCell>
                 <span
@@ -36,6 +42,13 @@ export function ListView({ tickets, onOpenTicket }: ListViewProps) {
                   <PriorityIcon className="h-4 w-4" />
                   {priorityStyle.label}
                 </span>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  {ticket.labels.map((label) => (
+                    <LabelChip key={label.id} label={label} />
+                  ))}
+                </div>
               </TableCell>
               <TableCell>{formatDueDateDayMonth(ticket.due_date)}</TableCell>
             </TableRow>

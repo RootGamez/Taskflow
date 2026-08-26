@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { ChevronLeft, ChevronRight, FolderKanban, KanbanSquare, LayoutDashboard, Settings, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, FolderKanban, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { useProjects } from "@/features/projects/hooks/useProjects";
@@ -56,6 +56,11 @@ export function Sidebar() {
         {[
           { to: "/workspaces", icon: FolderKanban, label: "Espacios" },
           { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+          // Fuera del bloque condicional `workspaceSlug ? [...]` a
+          // proposito (D36, docs/PHASE_2_REMAINING_PLAN.md seccion 5.3):
+          // "Mis tareas" es cross-workspace y debe verse siempre, incluso
+          // sin un workspace activo.
+          { to: "/my-tasks", icon: ListTodo, label: "Mis tareas" },
           ...(workspaceSlug
             ? [
                 { to: `/workspaces/${workspaceSlug}/members`, icon: Users, label: "Miembros" },

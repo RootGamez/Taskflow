@@ -1,10 +1,13 @@
-import { Chip } from "@heroui/react";
 import { Paperclip } from "lucide-react";
 
+import { LabelChip } from "@/features/labels/components/LabelChip";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
+import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { formatDueDateDayMonth, isDueDateOverdue } from "@/features/tickets/utils/dueDate";
+
+const MAX_VISIBLE_LABELS = 3;
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -44,7 +47,11 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
           <PriorityIcon className="h-4 w-4" />
           {priorityStyle.label}
         </div>
-        <Paperclip className="h-4 w-4 text-zinc-400" />
+        {/* Esquina superior derecha, junto al Paperclip (DESIGN_SYSTEM.md 8.5, D46) */}
+        <div className="flex items-center gap-1.5">
+          <TicketReferenceBadge reference={ticket.reference} />
+          <Paperclip className="h-4 w-4 text-zinc-400" />
+        </div>
       </div>
       <div className="mt-3 flex items-center justify-between">
         <div className="flex -space-x-2">
@@ -66,13 +73,18 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
         Responsable: {assigneeLabel}
       </p>
-      <div className="mt-2 flex flex-wrap gap-1">
-        {ticket.labels.slice(0, 2).map((label) => (
-          <Chip key={label.id} size="sm" style={{ backgroundColor: `${label.color}20`, color: label.color }}>
-            {label.name}
-          </Chip>
-        ))}
-      </div>
+      {ticket.labels.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {ticket.labels.slice(0, MAX_VISIBLE_LABELS).map((label) => (
+            <LabelChip key={label.id} label={label} />
+          ))}
+          {ticket.labels.length > MAX_VISIBLE_LABELS ? (
+            <span className="inline-flex items-center rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              +{ticket.labels.length - MAX_VISIBLE_LABELS}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </button>
   );
 }

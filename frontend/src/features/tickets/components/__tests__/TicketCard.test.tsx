@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { TicketCard } from "@/features/tickets/components/TicketCard";
-import type { Ticket } from "@/features/tickets/types/ticket.types";
+import type { Label, Ticket } from "@/features/tickets/types/ticket.types";
 import type { User } from "@/features/auth/types/auth.types";
 
 function buildUser(overrides: Partial<User> = {}): User {
@@ -13,6 +13,16 @@ function buildUser(overrides: Partial<User> = {}): User {
     avatar_url: null,
     is_active: true,
     created_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  };
+}
+
+function buildLabel(overrides: Partial<Label> = {}): Label {
+  return {
+    id: "label-1",
+    project_id: "project-1",
+    name: "Bug",
+    color: "#DC2626",
     ...overrides,
   };
 }
@@ -101,5 +111,63 @@ describe("TicketCard", () => {
     render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
 
     expect(screen.getByText("+2")).toBeInTheDocument();
+  });
+
+  it("renderiza el badge de referencia del ticket", () => {
+    const ticket = buildTicket({ reference: "TASK-142" });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.getByText("TASK-142")).toBeInTheDocument();
+  });
+
+  it("no renderiza el badge de referencia cuando reference es null", () => {
+    const ticket = buildTicket({ reference: null });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.queryByText(/^TASK-/)).not.toBeInTheDocument();
+  });
+
+  it("renderiza hasta 3 chips de labels", () => {
+    const ticket = buildTicket({
+      labels: [
+        buildLabel({ id: "l1", name: "Bug" }),
+        buildLabel({ id: "l2", name: "Feature" }),
+        buildLabel({ id: "l3", name: "Design" }),
+      ],
+    });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.getByText("Bug")).toBeInTheDocument();
+    expect(screen.getByText("Feature")).toBeInTheDocument();
+    expect(screen.getByText("Design")).toBeInTheDocument();
+    expect(screen.queryByText(/^\+\d/)).not.toBeInTheDocument();
+  });
+
+  it('renderiza "+N" cuando hay mas de 3 labels', () => {
+    const ticket = buildTicket({
+      labels: [
+        buildLabel({ id: "l1", name: "Bug" }),
+        buildLabel({ id: "l2", name: "Feature" }),
+        buildLabel({ id: "l3", name: "Design" }),
+        buildLabel({ id: "l4", name: "Backend" }),
+        buildLabel({ id: "l5", name: "Frontend" }),
+      ],
+    });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.getByText("+2")).toBeInTheDocument();
+    expect(screen.queryByText("Backend")).not.toBeInTheDocument();
+  });
+
+  it("no renderiza la fila de labels cuando el ticket no tiene labels", () => {
+    const ticket = buildTicket({ labels: [] });
+
+    const { container } = render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(container.querySelector(".flex-wrap")).not.toBeInTheDocument();
   });
 });

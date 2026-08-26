@@ -20,6 +20,10 @@ import {
 } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
+import { SprintSelector, SprintSummaryCard } from "@/features/sprints";
+import { useSprints } from "@/features/sprints/hooks/useSprints";
+import { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
+import { filterTicketsBySprint } from "@/features/sprints/utils/filterTicketsBySprint";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -42,13 +46,18 @@ export default function KanbanPage() {
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
   const dateFilter = useTicketFilterStore((state) => state.dateFilter);
   const clearDateFilter = useTicketFilterStore((state) => state.clear);
+  const { data: sprints = [] } = useSprints(projectId);
+  const sprintScope = useSprintScopeStore((state) => state.scope);
+  const clearSprintScope = useSprintScopeStore((state) => state.clear);
+  const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === "active") ?? null, [sprints]);
 
-  // El store de filtro de fecha es global (a propósito, no persiste entre
-  // proyectos). Sin este reset, un filtro activo en el Proyecto A se queda
-  // aplicado silenciosamente al navegar al Proyecto B.
+  // Los stores de filtro (fecha y sprint) son globales (a propósito, no
+  // persisten entre proyectos). Sin este reset, un filtro activo en el
+  // Proyecto A se queda aplicado silenciosamente al navegar al Proyecto B.
   useEffect(() => {
     clearDateFilter();
-  }, [projectId, clearDateFilter]);
+    clearSprintScope();
+  }, [projectId, clearDateFilter, clearSprintScope]);
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [createColumnId, setCreateColumnId] = useState<string | null>(null);
@@ -87,10 +96,14 @@ export default function KanbanPage() {
     [selectedTicketId, tickets],
   );
 
-  const filteredTickets = useMemo(
-    () => filterTicketsByDate(tickets, dateFilter),
-    [tickets, dateFilter],
-  );
+  // Composición de filtros: fecha -> sprint, en ese orden, dentro de un
+  // solo useMemo (D21). `allTickets` (sin filtrar) sigue yendo a
+  // KanbanBoard sin tocar (D5) -- un filtro mal aplicado ya corrompió una
+  // vez el `order` del drag & drop.
+  const filteredTickets = useMemo(() => {
+    const byDate = filterTicketsByDate(tickets, dateFilter);
+    return filterTicketsBySprint(byDate, sprintScope);
+  }, [tickets, dateFilter, sprintScope]);
 
   const projectColumns = useMemo(
     () => [...(project?.columns ?? [])].sort((a, b) => a.order - b.order),
@@ -247,9 +260,15 @@ export default function KanbanPage() {
       return;
     }
 
+    // D19: hereda el sprint del scope actual (WYSIWYG). Si el scope es
+    // "all" o "backlog" no se manda el campo (nunca se manda `null`
+    // explicito): el backend ya crea el ticket sin sprint por default.
+    const sprintPayload = sprintScope.kind === "sprint" ? { sprint_id: sprintScope.sprintId } : {};
+
     try {
       await createTicketMutation.mutateAsync({
         ...payload,
+        ...sprintPayload,
         column_id: createColumnId,
       });
       setCreateColumnId(null);
@@ -370,12 +389,15 @@ export default function KanbanPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <SprintSelector projectId={projectId} canMutate={canMutate} />
           <TicketDateFilter />
           <Tabs selectedKey="board" onSelectionChange={(key) => {
             if (key === "list") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/list`);
+            if (key === "calendar") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/calendar`);
           }}>
             <Tab key="board" title="Tablero" />
             <Tab key="list" title="Lista" />
+            <Tab key="calendar" title="Calendario" />
           </Tabs>
           {canMutate ? (
             <Button
@@ -388,6 +410,8 @@ export default function KanbanPage() {
           ) : null}
         </div>
       </div>
+
+      <SprintSummaryCard sprint={activeSprint} />
 
       <KanbanBoard
         columns={projectColumns}

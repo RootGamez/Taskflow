@@ -14,6 +14,10 @@ import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterSt
 import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
+import { SprintSelector, SprintSummaryCard } from "@/features/sprints";
+import { useSprints } from "@/features/sprints/hooks/useSprints";
+import { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
+import { filterTicketsBySprint } from "@/features/sprints/utils/filterTicketsBySprint";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useAuthStore } from "@/store/authStore";
@@ -35,13 +39,18 @@ export default function ListPage() {
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
   const dateFilter = useTicketFilterStore((state) => state.dateFilter);
   const clearDateFilter = useTicketFilterStore((state) => state.clear);
+  const { data: sprints = [] } = useSprints(projectId);
+  const sprintScope = useSprintScopeStore((state) => state.scope);
+  const clearSprintScope = useSprintScopeStore((state) => state.clear);
+  const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === "active") ?? null, [sprints]);
 
-  // El store de filtro de fecha es global (a propósito, no persiste entre
-  // proyectos). Sin este reset, un filtro activo en el Proyecto A se queda
-  // aplicado silenciosamente al navegar al Proyecto B.
+  // Los stores de filtro (fecha y sprint) son globales (a propósito, no
+  // persisten entre proyectos). Sin este reset, un filtro activo en el
+  // Proyecto A se queda aplicado silenciosamente al navegar al Proyecto B.
   useEffect(() => {
     clearDateFilter();
-  }, [projectId, clearDateFilter]);
+    clearSprintScope();
+  }, [projectId, clearDateFilter, clearSprintScope]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const { upsertTicketInCache, removeTicketFromCache } = useTicketRealtimeCache(projectId);
   const [fieldLocks, setFieldLocks] = useState<{
@@ -78,10 +87,12 @@ export default function ListPage() {
     [selectedTicketId, tickets],
   );
 
-  const filteredTickets = useMemo(
-    () => filterTicketsByDate(tickets, dateFilter),
-    [tickets, dateFilter],
-  );
+  // Composición de filtros: fecha -> sprint, en ese orden, dentro de un
+  // solo useMemo (D21).
+  const filteredTickets = useMemo(() => {
+    const byDate = filterTicketsByDate(tickets, dateFilter);
+    return filterTicketsBySprint(byDate, sprintScope);
+  }, [tickets, dateFilter, sprintScope]);
 
   const projectColumns = useMemo(
     () => [...(project?.columns ?? [])].sort((a, b) => a.order - b.order),
@@ -306,18 +317,22 @@ export default function ListPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <SprintSelector projectId={projectId} canMutate={canMutate} />
           <TicketDateFilter />
           <Tabs
             selectedKey="list"
             onSelectionChange={(key) => {
               if (key === "board") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/board`);
+              if (key === "calendar") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/calendar`);
             }}
           >
             <Tab key="board" title="Tablero" />
             <Tab key="list" title="Lista" />
+            <Tab key="calendar" title="Calendario" />
           </Tabs>
         </div>
       </div>
+      <SprintSummaryCard sprint={activeSprint} />
       <ListView tickets={filteredTickets} onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)} />
       <TicketDetail
         ticket={selectedTicket}

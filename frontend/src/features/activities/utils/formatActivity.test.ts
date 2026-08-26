@@ -1,4 +1,4 @@
-import { ArrowRightLeft, CalendarClock, MessageSquare, Pencil, Plus, SignalHigh, UserMinus, UserPlus } from "lucide-react";
+import { ArrowRightLeft, CalendarClock, MessageSquare, Pencil, Plus, Rocket, SignalHigh, UserMinus, UserPlus } from "lucide-react";
 import { describe, expect, it } from "vitest";
 
 import type { Activity } from "@/features/activities/types/activity.types";
@@ -128,6 +128,44 @@ describe("formatActivity", () => {
 
     expect(icon).toBe(Pencil);
     expect(text).toBe('Juan Perez cambió el título de "Titulo viejo" a "Titulo nuevo"');
+  });
+
+  it("sprint_changed: de Backlog a un sprint", () => {
+    const activity = buildActivity({
+      action: "sprint_changed",
+      from_value: { id: null, label: "Backlog" },
+      to_value: { id: "sprint-1", label: "Sprint 12" },
+    });
+
+    const { icon, text } = formatActivity(activity);
+
+    expect(icon).toBe(Rocket);
+    expect(text).toBe("Juan Perez movió el ticket de Backlog a Sprint 12");
+  });
+
+  it("sprint_changed: de un sprint a Backlog", () => {
+    const activity = buildActivity({
+      action: "sprint_changed",
+      from_value: { id: "sprint-1", label: "Sprint 12" },
+      to_value: { id: null, label: "Backlog" },
+    });
+
+    const { icon, text } = formatActivity(activity);
+
+    expect(icon).toBe(Rocket);
+    expect(text).toBe("Juan Perez movió el ticket de Sprint 12 a Backlog");
+  });
+
+  it("sprint_changed: usa 'Backlog' como respaldo cuando el label viene vacio", () => {
+    const activity = buildActivity({
+      action: "sprint_changed",
+      from_value: { id: null, label: "" },
+      to_value: { id: null, label: "" },
+    });
+
+    const { text } = formatActivity(activity);
+
+    expect(text).toBe("Juan Perez movió el ticket de Backlog a Backlog");
   });
 
   it("commented: usa el icono MessageSquare", () => {

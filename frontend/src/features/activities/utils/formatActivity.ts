@@ -1,4 +1,4 @@
-import { ArrowRightLeft, CalendarClock, MessageSquare, Pencil, Plus, UserMinus, UserPlus, type LucideIcon } from "lucide-react";
+import { ArrowRightLeft, CalendarClock, MessageSquare, Pencil, Plus, Rocket, UserMinus, UserPlus, type LucideIcon } from "lucide-react";
 
 import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
 import type { Priority } from "@/features/tickets/types/ticket.types";
@@ -87,6 +87,12 @@ export function formatActivity(activity: Activity): FormattedActivity {
       return {
         icon: Pencil,
         text: `${actor} cambió el título de "${entityLabel(activity.from_value, "(sin título)")}" a "${entityLabel(activity.to_value, "(sin título)")}"`,
+      };
+
+    case "sprint_changed":
+      return {
+        icon: Rocket,
+        text: `${actor} movió el ticket de ${entityLabel(activity.from_value, "Backlog")} a ${entityLabel(activity.to_value, "Backlog")}`,
       };
 
     case "commented":

@@ -12,7 +12,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
+import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
+import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
@@ -676,7 +678,11 @@ export function TicketDetail({
 
           <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
             <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
-              <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
+              {ticket?.reference ? (
+                <TicketReferenceBadge reference={ticket.reference} className="uppercase tracking-wider" />
+              ) : (
+                <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
+              )}
               {titleField.isLockedByOther && (
                 <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
                   {fieldLocks.title?.userName} editando...
@@ -838,6 +844,18 @@ export function TicketDetail({
                   />
                 </div>
               </div>
+
+              {/* Labels: autosuficiente (D43) — llama sus propios hooks en vez de
+                  props propagadas desde TicketDetail. Fuera del pipeline de
+                  draft/autosave a proposito (D44). */}
+              {ticket ? (
+                <TicketLabelsRow
+                  ticketId={ticket.id}
+                  projectId={ticket.project_id}
+                  labels={ticket.labels}
+                  canEdit={Boolean(canEdit)}
+                />
+              ) : null}
             </div>
           </div>
 

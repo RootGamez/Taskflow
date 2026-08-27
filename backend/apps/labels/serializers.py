@@ -56,6 +56,7 @@ class LabelCreateSerializer(_LabelWriteSerializerBase):
         },
     )
     color = serializers.CharField(
+        max_length=7,
         error_messages={
             "required": "El color debe ser uno de la paleta predefinida.",
             "blank": "El color debe ser uno de la paleta predefinida.",
@@ -79,6 +80,7 @@ class LabelUpdateSerializer(_LabelWriteSerializerBase):
         error_messages={"blank": "El nombre del label es obligatorio."},
     )
     color = serializers.CharField(
+        max_length=7,
         required=False,
         error_messages={"blank": "El color debe ser uno de la paleta predefinida."},
     )

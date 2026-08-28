@@ -36,4 +36,11 @@ export interface Ticket {
   labels: Label[];
   number?: number | null;
   reference?: string | null;
+  // Opcionales por el mismo motivo que `sprint_id`/`number`/`reference`
+  // arriba (Fase 2, D13 de docs/PHASE_3_PLAN.md): fixtures preexistentes
+  // (`buildTicket` en varios tests de Fase 1/2) construyen un `Ticket` sin
+  // estos 2 campos nuevos. El backend siempre los manda en runtime real
+  // (WP-0, `TicketSerializer.get_subtask_count`/`get_completed_subtask_count`).
+  subtask_count?: number;
+  completed_subtask_count?: number;
 }

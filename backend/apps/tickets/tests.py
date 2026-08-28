@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime, timedelta, timezone as dt_timezone
 from unittest.mock import patch
 
@@ -12,7 +13,9 @@ from rest_framework.test import APITestCase
 from apps.activities.models import Activity
 from apps.labels.models import Label
 from apps.projects.models import Project, ProjectColumn
+from apps.relations.models import TicketRelation
 from apps.sprints.models import Sprint
+from apps.subtasks.models import SubTask
 from apps.tickets.models import Ticket
 from apps.workspaces.models import Workspace, WorkspaceMember
 
@@ -521,3 +524,207 @@ class TicketSprintLabelReferenceTests(APITestCase):
 		# ni de labels por ticket (anti N+1, seccion 0.9): la cantidad de
 		# queries con 25 tickets no debe ser mayor que con 20.
 		self.assertLessEqual(len(bigger_batch.captured_queries), len(small_batch.captured_queries))
+
+
+class TicketSubtaskCountersAndDescriptionTextTests(APITestCase):
+	"""WP-0 (Fase 3): contadores de subtareas en el serializer (D12) +
+	`description_text` calculado en create/update (D9/D11)."""
+
+	def setUp(self) -> None:
+		self.user = User.objects.create_user(
+			email="owner@example.com",
+			full_name="Owner",
+			password="Passw0rd!123",
+		)
+		login_response = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "owner@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+		self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
+		self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
+
+	def _create_ticket(self, **overrides) -> dict:
+		payload = {"title": "Ticket base", "column_id": str(self.backlog.id), **overrides}
+		response = self.client.post(f"/api/v1/projects/{self.project.id}/tickets/", payload, format="json")
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		return response.data
+
+	def test_ticket_serializer_exposes_subtask_counts_as_zero_when_none(self) -> None:
+		ticket = self._create_ticket()
+
+		self.assertEqual(ticket["subtask_count"], 0)
+		self.assertEqual(ticket["completed_subtask_count"], 0)
+
+	def test_ticket_serializer_counts_only_done_subtasks_as_completed(self) -> None:
+		ticket_data = self._create_ticket()
+		ticket = Ticket.objects.get(id=ticket_data["id"])
+		SubTask.objects.create(ticket=ticket, title="Uno", is_done=True, order=1)
+		SubTask.objects.create(ticket=ticket, title="Dos", is_done=False, order=2)
+		SubTask.objects.create(ticket=ticket, title="Tres", is_done=True, order=3)
+
+		response = self.client.get(f"/api/v1/tickets/{ticket.id}/")
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["subtask_count"], 3)
+		self.assertEqual(response.data["completed_subtask_count"], 2)
+
+	def test_creating_a_ticket_populates_description_text(self) -> None:
+		doc = json.dumps(
+			{
+				"type": "doc",
+				"content": [{"type": "paragraph", "content": [{"type": "text", "text": "Hola desde create"}]}],
+			}
+		)
+
+		ticket_data = self._create_ticket(description=doc)
+
+		ticket = Ticket.objects.get(id=ticket_data["id"])
+		self.assertEqual(ticket.description_text, "Hola desde create")
+
+	def test_patching_description_updates_description_text(self) -> None:
+		ticket_data = self._create_ticket()
+		doc = json.dumps(
+			{
+				"type": "doc",
+				"content": [{"type": "paragraph", "content": [{"type": "text", "text": "Texto actualizado"}]}],
+			}
+		)
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket_data['id']}/",
+			{"description": doc},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		ticket = Ticket.objects.get(id=ticket_data["id"])
+		self.assertEqual(ticket.description_text, "Texto actualizado")
+
+	def test_patching_only_the_title_does_not_touch_description_text(self) -> None:
+		doc = json.dumps(
+			{"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Original"}]}]}
+		)
+		ticket_data = self._create_ticket(description=doc)
+		ticket = Ticket.objects.get(id=ticket_data["id"])
+		self.assertEqual(ticket.description_text, "Original")
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket_data['id']}/",
+			{"title": "Nuevo titulo"},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		ticket.refresh_from_db()
+		self.assertEqual(ticket.description_text, "Original")
+		self.assertEqual(ticket.title, "Nuevo titulo")
+
+	def test_listing_tickets_with_subtasks_does_not_scale_queries(self) -> None:
+		for i in range(5):
+			ticket_id = self._create_ticket(title=f"Ticket {i}")["id"]
+			ticket = Ticket.objects.get(id=ticket_id)
+			for j in range(4):
+				SubTask.objects.create(ticket=ticket, title=f"Subtarea {j}", order=j + 1)
+
+		with CaptureQueriesContext(connection) as small_batch:
+			response_small = self.client.get(f"/api/v1/projects/{self.project.id}/tickets/")
+		self.assertEqual(response_small.status_code, status.HTTP_200_OK)
+
+		for i in range(5, 10):
+			ticket_id = self._create_ticket(title=f"Ticket {i}")["id"]
+			ticket = Ticket.objects.get(id=ticket_id)
+			for j in range(4):
+				SubTask.objects.create(ticket=ticket, title=f"Subtarea {j}", order=j + 1)
+
+		with CaptureQueriesContext(connection) as bigger_batch:
+			response_big = self.client.get(f"/api/v1/projects/{self.project.id}/tickets/")
+		self.assertEqual(response_big.status_code, status.HTTP_200_OK)
+
+		# Anti N+1 (R0-5/D12): la cantidad de queries con 10 tickets x 4
+		# subtareas no debe ser mayor que con 5 tickets x 4 subtareas.
+		self.assertLessEqual(len(bigger_batch.captured_queries), len(small_batch.captured_queries))
+
+
+class TicketCascadeDeletionTests(APITestCase):
+	"""WP-0 (Fase 3): borrar un ticket borra sus subtareas y relaciones en
+	ambas direcciones (`on_delete=CASCADE`, RB1/RC1)."""
+
+	def setUp(self) -> None:
+		self.user = User.objects.create_user(
+			email="owner@example.com",
+			full_name="Owner",
+			password="Passw0rd!123",
+		)
+		login_response = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "owner@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+		self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
+		self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
+
+	def _create_ticket(self, title: str) -> Ticket:
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{"title": title, "column_id": str(self.backlog.id)},
+			format="json",
+		)
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		return Ticket.objects.get(id=response.data["id"])
+
+	def test_deleting_a_ticket_deletes_its_subtasks(self) -> None:
+		ticket = self._create_ticket("Con subtareas")
+		SubTask.objects.create(ticket=ticket, title="Sobrevive", order=1)
+		SubTask.objects.create(ticket=ticket, title="Tambien", order=2)
+
+		response = self.client.delete(f"/api/v1/projects/{self.project.id}/tickets/{ticket.id}/")
+
+		self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+		self.assertEqual(SubTask.objects.filter(ticket_id=ticket.id).count(), 0)
+
+	def test_deleting_a_ticket_deletes_its_relations_in_both_directions(self) -> None:
+		blocker = self._create_ticket("Bloqueador")
+		blocked = self._create_ticket("Bloqueado")
+		other = self._create_ticket("Otro")
+
+		relation_outgoing = TicketRelation.objects.create(
+			from_ticket=blocker,
+			to_ticket=blocked,
+			relation_type=TicketRelation.Type.BLOCKS,
+			created_by=self.user,
+		)
+		relation_incoming = TicketRelation.objects.create(
+			from_ticket=other,
+			to_ticket=blocker,
+			relation_type=TicketRelation.Type.RELATES_TO,
+			created_by=self.user,
+		)
+
+		response = self.client.delete(f"/api/v1/projects/{self.project.id}/tickets/{blocker.id}/")
+
+		self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+		self.assertFalse(TicketRelation.objects.filter(id=relation_outgoing.id).exists())
+		self.assertFalse(TicketRelation.objects.filter(id=relation_incoming.id).exists())
+		# El otro extremo de cada relacion (el ticket, no la fila de
+		# relacion) no se borra en cascada -- solo se borro `blocker`.
+		self.assertTrue(Ticket.objects.filter(id=blocked.id).exists())
+		self.assertTrue(Ticket.objects.filter(id=other.id).exists())

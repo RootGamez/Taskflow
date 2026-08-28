@@ -13,6 +13,7 @@ from apps.labels.serializers import LabelSerializer
 from apps.projects.models import ProjectColumn
 from apps.tickets.models import Ticket
 from apps.tickets.numbering import allocate_ticket_number
+from apps.tickets.rich_text import extract_plain_text
 from apps.users.serializers import UserSerializer
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,8 @@ class TicketSerializer(serializers.ModelSerializer):
     labels = serializers.SerializerMethodField()
     number = serializers.IntegerField(read_only=True)
     reference = serializers.SerializerMethodField()
+    subtask_count = serializers.SerializerMethodField()
+    completed_subtask_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Ticket
@@ -84,6 +87,8 @@ class TicketSerializer(serializers.ModelSerializer):
             "labels",
             "number",
             "reference",
+            "subtask_count",
+            "completed_subtask_count",
         )
 
     def get_created_by(self, obj: Ticket):
@@ -102,6 +107,18 @@ class TicketSerializer(serializers.ModelSerializer):
         if obj.project.key and obj.number:
             return f"{obj.project.key}-{obj.number}"
         return None
+
+    def get_subtask_count(self, obj: Ticket):
+        # `len(obj.subtasks.all())`, no `.count()` (D12 de
+        # docs/PHASE_3_PLAN.md): con `prefetch_related("subtasks")` (los 6
+        # call sites de listado) esto es 0 queries extra -- `.count()`
+        # dispararia un COUNT(*) nuevo por ticket incluso con el
+        # related manager ya prefetcheado. Sin prefetch (consumers.py,
+        # que serializa un unico ticket) sigue siendo 1 query, aceptable.
+        return len(obj.subtasks.all())
+
+    def get_completed_subtask_count(self, obj: Ticket):
+        return sum(1 for subtask in obj.subtasks.all() if subtask.is_done)
 
 
 class TicketCreateSerializer(serializers.Serializer):
@@ -172,12 +189,18 @@ class TicketCreateSerializer(serializers.Serializer):
 
             project.tickets.filter(column=column, order__gte=target_order).update(order=F("order") + 1)
 
+            description = validated_data.get("description", "")
             ticket = Ticket.objects.create(
                 project=project,
                 column=column,
                 created_by=request_user,
                 title=validated_data["title"],
-                description=validated_data.get("description", ""),
+                description=description,
+                # D11: se calcula en el serializer, nunca en Model.save() ni
+                # en un signal -- este es uno de los dos unicos caminos de
+                # escritura de `description` (el otro es
+                # TicketUpdateSerializer.update, mas abajo).
+                description_text=extract_plain_text(description),
                 progress_notes=validated_data.get("progress_notes", ""),
                 priority=validated_data.get("priority", Ticket.Priority.NONE),
                 due_date=validated_data.get("due_date"),
@@ -266,6 +289,13 @@ class TicketUpdateSerializer(serializers.Serializer):
             if field in validated_data:
                 setattr(instance, field, validated_data[field])
                 fields_to_save.append(field)
+
+        # D11: `description_text` solo se toca cuando el PATCH manda
+        # `description` -- un PATCH que solo cambia el titulo (u otro
+        # campo cualquiera) no debe recalcular ni reescribir la columna.
+        if "description" in validated_data:
+            instance.description_text = extract_plain_text(validated_data["description"])
+            fields_to_save.append("description_text")
 
         requested_order = validated_data.get("order")
         target_column = self.context.get("target_column", instance.column)

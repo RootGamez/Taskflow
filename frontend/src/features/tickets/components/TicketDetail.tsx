@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Input, Select, SelectItem } from "@heroui/react";
+import { Select, SelectItem } from "@heroui/react";
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -8,16 +8,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
 import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
+import { TicketRelationsSection } from "@/features/relations/components/TicketRelationsSection";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
 import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
+import { TicketSubtasksSection } from "@/features/subtasks/components/TicketSubtasksSection";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
+import { TicketDeleteDialog } from "./TicketDeleteDialog";
 import { useCollaborativeField } from "../hooks/useCollaborativeField";
 import { useDebounce } from "@/hooks/useDebounce";
 import type { Column } from "@/features/projects/types/project.types";
@@ -859,6 +861,22 @@ export function TicketDetail({
             </div>
           </div>
 
+            {/* Subtareas y relaciones: autosuficientes (D5), mismo patron que TicketLabelsRow/TicketDiscussion. */}
+            {ticket ? (
+              <TicketSubtasksSection
+                ticketId={ticket.id}
+                projectId={ticket.project_id}
+                canEdit={Boolean(canEdit)}
+              />
+            ) : null}
+            {ticket ? (
+              <TicketRelationsSection
+                ticketId={ticket.id}
+                projectId={ticket.project_id}
+                canEdit={Boolean(canEdit)}
+              />
+            ) : null}
+
             <div className="flex-1 space-y-5 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
               <TicketRichEditor
                 value={parseRichTextJson(description)}
@@ -902,48 +920,18 @@ export function TicketDetail({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteDialogOpen} onOpenChange={closeDeleteDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Eliminar ticket</DialogTitle>
-            <DialogDescription>
-              Esta acción es permanente y quitará el ticket del tablero y de la lista.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              Para confirmar, escribe el título exacto del ticket.
-            </p>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Título: <span className="font-semibold text-zinc-800 dark:text-zinc-100">{deleteKeyword || "(sin título)"}</span>
-            </p>
-            <Input
-              aria-label="Confirmación de eliminación"
-              placeholder="Escribe el título del ticket"
-              value={deleteConfirmation}
-              onValueChange={setDeleteConfirmation}
-              isDisabled={isDeleting}
-            />
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={closeDeleteDialog} disabled={isDeleting}>
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => {
-                void confirmDelete();
-              }}
-              disabled={!canConfirmDelete || isDeleting}
-            >
-              {isDeleting ? "Eliminando..." : "Eliminar ticket"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TicketDeleteDialog
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={closeDeleteDialog}
+        deleteKeyword={deleteKeyword}
+        deleteConfirmation={deleteConfirmation}
+        onDeleteConfirmationChange={setDeleteConfirmation}
+        isDeleting={isDeleting}
+        canConfirmDelete={canConfirmDelete}
+        onConfirm={() => {
+          void confirmDelete();
+        }}
+      />
     </>
   );
 }

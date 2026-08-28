@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from "cmdk"
 import { Search } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Dialog, DialogContent } from "@/components/ui/shadcn/dialog"
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -91,11 +92,65 @@ const CommandItem = React.forwardRef<
 ))
 CommandItem.displayName = CommandPrimitive.Item.displayName
 
+// --- Extensiones de Fase 3 (WP-0, D14) ---
+//
+// Append-only a partir de aca: `Command`, `CommandInput`, `CommandList`,
+// `CommandEmpty`, `CommandGroup` y `CommandItem` de arriba son contrato
+// vivo de `CommentComposer.tsx` (popup de menciones) y
+// `TicketAssigneeSelect.tsx` (selector de asignados) -- prohibido
+// tocarlos en esta fase (docs/PHASE_3_PLAN.md, hallazgo 0.1). Los colores
+// `zinc-*` hardcodeados de las primitivas existentes tampoco se migran a
+// tokens semanticos aca: es deuda documentada de `DESIGN_SYSTEM.md §1`,
+// fuera de scope de Fase 3.
+
+const CommandDialog = ({
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof Dialog>) => (
+  <Dialog {...props}>
+    <DialogContent className="overflow-hidden p-0 shadow-lg">
+      <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 dark:[&_[cmdk-group-heading]]:text-zinc-400">
+        {children}
+      </Command>
+    </DialogContent>
+  </Dialog>
+)
+CommandDialog.displayName = "CommandDialog"
+
+const CommandSeparator = React.forwardRef<
+  React.ElementRef<typeof CommandPrimitive.Separator>,
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Separator>
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Separator
+    ref={ref}
+    className={cn("-mx-1 h-px bg-zinc-200 dark:bg-zinc-800", className)}
+    {...props}
+  />
+))
+CommandSeparator.displayName = CommandPrimitive.Separator.displayName
+
+const CommandShortcut = ({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement>) => (
+  <span
+    className={cn(
+      "ml-auto text-xs tracking-widest text-zinc-500 dark:text-zinc-400",
+      className
+    )}
+    {...props}
+  />
+)
+CommandShortcut.displayName = "CommandShortcut"
+
 export {
   Command,
+  CommandDialog,
   CommandInput,
   CommandList,
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandSeparator,
+  CommandShortcut,
 }

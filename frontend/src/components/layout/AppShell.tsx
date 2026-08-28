@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { CommandPalette } from "@/features/command-palette/components/CommandPalette";
 import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useAuthStore } from "@/store/authStore";
@@ -107,6 +108,11 @@ export function AppShell({ children }: AppShellProps) {
         <Topbar />
         <main className="min-w-0 flex-1 overflow-auto p-6">{children}</main>
       </div>
+
+      {/* Overlay global, montado una sola vez (I6/D4 de
+          docs/PHASE_3_PLAN.md). Stub de WP-0: devuelve null hasta que
+          WP-A reemplace su cuerpo -- no requiere otra edicion aca. */}
+      <CommandPalette />
 
       {deletedWorkspaceName ? (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/45 p-4 backdrop-blur-sm">

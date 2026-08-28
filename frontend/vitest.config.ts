@@ -25,6 +25,22 @@ const COVERED_PATHS = [
   "src/features/sprints/**",
   "src/features/mytasks/**",
   "src/features/labels/**",
+  // Fase 3 (Command Palette, Busqueda, Subtareas, Relaciones, Atajos):
+  // agregado por WP-0 para que los 3 agentes de Wave 1 y el de Wave 2
+  // hereden el umbral desde su primer commit, sin tener que tocar este
+  // archivo compartido ellos mismos (I7 de docs/PHASE_3_PLAN.md).
+  "src/features/search/**",
+  "src/features/command-palette/**",
+  "src/features/subtasks/**",
+  "src/features/relations/**",
+  "src/features/shortcuts/**",
+  // Solo los 2 stores nuevos de WP-0 (D7/D8), no "src/store/**" entero:
+  // authStore.ts/workspaceStore.ts no tienen tests propios y meterlos
+  // aca haria caer el promedio de cobertura por debajo del 80% (mismo
+  // motivo por el que arriba solo esta "src/store/uiStore.ts", no todo
+  // el directorio).
+  "src/store/commandPaletteStore.ts",
+  "src/store/commandActionsStore.ts",
 ];
 
 export default defineConfig({

@@ -1,4 +1,3 @@
-import { Input } from "@heroui/react";
 import { ChevronRight, Search } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
@@ -9,11 +8,13 @@ import { NotificationBell } from "@/features/notifications/components/Notificati
 import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
 import { getWorkspaceDashboardPath } from "@/features/workspaces/lib/workspaceRouting";
 import { useAuthStore } from "@/store/authStore";
+import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 
 export function Topbar() {
   const location = useLocation();
   const { workspaceSlug, projectId } = useParams();
   const user = useAuthStore((state) => state.user);
+  const openCommandPalette = useCommandPaletteStore((state) => state.open);
   const { data: workspaces = [] } = useWorkspaces();
   const { data: project } = useProject(workspaceSlug ?? "", projectId ?? "");
 
@@ -70,7 +71,22 @@ export function Topbar() {
         ) : null}
       </div>
       <div className="mx-4 hidden max-w-md flex-1 md:block">
-        <Input startContent={<Search className="h-4 w-4 text-zinc-400" />} placeholder="Buscar tickets..." variant="bordered" />
+        {/* D26 de docs/PHASE_3_PLAN.md: el input muerto (sin `value`/
+            `onChange`) se reemplaza por un boton que abre el command
+            palette -- una sola caja de busqueda, dos formas de abrirla
+            (click aca o el atajo `Cmd/Ctrl+K` de WP-D). */}
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          aria-label="Buscar tickets, proyectos y acciones"
+          className="flex w-full items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:border-zinc-300 hover:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="flex-1 text-left">Buscar tickets...</span>
+          <kbd className="hidden shrink-0 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 sm:inline-block">
+            ⌘K
+          </kbd>
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <NotificationBell />

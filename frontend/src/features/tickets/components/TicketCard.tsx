@@ -1,7 +1,8 @@
-import { Paperclip } from "lucide-react";
+import { ListChecks, Paperclip } from "lucide-react";
 
 import { LabelChip } from "@/features/labels/components/LabelChip";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
+import { SubtaskProgressBar } from "@/features/subtasks/components/SubtaskProgressBar";
 import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -73,6 +74,21 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
       <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
         Responsable: {assigneeLabel}
       </p>
+      {/* D36 (docs/PHASE_3_PLAN.md): la barra sale de los contadores que ya
+          vienen en el payload del ticket -- ningun hook nuevo aca. Se oculta
+          por completo cuando el ticket no tiene subtareas (0/undefined),
+          precondicion que tambien preserva los fixtures de tests
+          preexistentes sin `subtask_count` (D13). */}
+      {ticket.subtask_count ? (
+        <div className="mt-2 flex items-center gap-1.5">
+          <ListChecks className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          <SubtaskProgressBar
+            done={ticket.completed_subtask_count ?? 0}
+            total={ticket.subtask_count}
+            className="flex-1"
+          />
+        </div>
+      ) : null}
       {ticket.labels.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1">
           {ticket.labels.slice(0, MAX_VISIBLE_LABELS).map((label) => (

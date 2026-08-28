@@ -1,6 +1,16 @@
-from __future__ import annotations
+from django.urls import path
 
-# Reservado por WP-0 para WP-C (relaciones entre tickets). El agente de
-# WP-C lo rellena sin necesitar tocar config/urls.py de nuevo (ya incluido
-# ahi).
-urlpatterns = []
+from apps.relations.views import TicketRelationDetailView, TicketRelationListCreateView
+
+urlpatterns = [
+    path(
+        "projects/<uuid:project_id>/tickets/<uuid:ticket_id>/relations/",
+        TicketRelationListCreateView.as_view(),
+        name="ticket-relation-list-create",
+    ),
+    path(
+        "projects/<uuid:project_id>/tickets/<uuid:ticket_id>/relations/<uuid:relation_id>/",
+        TicketRelationDetailView.as_view(),
+        name="ticket-relation-detail",
+    ),
+]

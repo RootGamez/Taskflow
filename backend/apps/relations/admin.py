@@ -1,5 +1,10 @@
 from django.contrib import admin
 
-# Registro de `TicketRelation` reservado para WP-C, que agrega el
-# `ModelAdmin` (list_display/list_filter) una vez que el modelo tiene
-# serializers/vistas propios.
+from apps.relations.models import TicketRelation
+
+
+@admin.register(TicketRelation)
+class TicketRelationAdmin(admin.ModelAdmin):
+    list_display = ("id", "from_ticket", "relation_type", "to_ticket", "created_by", "created_at")
+    list_filter = ("relation_type",)
+    search_fields = ("from_ticket__title", "to_ticket__title")

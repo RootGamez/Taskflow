@@ -170,4 +170,29 @@ describe("TicketCard", () => {
 
     expect(container.querySelector(".flex-wrap")).not.toBeInTheDocument();
   });
+
+  it("muestra el progreso de subtareas cuando subtask_count > 0", () => {
+    const ticket = buildTicket({ subtask_count: 7, completed_subtask_count: 3 });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.getByText("3/7")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toBeInTheDocument();
+  });
+
+  it("no muestra la barra de progreso cuando subtask_count es 0", () => {
+    const ticket = buildTicket({ subtask_count: 0, completed_subtask_count: 0 });
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("no muestra la barra de progreso cuando subtask_count es undefined", () => {
+    const ticket = buildTicket();
+
+    render(<TicketCard ticket={ticket} onOpen={vi.fn()} />);
+
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
 });

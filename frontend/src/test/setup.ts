@@ -18,6 +18,15 @@ if (typeof window !== "undefined" && typeof window.ResizeObserver === "undefined
   window.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 }
 
+// jsdom no implementa scrollIntoView. cmdk's CommandGroup lo llama en un
+// layout effect al montar cuando hay CommandItem reales (command palette,
+// AddRelationPopover) -- sin este stub cada test que monta cmdk explota con
+// un TypeError. Hallazgo del agente de WP-A (Fase 3), subido a global aca
+// para que WP-D no tenga que repetirlo por archivo.
+if (typeof window !== "undefined" && typeof window.HTMLElement !== "undefined" && !window.HTMLElement.prototype.scrollIntoView) {
+  window.HTMLElement.prototype.scrollIntoView = () => {};
+}
+
 // jsdom no implementa matchMedia. ThemeProvider (src/app/providers.tsx) y
 // useThemeMode lo usan para resolver el tema "system", así que sin este
 // polyfill cualquier test que monte esos componentes falla al instanciarlos.

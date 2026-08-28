@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.sprints",
     "apps.labels",
+    "apps.subtasks",
+    "apps.relations",
 ]
 
 MIDDLEWARE = [

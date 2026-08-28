@@ -1,7 +1,8 @@
 import { Button, Dropdown, DropdownItem, DropdownMenu, DropdownTrigger } from "@heroui/react";
-import { LogOut, Settings, Shield, User as UserIcon } from "lucide-react";
+import { Keyboard, LogOut, Settings, Shield, User as UserIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
+import { useShortcutsHelpDialogStore } from "@/features/shortcuts/store/shortcutsHelpDialogStore";
 import { useAuthStore } from "@/store/authStore";
 import type { User } from "@/features/auth/types/auth.types";
 
@@ -12,6 +13,10 @@ interface UserMenuProps {
 export function UserMenu({ user }: UserMenuProps) {
   const navigate = useNavigate();
   const logout = useAuthStore((state) => state.logout);
+  // WP-D (§7 de docs/PHASE_3_PLAN.md): mismo store que
+  // `GlobalShortcutsProvider`/`KeyboardShortcutsDialog` -- una segunda
+  // forma de abrir el mismo panel de ayuda que el atajo `?`.
+  const openShortcutsDialog = useShortcutsHelpDialogStore((state) => state.open);
 
   const handleLogout = () => {
     logout();
@@ -40,6 +45,9 @@ export function UserMenu({ user }: UserMenuProps) {
         </DropdownItem>
         <DropdownItem key="settings" startContent={<Settings className="h-4 w-4" />} onPress={() => navigate("/settings/account")}>
           Configuración
+        </DropdownItem>
+        <DropdownItem key="shortcuts" startContent={<Keyboard className="h-4 w-4" />} onPress={openShortcutsDialog}>
+          Atajos de teclado
         </DropdownItem>
         <DropdownItem key="logout" color="danger" startContent={<LogOut className="h-4 w-4" />} onPress={handleLogout}>
           Cerrar sesión

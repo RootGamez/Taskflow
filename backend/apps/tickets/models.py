@@ -59,6 +59,14 @@ class Ticket(models.Model):
 	number = models.PositiveIntegerField(null=True, blank=True)
 	title = models.CharField(max_length=255)
 	description = models.TextField(blank=True)
+	# Texto plano extraido del JSON de Tiptap de `description`
+	# (apps.tickets.rich_text.extract_plain_text), para que la busqueda por
+	# descripcion (WP-A) no tenga que hacer `icontains` sobre el blob JSON
+	# crudo. `blank=True, default=""` -- nunca NULL -- para que el filtro
+	# sea uniforme (docs/PHASE_3_PLAN.md D9). Se recalcula en
+	# TicketCreateSerializer/TicketUpdateSerializer (D11), nunca aca ni en
+	# un signal.
+	description_text = models.TextField(blank=True, default="")
 	progress_notes = models.TextField(blank=True)
 	priority = models.CharField(max_length=10, choices=Priority.choices, default=Priority.NONE)
 	due_date = models.DateTimeField(null=True, blank=True)

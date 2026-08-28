@@ -77,7 +77,7 @@ class MyTasksView(APIView):
             Ticket.objects.filter(assignees=request.user, project__workspace_id__in=member_workspace_ids)
             .exclude(project__is_archived=True)
             .select_related("project", "project__workspace", "column", "created_by", "sprint")
-            .prefetch_related("assignees", "labels")
+            .prefetch_related("assignees", "labels", "subtasks")
             .order_by("project__name", F("due_date").asc(nulls_last=True), "created_at")[:MY_TASKS_LIMIT]
         )
 

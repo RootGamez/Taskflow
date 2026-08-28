@@ -392,7 +392,7 @@ class TicketConsumer(BaseJWTConsumer):
         # Re-fetch with all relations to ensure assignees are populated correctly
         updated_ticket = (
             Ticket.objects.select_related("project", "column", "created_by", "sprint")
-            .prefetch_related("assignees", "labels")
+            .prefetch_related("assignees", "labels", "subtasks")
             .get(id=ticket_id)
         )
         serialized_ticket = TicketSerializer(updated_ticket).data

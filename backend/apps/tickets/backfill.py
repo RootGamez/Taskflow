@@ -1,14 +1,17 @@
-"""Backfill de datos para `Ticket.number` (migracion 0008_backfill_ticket_numbers).
+"""Backfill de datos para `apps.tickets` (migraciones 0008 y 0011).
 
-`backfill_ticket_numbers` recibe la CLASE de modelo como parametro, mismo
-patron que `apps.projects.backfill.backfill_project_keys`: la migracion le
-pasa el modelo historico y los tests le pasan el modelo real.
+Cada funcion recibe la CLASE de modelo como parametro, mismo patron que
+`apps.projects.backfill.backfill_project_keys`: la migracion le pasa el
+modelo historico (`apps.get_model(...)`) y los tests le pasan el modelo
+real.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 from typing import Any
+
+from apps.tickets.rich_text import extract_plain_text
 
 BULK_UPDATE_BATCH_SIZE = 500
 
@@ -51,3 +54,27 @@ def backfill_ticket_numbers(ticket_model: Any) -> int:
 
     ticket_model.objects.bulk_update(to_update, ["number"], batch_size=BULK_UPDATE_BATCH_SIZE)
     return len(to_update)
+
+
+def backfill_description_text(ticket_model: Any) -> int:
+    """Popula `Ticket.description_text` extrayendo el texto plano del JSON
+    de Tiptap guardado en `description`, para los tickets que todavia no lo
+    tienen (docs/PHASE_3_PLAN.md D9/D10, migracion 0011).
+
+    Idempotente: solo toca filas con `description_text=""` y `description`
+    no vacia -- correr esto de nuevo despues de que el serializer ya
+    empezo a poblar `description_text` en runtime (D11) no pisa nada.
+    Devuelve la cantidad de tickets efectivamente actualizados.
+    """
+    pending_tickets = list(
+        ticket_model.objects.filter(description_text="").exclude(description="")
+    )
+
+    if not pending_tickets:
+        return 0
+
+    for ticket in pending_tickets:
+        ticket.description_text = extract_plain_text(ticket.description)
+
+    ticket_model.objects.bulk_update(pending_tickets, ["description_text"], batch_size=BULK_UPDATE_BATCH_SIZE)
+    return len(pending_tickets)

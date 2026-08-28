@@ -20,6 +20,7 @@ import {
 } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
+import { useRegisterCommandAction } from "@/features/shortcuts/hooks/useRegisterCommandAction";
 import { SprintSelector, SprintSummaryCard } from "@/features/sprints";
 import { useSprints } from "@/features/sprints/hooks/useSprints";
 import { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
@@ -111,6 +112,18 @@ export default function KanbanPage() {
   );
 
   const selectedCreateColumn = projectColumns.find((column) => column.id === createColumnId);
+
+  // D8/D53 de docs/PHASE_3_PLAN.md (WP-D, Wave 2): registra la accion
+  // "create-ticket" para que el command palette (WP-A) y el atajo `c`
+  // (WP-D) compartan un unico disparador -- el mismo que usa el boton
+  // "Nuevo ticket" de abajo. Solo se registra cuando el usuario puede
+  // mutar (mismo criterio que ese boton, D53); `useRegisterCommandAction`
+  // desregistra automaticamente al desmontar (RD5) o si `canMutate` pasa
+  // a `false`.
+  const handleShortcutCreateTicket = useCallback(() => {
+    setCreateColumnId(projectColumns[0]?.id ?? null);
+  }, [projectColumns]);
+  useRegisterCommandAction("create-ticket", canMutate ? handleShortcutCreateTicket : null);
 
   useEffect(() => {
     setFieldLocks({

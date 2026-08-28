@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 from apps.projects.models import Project, ProjectColumn
-from apps.tickets.backfill import backfill_ticket_numbers
+from apps.tickets.backfill import backfill_description_text, backfill_ticket_numbers
 from apps.tickets.models import Ticket
 from apps.workspaces.models import Workspace
 
@@ -143,3 +145,88 @@ class BackfillTicketNumbersTests(TestCase):
         self.assertEqual(ticket.order, original_order)
         self.assertEqual(ticket.title, original_title)
         self.assertIsNotNone(ticket.number)
+
+
+class BackfillDescriptionTextTests(TestCase):
+    """Tests de `backfill_description_text` (migracion 0011, R0-1)."""
+
+    def setUp(self) -> None:
+        self.owner = User.objects.create_user(
+            email="owner@example.com",
+            full_name="Owner",
+            password="Passw0rd!123",
+        )
+        self.workspace = Workspace.objects.create(name="Producto", owner=self.owner)
+        self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
+        self.column = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
+
+    def _make_ticket(self, description: str) -> Ticket:
+        ticket = Ticket.objects.create(
+            project=self.project,
+            column=self.column,
+            created_by=self.owner,
+            title="Ticket base",
+            order=1,
+            description=description,
+        )
+        Ticket.objects.filter(id=ticket.id).update(description_text="")
+        ticket.refresh_from_db()
+        return ticket
+
+    def test_backfill_description_text_populates_from_tiptap_json(self) -> None:
+        doc = {
+            "type": "doc",
+            "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "Hola mundo"}]},
+            ],
+        }
+        ticket = self._make_ticket(json.dumps(doc))
+
+        backfill_description_text(Ticket)
+
+        ticket.refresh_from_db()
+        self.assertEqual(ticket.description_text, "Hola mundo")
+
+    def test_backfill_description_text_is_idempotent(self) -> None:
+        doc = {"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "Uno"}]}]}
+        ticket = self._make_ticket(json.dumps(doc))
+
+        first_run = backfill_description_text(Ticket)
+        ticket.refresh_from_db()
+        first_value = ticket.description_text
+
+        second_run = backfill_description_text(Ticket)
+        ticket.refresh_from_db()
+
+        self.assertEqual(first_run, 1)
+        self.assertEqual(second_run, 0)
+        self.assertEqual(ticket.description_text, first_value)
+
+    def test_backfill_description_text_skips_tickets_that_already_have_it(self) -> None:
+        ticket = self._make_ticket("")
+        Ticket.objects.filter(id=ticket.id).update(
+            description=json.dumps({"type": "doc", "content": []}),
+            description_text="ya tenia texto",
+        )
+        ticket.refresh_from_db()
+
+        updated_count = backfill_description_text(Ticket)
+
+        ticket.refresh_from_db()
+        self.assertEqual(updated_count, 0)
+        self.assertEqual(ticket.description_text, "ya tenia texto")
+
+    def test_backfill_description_text_returns_updated_count(self) -> None:
+        doc = json.dumps({"type": "doc", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "X"}]}]})
+        self._make_ticket(doc)
+        self._make_ticket(doc)
+        self._make_ticket("")
+
+        updated_count = backfill_description_text(Ticket)
+
+        # Solo se actualizan los que tienen description no vacia y
+        # description_text todavia vacio -- el tercero (description="")
+        # no aporta texto util, pero igual pasa por bulk_update porque
+        # `description_text=""` y `description` vacia -> resultado sigue
+        # siendo "" (no se cuenta como actualizacion real).
+        self.assertEqual(updated_count, 2)

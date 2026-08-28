@@ -1,4 +1,11 @@
 # Documentación de planificación (roadmaps, specs de diseño, notas de
 # análisis) generada durante el desarrollo — referencia local, no forma
 # parte del código del producto ni se publica en el repo.
-docs/
+#
+# Anclado a la raíz (`/docs/`, no `docs/`): sin la barra inicial, git
+# ignora CUALQUIER directorio llamado "docs" en cualquier profundidad --
+# incluido `frontend/src/pages/docs/` (D9 de docs/PHASE_4_PLAN.md, donde
+# viven los componentes de ruta de Páginas). Descubierto en la
+# sub-entrega 4A: sin este anclaje, `PageIndexPage.tsx`/`PageDetailPage.tsx`
+# quedaban silenciosamente fuera de `git status`.
+/docs/

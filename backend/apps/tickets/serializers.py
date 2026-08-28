@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 import apps.activities.services as activities_services
 import apps.notifications.services as notifications_services
+import apps.tickettemplates.services as tickettemplates_services
 from apps.activities.models import Activity
 from apps.labels.serializers import LabelSerializer
 from apps.projects.models import ProjectColumn
@@ -146,6 +147,14 @@ class TicketCreateSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
+    # docs/PHASE_4_PLAN.md D20/R0A-3: `required=False` a proposito -- un
+    # POST sin `template_id` (el 100% del trafico de hoy) tiene que
+    # producir exactamente el mismo resultado que antes de este campo.
+    # `write_only=True`: nunca debe aparecer en la respuesta (el ticket
+    # creado se re-serializa con `TicketSerializer`, que ni siquiera
+    # declara este campo, pero se marca explicito igual para que quede
+    # documentado en el propio serializer).
+    template_id = serializers.UUIDField(required=False, write_only=True)
 
     def validate_column_id(self, value):
         project = self.context["project"]
@@ -168,6 +177,18 @@ class TicketCreateSerializer(serializers.Serializer):
         valid_count = project.labels.filter(id__in=value).count()
         if valid_count != len(set(value)):
             raise serializers.ValidationError("Uno o mas labels no pertenecen al proyecto.")
+        return value
+
+    def validate_template_id(self, value):
+        # Scopeada al proyecto ya resuelto en el context (RT-4 de
+        # docs/PHASE_4_PLAN.md): una plantilla de otro proyecto -- incluso
+        # de otro workspace -- da el mismo 400 generico, sin filtrar su
+        # nombre.
+        project = self.context["project"]
+        template = project.ticket_templates.filter(id=value).first()
+        if template is None:
+            raise serializers.ValidationError("La plantilla no pertenece a este proyecto.")
+        self.context["template"] = template
         return value
 
     def create(self, validated_data: dict) -> Ticket:
@@ -214,6 +235,19 @@ class TicketCreateSerializer(serializers.Serializer):
 
             if "label_ids" in validated_data:
                 ticket.labels.set(validated_data["label_ids"])
+
+            # D20 de docs/PHASE_4_PLAN.md: solo el checklist de la
+            # plantilla se aplica en el servidor (titulo/descripcion/
+            # prioridad ya los mando el cliente como campos normales,
+            # arriba). `self.context.get("template")` viene de
+            # `validate_template_id` -- ausente si no se mando
+            # `template_id` (el 100% del trafico de hoy, R0A-3). El stub
+            # de WP-0A (`apps.tickettemplates.services.apply_template_
+            # items`) siempre devuelve 0 sin tocar la DB; WP-T reescribe
+            # su cuerpo sin que este call site vuelva a cambiar.
+            template = self.context.get("template")
+            if template is not None:
+                tickettemplates_services.apply_template_items(ticket, template, request_user)
 
         # Fuera de la transacción: el único evento `created` de este ticket,
         # nunca acompañado de status_changed/assigned por los valores

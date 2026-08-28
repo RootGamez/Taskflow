@@ -1,7 +1,8 @@
 import { Button } from "@heroui/react";
-import { ChevronLeft, ChevronRight, FolderKanban, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, FolderKanban, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
+import { PageTreeNav } from "@/features/pages/components/PageTreeNav";
 import { useProjects } from "@/features/projects/hooks/useProjects";
 import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
 import { useUIStore } from "@/store/uiStore";
@@ -63,6 +64,9 @@ export function Sidebar() {
           { to: "/my-tasks", icon: ListTodo, label: "Mis tareas" },
           ...(workspaceSlug
             ? [
+                // D18 de docs/PHASE_4_PLAN.md: "Paginas" debajo de "Mis
+                // tareas", debajo de este item el arbol (PageTreeNav).
+                { to: `/workspaces/${workspaceSlug}/pages`, icon: FileText, label: "Páginas" },
                 { to: `/workspaces/${workspaceSlug}/members`, icon: Users, label: "Miembros" },
                 { to: `/workspaces/${workspaceSlug}/settings`, icon: Settings, label: "Configuracion" },
               ]
@@ -86,6 +90,14 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* D18: el arbol de paginas se oculta entero cuando el sidebar esta
+          colapsado, y no tiene sentido sin un workspace activo. */}
+      {!sidebarCollapsed && workspaceSlug ? (
+        <div className="px-3">
+          <PageTreeNav workspaceSlug={workspaceSlug} />
+        </div>
+      ) : null}
 
       {!sidebarCollapsed ? (
         <div className="mt-auto grid grid-cols-3 gap-1 border-t border-zinc-200 p-2 dark:border-zinc-800">

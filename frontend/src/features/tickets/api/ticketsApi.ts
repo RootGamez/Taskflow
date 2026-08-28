@@ -12,6 +12,10 @@ interface CreateTicketPayload {
   assignee_ids?: string[];
   sprint_id?: string | null;
   label_ids?: string[];
+  // Contrato de WP-0A (docs/PHASE_4_PLAN.md D20): `required=False` en el
+  // backend, aditivo -- un create sin `template_id` es identico al de
+  // siempre.
+  template_id?: string;
 }
 
 interface UpdateTicketPayload {

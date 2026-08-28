@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowDown,
@@ -39,6 +40,8 @@ import { Button } from "@/components/ui/shadcn/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/shadcn/dialog";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
+import { DEFAULT_TICKET_DESCRIPTION } from "@/features/tickets/lib/defaultTicketTemplate";
+import { TicketTemplatePicker, type AppliedTicketTemplate } from "@/features/ticket-templates/components/TicketTemplatePicker";
 import type { Priority } from "@/features/tickets/types/ticket.types";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import {
@@ -99,54 +102,6 @@ const PRIORITY_OPTIONS: Array<{
     border: "border-zinc-200 dark:border-zinc-700",
   },
 ];
-
-// ─── Default description template ─────────────────────────────────────────────
-
-const DEFAULT_DESCRIPTION = {
-  type: "doc",
-  content: [
-    {
-      type: "heading",
-      attrs: { level: 2 },
-      content: [{ type: "text", text: "📋 Descripción" }],
-    },
-    {
-      type: "paragraph",
-      content: [{ type: "text", text: "Describe brevemente el objetivo de esta tarea y su contexto." }],
-    },
-    {
-      type: "heading",
-      attrs: { level: 2 },
-      content: [{ type: "text", text: "✅ Objetivos" }],
-    },
-    {
-      type: "taskList",
-      content: [
-        {
-          type: "taskItem",
-          attrs: { checked: false },
-          content: [{ type: "paragraph", content: [{ type: "text", text: "Definir alcance de la tarea" }] }],
-        },
-        {
-          type: "taskItem",
-          attrs: { checked: false },
-          content: [{ type: "paragraph", content: [{ type: "text", text: "Identificar dependencias" }] }],
-        },
-        {
-          type: "taskItem",
-          attrs: { checked: false },
-          content: [{ type: "paragraph", content: [{ type: "text", text: "Criterios de aceptación definidos" }] }],
-        },
-      ],
-    },
-    {
-      type: "heading",
-      attrs: { level: 2 },
-      content: [{ type: "text", text: "📎 Notas adicionales" }],
-    },
-    { type: "paragraph" },
-  ],
-};
 
 // ─── File type helpers ─────────────────────────────────────────────────────────
 
@@ -440,6 +395,10 @@ export interface CreateTicketInput {
   due_date: string | null;
   description?: Record<string, unknown>;
   assignee_ids?: string[];
+  // D20 de docs/PHASE_4_PLAN.md: solo el checklist de la plantilla se
+  // aplica en el servidor -- titulo/descripcion/prioridad ya viajan como
+  // campos normales, prefijados en el cliente por `handleApplyTemplate`.
+  template_id?: string;
 }
 
 interface CreateTicketModalProps {
@@ -520,10 +479,15 @@ export function CreateTicketModal({
   onClose,
   onCreate,
 }: CreateTicketModalProps) {
+  // Autosuficiente (D4 de docs/PHASE_4_PLAN.md): el modal solo se monta
+  // bajo /workspaces/:workspaceSlug/projects/:projectId/*, asi que lee su
+  // propio `projectId` de la ruta en vez de recibirlo como prop nueva.
+  const { projectId = "" } = useParams();
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<Priority>("none");
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
+  const [templateId, setTemplateId] = useState<string | undefined>(undefined);
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -639,7 +603,7 @@ export function CreateTicketModal({
       }),
     ],
 
-    content: DEFAULT_DESCRIPTION,
+    content: DEFAULT_TICKET_DESCRIPTION,
     editable: !isLoading,
     immediatelyRender: false,
     editorProps: {
@@ -657,7 +621,8 @@ export function CreateTicketModal({
       setPriority("none");
       setDueDate(null);
       setAssigneeIds([]);
-      editor?.commands.setContent(DEFAULT_DESCRIPTION, false);
+      setTemplateId(undefined);
+      editor?.commands.setContent(DEFAULT_TICKET_DESCRIPTION, false);
       setTimeout(() => titleRef.current?.focus(), 80);
     }
   }, [isOpen, editor]);
@@ -666,6 +631,24 @@ export function CreateTicketModal({
   useEffect(() => {
     editor?.setEditable(!isLoading);
   }, [editor, isLoading]);
+
+  // ── Apply a ticket template (D20 de docs/PHASE_4_PLAN.md) ──────────────────
+  // Callback "hacia adentro" del propio modal (D4): TicketTemplatePicker es
+  // un stub que hoy nunca la invoca, pero la firma queda fija para que WP-T
+  // no tenga que volver a tocar este archivo.
+  const handleApplyTemplate = useCallback((template: AppliedTicketTemplate) => {
+    setTemplateId(template.id);
+    if (template.title_template) setTitle(template.title_template);
+    setPriority(template.priority);
+    if (template.description) {
+      try {
+        editor?.commands.setContent(JSON.parse(template.description), false);
+      } catch {
+        // RT-9: descripcion de plantilla con JSON invalido -- se ignora,
+        // el editor conserva su contenido actual en vez de romper.
+      }
+    }
+  }, [editor]);
 
   const handleSubmit = async () => {
     const trimmedTitle = title.trim();
@@ -677,6 +660,7 @@ export function CreateTicketModal({
       due_date: dueDate,
       description,
       assignee_ids: assigneeIds.length > 0 ? assigneeIds : undefined,
+      template_id: templateId,
     });
   };
 
@@ -827,6 +811,13 @@ export function CreateTicketModal({
 
           {/* Right: metadata sidebar */}
           <aside className="flex w-[220px] shrink-0 flex-col gap-5 overflow-y-auto bg-zinc-50/60 px-5 py-5 dark:bg-zinc-900/40">
+
+            <section>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                Plantilla
+              </p>
+              <TicketTemplatePicker projectId={projectId} onApply={handleApplyTemplate} disabled={isLoading} />
+            </section>
 
             <section>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">

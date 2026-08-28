@@ -17,6 +17,7 @@ from apps.relations.models import TicketRelation
 from apps.sprints.models import Sprint
 from apps.subtasks.models import SubTask
 from apps.tickets.models import Ticket
+from apps.tickettemplates.models import TicketTemplate
 from apps.workspaces.models import Workspace, WorkspaceMember
 
 User = get_user_model()
@@ -728,3 +729,107 @@ class TicketCascadeDeletionTests(APITestCase):
 		# relacion) no se borra en cascada -- solo se borro `blocker`.
 		self.assertTrue(Ticket.objects.filter(id=blocked.id).exists())
 		self.assertTrue(Ticket.objects.filter(id=other.id).exists())
+
+
+class TicketTemplateIdContractTests(APITestCase):
+	"""WP-0A (docs/PHASE_4_PLAN.md seccion 3.6, tests 1-4): contrato de
+	`template_id` en `TicketCreateSerializer`. R0A-3 (severidad ALTA): un
+	POST sin `template_id` tiene que dar EXACTAMENTE el mismo resultado
+	que antes de este campo -- es el primer test de esta clase."""
+
+	def setUp(self) -> None:
+		self.user = User.objects.create_user(
+			email="owner@example.com",
+			full_name="Owner",
+			password="Passw0rd!123",
+		)
+		login_response = self.client.post(
+			"/api/v1/auth/login/",
+			{"email": "owner@example.com", "password": "Passw0rd!123"},
+			format="json",
+		)
+		self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {login_response.data['access']}")
+
+		self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
+		WorkspaceMember.objects.create(
+			workspace=self.workspace,
+			user=self.user,
+			role=WorkspaceMember.Role.OWNER,
+			is_active=True,
+		)
+		self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
+		self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
+
+	def test_creating_a_ticket_without_template_id_is_unchanged(self) -> None:
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket sin plantilla",
+				"priority": "high",
+				"column_id": str(self.backlog.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		self.assertEqual(response.data["title"], "Ticket sin plantilla")
+		self.assertEqual(response.data["priority"], "high")
+		self.assertNotIn("template_id", response.data)
+
+		ticket = Ticket.objects.get(id=response.data["id"])
+		self.assertEqual(ticket.title, "Ticket sin plantilla")
+
+	def test_creating_a_ticket_with_an_unknown_template_id_returns_400(self) -> None:
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con plantilla inexistente",
+				"column_id": str(self.backlog.id),
+				"template_id": "00000000-0000-0000-0000-000000000000",
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertFalse(Ticket.objects.filter(title="Ticket con plantilla inexistente").exists())
+
+	def test_creating_a_ticket_with_a_template_from_another_project_returns_400(self) -> None:
+		other_project = Project.objects.create(workspace=self.workspace, name="Otro proyecto")
+		foreign_template = TicketTemplate.objects.create(
+			project=other_project,
+			name="Bug report",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con plantilla ajena",
+				"column_id": str(self.backlog.id),
+				"template_id": str(foreign_template.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertFalse(Ticket.objects.filter(title="Ticket con plantilla ajena").exists())
+
+	def test_template_id_is_write_only_and_absent_from_the_response(self) -> None:
+		template = TicketTemplate.objects.create(
+			project=self.project,
+			name="Bug report",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con plantilla propia",
+				"column_id": str(self.backlog.id),
+				"template_id": str(template.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		self.assertNotIn("template_id", response.data)

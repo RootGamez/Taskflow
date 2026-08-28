@@ -42,6 +42,7 @@ import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
 import { DEFAULT_TICKET_DESCRIPTION } from "@/features/tickets/lib/defaultTicketTemplate";
 import { TicketTemplatePicker, type AppliedTicketTemplate } from "@/features/ticket-templates/components/TicketTemplatePicker";
+import { BUILT_IN_TEMPLATE_ID } from "@/features/ticket-templates/lib/builtInTemplate";
 import type { Priority } from "@/features/tickets/types/ticket.types";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import {
@@ -637,7 +638,13 @@ export function CreateTicketModal({
   // un stub que hoy nunca la invoca, pero la firma queda fija para que WP-T
   // no tenga que volver a tocar este archivo.
   const handleApplyTemplate = useCallback((template: AppliedTicketTemplate) => {
-    setTemplateId(template.id);
+    // Hallazgo de code-review (Fase 4A, HIGH): la plantilla "por defecto"
+    // (BUILT_IN_TEMPLATE_ID) es solo un sentinel local, no una fila real
+    // de la DB -- el backend valida `template_id` como UUID y rechaza
+    // cualquier otra cosa con 400. Aplicarla debe seguir siendo identico
+    // al comportamiento de hoy (D24): título/descripción/prioridad sí se
+    // prefijan, pero NO se manda template_id al crear.
+    setTemplateId(template.id === BUILT_IN_TEMPLATE_ID ? undefined : template.id);
     if (template.title_template) setTitle(template.title_template);
     setPriority(template.priority);
     if (template.description) {
@@ -816,7 +823,12 @@ export function CreateTicketModal({
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 Plantilla
               </p>
-              <TicketTemplatePicker projectId={projectId} onApply={handleApplyTemplate} disabled={isLoading} />
+              <TicketTemplatePicker
+                projectId={projectId}
+                onApply={handleApplyTemplate}
+                disabled={isLoading}
+                currentTitle={title}
+              />
             </section>
 
             <section>

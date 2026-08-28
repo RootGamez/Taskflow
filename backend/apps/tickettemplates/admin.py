@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-# Registro de `TicketTemplate`/`TicketTemplateItem` reservado para WP-T,
-# que agrega el `ModelAdmin` (list_display/list_filter) una vez que los
-# modelos tienen serializers/vistas propios. Registrar aca sin eso
-# todavia seria admin sin uso real.
+from apps.tickettemplates.models import TicketTemplate, TicketTemplateItem
+
+
+class TicketTemplateItemInline(admin.TabularInline):
+    model = TicketTemplateItem
+    extra = 0
+
+
+@admin.register(TicketTemplate)
+class TicketTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "project", "priority", "created_at")
+    list_filter = ("priority",)
+    search_fields = ("name",)
+    inlines = [TicketTemplateItemInline]

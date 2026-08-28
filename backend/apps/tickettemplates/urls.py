@@ -1,6 +1,18 @@
 from __future__ import annotations
 
-# Reservado por WP-0A (docs/PHASE_4_PLAN.md seccion 3) para WP-T (Ola 1,
-# plantillas de ticket). El agente de WP-T lo rellena sin necesitar tocar
-# config/urls.py de nuevo (ya incluido ahi bajo "api/v1/").
-urlpatterns = []
+from django.urls import path
+
+from apps.tickettemplates.views import TicketTemplateDetailView, TicketTemplateListCreateView
+
+urlpatterns = [
+    path(
+        "projects/<uuid:project_id>/ticket-templates/",
+        TicketTemplateListCreateView.as_view(),
+        name="ticket-template-list-create",
+    ),
+    path(
+        "projects/<uuid:project_id>/ticket-templates/<uuid:template_id>/",
+        TicketTemplateDetailView.as_view(),
+        name="ticket-template-detail",
+    ),
+]

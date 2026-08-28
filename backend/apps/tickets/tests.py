@@ -17,7 +17,7 @@ from apps.relations.models import TicketRelation
 from apps.sprints.models import Sprint
 from apps.subtasks.models import SubTask
 from apps.tickets.models import Ticket
-from apps.tickettemplates.models import TicketTemplate
+from apps.tickettemplates.models import TicketTemplate, TicketTemplateItem
 from apps.workspaces.models import Workspace, WorkspaceMember
 
 User = get_user_model()
@@ -833,3 +833,104 @@ class TicketTemplateIdContractTests(APITestCase):
 
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
 		self.assertNotIn("template_id", response.data)
+
+	# --- A partir de aca: tests 27-30 de docs/PHASE_4_PLAN.md seccion 5.5
+	# (WP-T, integracion de `template_id` con la creacion real de tickets).
+	# Los tests 1-4 de arriba son de WP-0A (contrato del campo con el stub
+	# de `apply_template_items`); estos prueban el cuerpo real (D20). ---
+
+	def test_creating_a_ticket_with_template_id_creates_its_checklist(self) -> None:
+		template = TicketTemplate.objects.create(project=self.project, name="Bug report", created_by=self.user)
+		TicketTemplateItem.objects.create(template=template, title="Pasos para reproducir", order=1)
+		TicketTemplateItem.objects.create(template=template, title="Comportamiento esperado", order=2)
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con checklist",
+				"column_id": str(self.backlog.id),
+				"template_id": str(template.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		ticket = Ticket.objects.get(id=response.data["id"])
+		self.assertEqual(ticket.subtasks.count(), 2)
+		self.assertEqual(
+			list(ticket.subtasks.order_by("order").values_list("title", flat=True)),
+			["Pasos para reproducir", "Comportamiento esperado"],
+		)
+
+	def test_creating_a_ticket_with_template_id_does_not_overwrite_the_sent_title(self) -> None:
+		# D20: el servidor SOLO aplica el checklist -- titulo/descripcion/
+		# prioridad ya los mando el cliente como campos normales
+		# (`applyTemplateToDraft` en el frontend). Un `title_template` en la
+		# plantilla no debe pisar el titulo que efectivamente llego en el
+		# POST.
+		template = TicketTemplate.objects.create(
+			project=self.project,
+			name="Bug report",
+			title_template="[BUG] ",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Titulo escrito por el usuario",
+				"column_id": str(self.backlog.id),
+				"template_id": str(template.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+		self.assertEqual(response.data["title"], "Titulo escrito por el usuario")
+
+	def test_creating_a_ticket_with_a_template_from_another_project_returns_400_without_leaking_its_name(self) -> None:
+		other_project = Project.objects.create(workspace=self.workspace, name="Otro proyecto")
+		foreign_template = TicketTemplate.objects.create(
+			project=other_project,
+			name="Nombre secreto de la plantilla ajena",
+			created_by=self.user,
+		)
+
+		response = self.client.post(
+			f"/api/v1/projects/{self.project.id}/tickets/",
+			{
+				"title": "Ticket con plantilla ajena",
+				"column_id": str(self.backlog.id),
+				"template_id": str(foreign_template.id),
+			},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertNotIn("Nombre secreto de la plantilla ajena", str(response.data))
+		self.assertFalse(Ticket.objects.filter(title="Ticket con plantilla ajena").exists())
+
+	def test_creating_a_ticket_with_template_id_is_atomic_with_the_subtasks(self) -> None:
+		# Si `apply_template_items` fallara (D26: en la practica nunca lanza,
+		# trunca y loguea), el ticket entero tiene que revertirse -- prueba
+		# que ambas escrituras viven en la MISMA `transaction.atomic()`
+		# (serializers.py:206-250), no en dos pasos independientes.
+		template = TicketTemplate.objects.create(project=self.project, name="Bug report", created_by=self.user)
+		TicketTemplateItem.objects.create(template=template, title="Paso 1", order=1)
+
+		with patch(
+			"apps.tickets.serializers.tickettemplates_services.apply_template_items",
+			side_effect=RuntimeError("boom"),
+		):
+			with self.assertRaises(RuntimeError):
+				self.client.post(
+					f"/api/v1/projects/{self.project.id}/tickets/",
+					{
+						"title": "Ticket con checklist que falla",
+						"column_id": str(self.backlog.id),
+						"template_id": str(template.id),
+					},
+					format="json",
+				)
+
+		self.assertFalse(Ticket.objects.filter(title="Ticket con checklist que falla").exists())

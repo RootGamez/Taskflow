@@ -16,6 +16,7 @@ import { TicketRelationsSection } from "@/features/relations/components/TicketRe
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
 import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
+import type { MentionItem } from "@/features/tickets/components/editor/MentionList";
 import { TicketSubtasksSection } from "@/features/subtasks/components/TicketSubtasksSection";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
@@ -75,6 +76,8 @@ interface TicketDetailProps {
   onUploadImage?: ImageUploadFn;
   /** Función para subir videos al servidor desde el editor de contenido. */
   onUploadVideo?: ImageUploadFn;
+  /** Miembros mencionables con `@` en el editor. */
+  mentionItems?: MentionItem[];
 }
 
 function toDateInput(isoDate: string | null): string {
@@ -277,6 +280,7 @@ export function TicketDetail({
   onDelete,
   onUploadImage,
   onUploadVideo,
+  mentionItems,
 }: TicketDetailProps) {
   const [draftState, dispatch] = useReducer(draftReducer, initialDraft);
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
@@ -890,6 +894,7 @@ export function TicketDetail({
                 }
                 onUploadImage={onUploadImage}
                 onUploadVideo={onUploadVideo}
+                mentionItems={mentionItems}
                 onChange={(next) => {
                   if (activeFieldRef.current !== "description") {
                     return;

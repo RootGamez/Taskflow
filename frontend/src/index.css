@@ -269,6 +269,16 @@ summary {
 
 /* ─── Extensiones compartidas del editor (Fase 5-7 del plan Tiptap) ───────── */
 
+/* Menciones (@usuario) */
+.tiptap .tf-mention {
+  border-radius: 0.3rem;
+  padding: 0.05em 0.3em;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 /* Marca de resaltado (Highlight) */
 .tiptap mark {
   background-color: #fef08a;

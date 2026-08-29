@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
 import { ListView } from "@/features/tickets/components/ListView";
+import { useMembers } from "@/features/members/hooks/useMembers";
 import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useDeleteTicket, useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
@@ -43,6 +44,16 @@ export default function ListPage() {
   const sprintScope = useSprintScopeStore((state) => state.scope);
   const clearSprintScope = useSprintScopeStore((state) => state.clear);
   const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === "active") ?? null, [sprints]);
+  const { data: workspaceMembers = [] } = useMembers(workspaceSlug);
+  const mentionItems = useMemo(
+    () =>
+      workspaceMembers.map((member) => ({
+        id: member.user_id,
+        label: member.full_name,
+        avatarUrl: member.avatar_url,
+      })),
+    [workspaceMembers],
+  );
 
   // Los stores de filtro (fecha y sprint) son globales (a propósito, no
   // persisten entre proyectos). Sin este reset, un filtro activo en el
@@ -348,6 +359,7 @@ export default function ListPage() {
         onTypingField={handleTypingField}
         onUploadImage={canMutate ? handleUploadImage : undefined}
         onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        mentionItems={mentionItems}
         onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />

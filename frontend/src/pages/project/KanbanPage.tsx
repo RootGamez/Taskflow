@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
+import { useMembers } from "@/features/members/hooks/useMembers";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
 import { KanbanBoardMobile } from "@/features/tickets/components/KanbanBoardMobile";
@@ -54,6 +55,16 @@ export default function KanbanPage() {
   const sprintScope = useSprintScopeStore((state) => state.scope);
   const clearSprintScope = useSprintScopeStore((state) => state.clear);
   const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === "active") ?? null, [sprints]);
+  const { data: workspaceMembers = [] } = useMembers(workspaceSlug);
+  const mentionItems = useMemo(
+    () =>
+      workspaceMembers.map((member) => ({
+        id: member.user_id,
+        label: member.full_name,
+        avatarUrl: member.avatar_url,
+      })),
+    [workspaceMembers],
+  );
 
   // Los stores de filtro (fecha y sprint) son globales (a propósito, no
   // persisten entre proyectos). Sin este reset, un filtro activo en el
@@ -485,6 +496,7 @@ export default function KanbanPage() {
         onTypingField={handleTypingField}
         onUploadImage={canMutate ? handleUploadImage : undefined}
         onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        mentionItems={mentionItems}
         onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />

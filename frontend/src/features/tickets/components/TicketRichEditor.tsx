@@ -57,8 +57,10 @@ import { Button } from "@/components/ui/shadcn/button";
 import { Input } from "@/components/ui/shadcn/input";
 
 import { BookmarkExtension } from "./BookmarkExtension";
+import Mention from "@tiptap/extension-mention";
 import { normalizeUrl } from "./editor/url";
 import { createSharedExtensions } from "./editor/sharedExtensions";
+import { MentionList, createMentionRenderer, type MentionItem, type MentionReactState } from "./editor/MentionList";
 import { useUrlPrompt, type RequestUrlFn } from "./editor/useUrlPrompt";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import { VideoExtension } from "./extensions/VideoExtension";
@@ -122,6 +124,8 @@ interface TicketRichEditorProps {
   onUploadImage?: ImageUploadFn;
   /** Upload function for videos: receives a File, resolves with public URL */
   onUploadVideo?: ImageUploadFn;
+  /** Miembros mencionables con `@`. Si no se pasa, las menciones quedan desactivadas. */
+  mentionItems?: MentionItem[];
 }
 
 // ─── Editor styles (injected once as a <style> tag) ──────────────────────────
@@ -497,20 +501,35 @@ export function TicketRichEditor({
   onBlur,
   onUploadImage,
   onUploadVideo,
+  mentionItems,
 }: TicketRichEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { requestUrl, urlPromptDialog } = useUrlPrompt();
   const onChangeRef = useRef(onChange);
   const onUploadImageRef = useRef(onUploadImage);
   const onUploadVideoRef = useRef(onUploadVideo);
+  const mentionItemsRef = useRef<MentionItem[]>(mentionItems ?? []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const [mentionState, setMentionState] = useState<MentionReactState>({
+    items: [],
+    command: () => {},
+    clientRect: null,
+    isVisible: false,
+  });
+  const mentionKeyDownRef = useRef<((e: KeyboardEvent) => boolean) | null>(null);
+  const mentionRenderer = useMemo(
+    () => createMentionRenderer(setMentionState, mentionKeyDownRef),
+    [],
+  );
 
   // Keep refs in sync (stable reference for extensions)
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onUploadImageRef.current = onUploadImage; }, [onUploadImage]);
   useEffect(() => { onUploadVideoRef.current = onUploadVideo; }, [onUploadVideo]);
+  useEffect(() => { mentionItemsRef.current = mentionItems ?? []; }, [mentionItems]);
 
   const triggerImageFileInput = useCallback(() => {
     fileInputRef.current?.click();
@@ -552,6 +571,20 @@ export function TicketRichEditor({
         codeBlock: false,
       }),
       ...createSharedExtensions(),
+
+      Mention.configure({
+        HTMLAttributes: { class: "tf-mention" },
+        suggestion: {
+          char: "@",
+          items: ({ query }: { query: string }) => {
+            const q = query.toLowerCase();
+            return mentionItemsRef.current
+              .filter((m) => m.label.toLowerCase().includes(q))
+              .slice(0, 8);
+          },
+          render: mentionRenderer,
+        },
+      }),
 
       // Image with React NodeView (resize + toolbar)
       Image.configure({
@@ -858,6 +891,17 @@ export function TicketRichEditor({
           (typeof document !== "undefined" ? document.body : null)
         }
         onDismiss={() => setSlashMenuState((prev) => ({ ...prev, isVisible: false }))}
+      />
+
+      {/* Menú de menciones (@) */}
+      <MentionList
+        state={mentionState}
+        keyDownHandlerRef={mentionKeyDownRef}
+        container={
+          (editor?.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null) ??
+          (typeof document !== "undefined" ? document.body : null)
+        }
+        onDismiss={() => setMentionState((prev) => ({ ...prev, isVisible: false }))}
       />
 
       {/* Diálogo para pedir URL (reemplaza window.prompt) */}

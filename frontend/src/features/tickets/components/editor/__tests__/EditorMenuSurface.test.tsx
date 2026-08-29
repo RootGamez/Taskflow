@@ -47,10 +47,10 @@ describe("EditorMenuSurface (escritorio)", () => {
     expect(scroller?.className).toContain("overflow-y-auto");
   });
 
-  it("portalea el ancla a <body> (fuera de cualquier transform del panel)", () => {
-    // El ancla es un div position:fixed aria-hidden. Debe colgar de <body>,
-    // no del árbol donde se monta el componente, para que su fixed sea
-    // relativo al viewport y no a un DialogContent con translate.
+  it("portalea el contenido a <body> (fuera de cualquier transform del panel)", () => {
+    // El menú se implementa sobre Radix Dialog: su contenido cuelga de un
+    // portal en <body>, no del árbol donde se monta, para que el
+    // `position: fixed` sea relativo al viewport y no a un panel con transform.
     const { container } = render(
       <div style={{ transform: "translateX(0)" }} data-testid="transformed">
         <EditorMenuSurface
@@ -66,10 +66,8 @@ describe("EditorMenuSurface (escritorio)", () => {
       </div>,
     );
     const transformed = container.querySelector('[data-testid="transformed"]')!;
-    const anchor = document.querySelector('div[aria-hidden="true"][style*="fixed"]');
-    expect(anchor).not.toBeNull();
-    expect(transformed.contains(anchor)).toBe(false);
-    expect(anchor?.parentElement).toBe(document.body);
+    const listbox = screen.getByRole("listbox", { name: "Insertar bloque" });
+    expect(transformed.contains(listbox)).toBe(false);
   });
 
   it("no renderiza nada cuando open=false", () => {

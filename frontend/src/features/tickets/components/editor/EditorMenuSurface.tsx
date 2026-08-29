@@ -1,9 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import * as Popover from "@radix-ui/react-popover";
-import { RemoveScroll } from "react-remove-scroll";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/Sheet";
 import { useIsMobile } from "@/hooks/useBreakpoint";
@@ -11,53 +9,39 @@ import { cn } from "@/lib/utils";
 
 /**
  * Superficie compartida de los menús flotantes del editor (menú "+", menú
- * "/", acciones de bloque, y en el futuro menciones).
+ * "/", acciones de bloque, menciones).
  *
- * Resuelve de una vez los bugs históricos del menú de bloques:
+ * Se implementa sobre **Radix Dialog** (no Popover) tanto en móvil como en
+ * escritorio, portaleado a `document.body`. Motivos:
  *
- * 1. **El scroll no funcionaba (rueda ni táctil).** El menú se portaleaba a
- *    `document.body`, fuera del Radix Dialog del ticket, y el scroll-lock del
- *    Dialog (`react-remove-scroll`) hacía `preventDefault` de `wheel`/
- *    `touchmove` sobre todo lo externo. Aquí la lista scrolleable va envuelta
- *    en un `<RemoveScroll>` anidado: al montarse pasa a ser el lock activo y
- *    "libera" la rueda y el táctil dentro de sí mismo.
+ * 1. **El panel de ticket lleva `translate-x-0` (un `transform` real).** Eso
+ *    convierte cualquier `position: fixed` descendiente en relativo al panel.
+ *    Con Radix Popover anclado dentro del panel el menú acababa fuera de
+ *    pantalla ("no se abría nada"). Radix Dialog portalea a `<body>` y el
+ *    `position: fixed` del contenido vuelve a ser relativo al viewport.
+ * 2. **Foco del buscador.** Radix Dialog monta su propio `FocusScope`
+ *    (`modal`) que pausa el del panel padre, así el `<input>` del menú "+"
+ *    conserva el foco (antes lo robaba el focus-trap del panel).
+ * 3. **Scroll.** Radix Dialog trae su `RemoveScroll`, que pasa a ser el lock
+ *    activo y permite scrollear (rueda + táctil) dentro del contenido —
+ *    antes el lock del panel bloqueaba el `wheel`/`touchmove` del menú.
  *
- * 2. **El buscador robaba/perdía el foco y el menú "desaparecía".** El
- *    `FocusScope` del Dialog devolvía el foco al detectar que salía del
- *    diálogo. Los menús con `<input>` (el "+") se abren con `modal` -> Radix
- *    monta su propio `FocusScope`, que pausa el del Dialog mientras está
- *    abierto. Los que no toman el foco (menú "/", menciones) van sin `modal`.
- *
- * 3. **Posición con constante mágica (`menuHeight = 320`).** Radix Popper
- *    mide el ancla real y hace flip/colisión solo.
- *
- * NOTA: el ancla y el contenido se portalean a `document.body`, NO dentro del
- * `DialogContent`. El panel de ticket lleva `translate-x-0` (un `transform`
- * real), que convierte cualquier `position: fixed` descendiente en relativo
- * al panel -> el ancla acababa fuera de pantalla y "no se abría nada".
- *
- * En móvil se renderiza como hoja inferior (`components/ui/Sheet.tsx`).
+ * En escritorio se posiciona como una tarjeta flotante junto al cursor
+ * (`anchorRect`, coordenadas de viewport). En móvil, hoja inferior.
  */
 
 interface EditorMenuSurfaceProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /**
-   * Rect (coordenadas de viewport) del ancla virtual: el cursor, el
-   * `clientRect` de `@tiptap/suggestion`, o el botón "+".
-   */
+  /** Rect (viewport) del ancla: cursor, `clientRect` de suggestion, o el botón "+". */
   anchorRect: { top: number; left: number; width?: number; height?: number } | null;
-  /** Aceptado por compatibilidad; ya no se usa (ver NOTA en el docstring). */
+  /** Aceptado por compatibilidad; ya no se usa. */
   container?: HTMLElement | null;
   side?: "top" | "bottom";
   align?: "start" | "center" | "end";
   /** true = enfoca el primer foco al abrir (menú "+"); false = deja el foco en el editor (menú "/"). */
   autoFocus?: boolean;
-  /**
-   * `modal` en Radix Popover: monta un `FocusScope` propio que pausa el del
-   * Dialog padre. Necesario para los menús con `<input>` (el "+"), innecesario
-   * para los que no roban el foco.
-   */
+  /** Aceptado por compatibilidad; el `modal` de Radix Dialog es siempre true. */
   modal?: boolean;
   ariaLabel: string;
   /** Cabecera fija sobre la zona scrolleable (p. ej. el input de búsqueda). */
@@ -70,14 +54,34 @@ interface EditorMenuSurfaceProps {
   desktopMaxHeightClass?: string;
 }
 
+const DESKTOP_MENU_WIDTH = 288; // w-72
+const DESKTOP_MENU_MAX_HEIGHT = 360;
+
+function clampToViewport(rect: { top: number; left: number } | null) {
+  if (typeof window === "undefined" || !rect) {
+    return { top: 80, left: 80 };
+  }
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  let top = rect.top + 6;
+  let left = rect.left;
+
+  if (top + DESKTOP_MENU_MAX_HEIGHT > vh - 12) {
+    top = Math.max(12, rect.top - DESKTOP_MENU_MAX_HEIGHT - 6);
+  }
+  if (left + DESKTOP_MENU_WIDTH > vw - 12) {
+    left = vw - DESKTOP_MENU_WIDTH - 12;
+  }
+  left = Math.max(12, left);
+  return { top, left };
+}
+
 export function EditorMenuSurface({
   open,
   onOpenChange,
   anchorRect,
-  side = "bottom",
-  align = "start",
   autoFocus = false,
-  modal = false,
   ariaLabel,
   header,
   children,
@@ -85,7 +89,6 @@ export function EditorMenuSurface({
   desktopMaxHeightClass = "max-h-80",
 }: EditorMenuSurfaceProps) {
   const isMobile = useIsMobile();
-  const bodyEl = typeof document !== "undefined" ? document.body : null;
 
   if (isMobile) {
     return (
@@ -100,66 +103,48 @@ export function EditorMenuSurface({
         >
           <SheetTitle className="sr-only">{ariaLabel}</SheetTitle>
           {header ? <div className="px-2 pb-1 pt-1">{header}</div> : null}
-          <RemoveScroll
+          <div
             className="tf-scroll-contain max-h-[62dvh] overflow-y-auto overscroll-contain p-1.5"
             style={{ touchAction: "pan-y" }}
           >
             <div role="listbox" aria-label={ariaLabel}>
               {children}
             </div>
-          </RemoveScroll>
+          </div>
         </SheetContent>
       </Sheet>
     );
   }
 
-  const anchor = (
-    <Popover.Anchor asChild>
-      <div
-        aria-hidden="true"
-        style={{
-          position: "fixed",
-          top: anchorRect?.top ?? 0,
-          left: anchorRect?.left ?? 0,
-          width: anchorRect?.width ?? 0,
-          height: anchorRect?.height ?? 0,
-          pointerEvents: "none",
-        }}
-      />
-    </Popover.Anchor>
-  );
+  const pos = clampToViewport(anchorRect);
 
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange} modal={modal}>
-      {/* Ancla portaleada a <body>: fuera del `transform` del panel de ticket,
-          para que su `position: fixed` sea relativo al viewport. */}
-      {bodyEl ? createPortal(anchor, bodyEl) : anchor}
-      <Popover.Portal>
-        <Popover.Content
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+      <DialogPrimitive.Portal>
+        {/* Scrim invisible: sólo captura el clic-fuera (Radix lo cierra). */}
+        <DialogPrimitive.Overlay className="fixed inset-0 z-[9998] bg-transparent" />
+        <DialogPrimitive.Content
           data-ticket-editor-floating="true"
-          side={side}
-          align={align}
-          sideOffset={6}
-          collisionPadding={12}
-          avoidCollisions
           onOpenAutoFocus={(event) => {
             if (!autoFocus) event.preventDefault();
           }}
           onCloseAutoFocus={(event) => {
-            // No robar el foco al cerrar: lo devuelve el consumidor al editor.
+            // El consumidor devuelve el foco al editor.
             event.preventDefault();
           }}
+          style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 9999 }}
           className={cn(
-            "z-[9999] flex w-72 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:border-zinc-700 dark:bg-zinc-900",
+            "flex w-72 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:border-zinc-700 dark:bg-zinc-900",
             className,
           )}
         >
+          <DialogPrimitive.Title className="sr-only">{ariaLabel}</DialogPrimitive.Title>
           {header ? (
             <div className="shrink-0 border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
               {header}
             </div>
           ) : null}
-          <RemoveScroll
+          <div
             className={cn(
               "tf-scroll-contain overflow-y-auto overscroll-contain p-1",
               desktopMaxHeightClass,
@@ -169,9 +154,9 @@ export function EditorMenuSurface({
             <div role="listbox" aria-label={ariaLabel}>
               {children}
             </div>
-          </RemoveScroll>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

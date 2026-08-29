@@ -183,7 +183,6 @@ function BlockMenuPopup({ options, onSelect, onClose, anchorRect }: BlockMenuPro
       }}
       anchorRect={anchorRect}
       autoFocus={!isMobile}
-      modal={!isMobile}
       ariaLabel="Insertar bloque"
       desktopMaxHeightClass="max-h-80"
       header={
@@ -500,10 +499,21 @@ export function BlockControls({
       .run();
   }, [editor, hoveredBlockIndex]);
 
-  const openBlockMenuMobile = useCallback(() => {
+  /**
+   * Botón "+" persistente (siempre visible, en móvil y escritorio): abre el
+   * menú de bloques anclado a la posición actual del cursor.
+   */
+  const openBlockMenuFromButton = useCallback(() => {
     editor.chain().focus().run();
     setActionsMenu((s) => ({ ...s, open: false }));
-    setBlockMenu({ open: true, anchorRect: null });
+    let anchorRect: AnchorRect = null;
+    try {
+      const coords = editor.view.coordsAtPos(editor.state.selection.head);
+      anchorRect = { top: coords.bottom, left: coords.left };
+    } catch {
+      anchorRect = null;
+    }
+    setBlockMenu({ open: true, anchorRect });
   }, [editor]);
 
   if (disabled) return null;
@@ -513,18 +523,18 @@ export function BlockControls({
 
   return (
     <>
-      {/* Móvil: sin hover, un botón "+" persistente abre la hoja de bloques. */}
-      {isMobile && (
-        <button
-          type="button"
-          aria-label="Insertar bloque"
-          className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-md transition active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-          onPointerDown={(e) => e.preventDefault()}
-          onClick={openBlockMenuMobile}
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      )}
+      {/* Botón "+" persistente (siempre visible), en color de marca para que
+          destaque sobre el editor. */}
+      <button
+        type="button"
+        aria-label="Insertar bloque"
+        title="Insertar bloque"
+        className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 ring-2 ring-white transition hover:bg-brand-700 active:scale-95 dark:ring-zinc-900"
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={openBlockMenuFromButton}
+      >
+        <Plus className="h-5 w-5" />
+      </button>
 
       {showControls && (
         <div

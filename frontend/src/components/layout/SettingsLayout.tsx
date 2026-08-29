@@ -24,7 +24,7 @@ export function SettingsLayout() {
               className={cn(
                 "flex items-center gap-2.5 border-l-[3px] px-2.5 py-2 text-sm transition-colors",
                 isActive(path)
-                  ? "border-primary bg-secondary font-semibold text-foreground"
+                  ? "border-primary bg-primary/10 font-semibold text-foreground"
                   : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground",
               )}
             >

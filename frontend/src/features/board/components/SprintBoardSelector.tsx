@@ -36,7 +36,7 @@ export function SprintBoardSelector({ sprints, scope, onChange }: SprintBoardSel
   const rowClass = (selected: boolean) =>
     `flex w-full items-center gap-2 rounded border-l-[3px] px-2 py-1.5 text-left text-sm transition-colors ${
       selected
-        ? "border-primary bg-secondary font-semibold text-foreground"
+        ? "border-primary bg-primary/10 font-semibold text-foreground"
         : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground"
     }`;
 

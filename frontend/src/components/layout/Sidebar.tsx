@@ -32,7 +32,7 @@ interface SidebarProps {
 
 const navLinkBase =
   "flex items-center gap-2.5 border-l-[3px] px-2.5 py-2 text-sm transition-colors";
-const navLinkActive = "border-primary bg-secondary font-semibold text-foreground";
+const navLinkActive = "border-primary bg-primary/10 font-semibold text-foreground";
 const navLinkIdle =
   "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground";
 

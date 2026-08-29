@@ -46,7 +46,7 @@ export default function StatusesAdminPage() {
         }
       />
 
-      <p className="border-2 border-border bg-secondary px-3 py-2 text-xs text-muted-foreground">
+      <p className="border-2 border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
         <strong className="text-foreground">Backlog</strong>,{" "}
         <strong className="text-foreground">En progreso</strong> y{" "}
         <strong className="text-foreground">Completado</strong> son fijos y no se pueden editar ni

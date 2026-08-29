@@ -127,7 +127,7 @@ export function WorkspaceSwitcher() {
                     className={cn(
                       "h-auto w-full justify-between rounded-none border-2 px-3 py-2 text-left",
                       isActive
-                        ? "border-primary bg-secondary text-foreground"
+                        ? "border-primary bg-primary/10 text-foreground"
                         : "border-border bg-card text-foreground hover:bg-accent",
                     )}
                     isDisabled={selectActiveWorkspaceMutation.isPending || isLoading}

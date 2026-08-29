@@ -17,15 +17,15 @@
     --card-foreground: 20 19% 9%;
     --popover: 0 0% 100%;
     --popover-foreground: 20 19% 9%;
-    --muted: 42 22% 89%;
+    --muted: 40 20% 90%;
     --muted-foreground: 24 10% 32%;
     /* accent = superficie sutil de hover/foco (shadcn), NO el color de marca.
        Mismo tono que --muted: hueso apenas más oscuro, nunca a color. */
-    --accent: 42 22% 89%;
+    --accent: 40 24% 88%;
     --accent-foreground: 20 19% 9%;
     --primary: 353 66% 34%; /* #8C1D2B — carmesí, sello de tinta */
     --primary-foreground: 42 33% 96%;
-    --secondary: 42 20% 90%; /* superficie neutra de papel (no la mostaza) */
+    --secondary: 40 30% 86%; /* papel kraft — superficie con presencia (no la mostaza) */
     --secondary-foreground: 20 19% 9%;
     --destructive: 4 68% 42%; /* #B3261E */
     --destructive-foreground: 42 33% 96%;
@@ -66,31 +66,36 @@
   }
 
   .dark {
-    --background: 20 12% 8%; /* #14110F */
-    --foreground: 42 33% 93%; /* #F7F4EC */
-    --card: 24 10% 11%; /* #1D1916 */
-    --card-foreground: 42 33% 93%;
-    --popover: 24 10% 11%;
-    --popover-foreground: 42 33% 93%;
-    --muted: 24 8% 17%;
-    --muted-foreground: 40 10% 64%;
-    --accent: 24 8% 17%;
-    --accent-foreground: 42 33% 93%;
-    --primary: 352 58% 55%; /* #C23B4B — carmesí aclarado para fondo oscuro */
-    --primary-foreground: 20 12% 8%;
-    --secondary: 24 8% 16%;
-    --secondary-foreground: 42 33% 93%;
-    --destructive: 6 100% 70%; /* #FF6B5E */
-    --destructive-foreground: 20 12% 8%;
-    --success: 147 40% 55%;
-    --success-foreground: 20 12% 8%;
-    --mustard: 45 60% 58%; /* #D8B84A */
-    --mustard-foreground: 20 12% 8%;
-    /* Borde INVERTIDO: claro sobre oscuro. Es el único recurso de "peso" del
-       panel en oscuro (no hay sombra dura — negro sobre negro no se ve). */
-    --border: 40 18% 74%;
-    --input: 40 18% 74%;
-    --ring: 352 68% 62%;
+    /* "Terminal nocturno" cálido: en vez de gris-carbón plano, las superficies
+       llevan tinte marrón/ámbar y se escalonan en luminancia (bg < card <
+       popover < muted < accent) para que los paneles tengan cuerpo. El acento
+       carmesí sube a un tono más vívido. */
+    --background: 24 16% 9%;
+    --foreground: 40 30% 92%;
+    --card: 26 15% 13%;
+    --card-foreground: 40 30% 92%;
+    --popover: 26 17% 14%;
+    --popover-foreground: 40 30% 92%;
+    --muted: 28 13% 19%;
+    --muted-foreground: 38 16% 68%;
+    --accent: 30 18% 23%;
+    --accent-foreground: 42 33% 94%;
+    --primary: 351 74% 60%; /* carmesí vívido para fondo oscuro */
+    --primary-foreground: 24 16% 9%;
+    --secondary: 28 16% 21%; /* superficie cálida con presencia (nav activo, thead) */
+    --secondary-foreground: 40 30% 92%;
+    --destructive: 6 92% 68%;
+    --destructive-foreground: 24 16% 9%;
+    --success: 150 48% 55%;
+    --success-foreground: 24 16% 9%;
+    --mustard: 44 72% 62%;
+    --mustard-foreground: 24 16% 9%;
+    /* Borde claro sobre oscuro (da el "peso" del panel — no hay sombra dura),
+       pero a media luminancia y cálido: un blanco puro en cada tarjeta
+       aplanaba todo. */
+    --border: 34 15% 50%;
+    --input: 34 15% 50%;
+    --ring: 351 80% 66%;
 
     /* Sin sombra dura en oscuro por defecto — el borde invertido da el peso.
        Se reserva una sombra dura con el acento para hover de acción primaria,

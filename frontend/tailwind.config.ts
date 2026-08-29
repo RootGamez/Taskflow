@@ -62,11 +62,17 @@ const config: Config = {
         // shadcn tokens: leidos desde las variables CSS de src/index.css.
         // `<alpha-value>` es obligatorio para que utilidades con opacidad
         // (bg-card/80, border-border/50, etc.) sigan funcionando.
-        // `primary`/`secondary`/`success`/`warning`/`danger`/`default`/
-        // `focus`/`content1-4`/`divider` NO se tocan aca: son propiedad de
-        // HeroUI (ver plugin heroui() mas abajo), evita colision de nombres.
+        // `secondary` y `success` SÍ se mapean acá a los tokens del tema
+        // (ninguna vista usa `color="secondary"` de HeroUI — verificado): sin
+        // esto `bg-secondary` caía al violeta por defecto de HeroUI. El resto
+        // (`warning`/`danger`/`default`/`focus`/`content1-4`/`divider`) queda
+        // a HeroUI porque no se usa como utilidad Tailwind en ninguna vista.
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
+        secondary: {
+          DEFAULT: "hsl(var(--secondary) / <alpha-value>)",
+          foreground: "hsl(var(--secondary-foreground) / <alpha-value>)",
+        },
         card: {
           DEFAULT: "hsl(var(--card) / <alpha-value>)",
           foreground: "hsl(var(--card-foreground) / <alpha-value>)",

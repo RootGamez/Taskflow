@@ -3,11 +3,14 @@ import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
+import CharacterCount from "@tiptap/extension-character-count";
 import Table from "@tiptap/extension-table";
 import TableRow from "@tiptap/extension-table-row";
 import TableHeader from "@tiptap/extension-table-header";
 import TableCell from "@tiptap/extension-table-cell";
 import { createLowlight } from "lowlight";
+
+import { TrailingNode } from "../extensions/TrailingNode";
 
 import ts from "highlight.js/lib/languages/typescript";
 import js from "highlight.js/lib/languages/javascript";
@@ -72,5 +75,7 @@ export function createSharedExtensions(): AnyExtension[] {
     TableRow,
     TableHeader,
     TableCell,
+    TrailingNode,
+    CharacterCount,
   ];
 }

@@ -837,6 +837,13 @@ export function TicketRichEditor({
         )}
 
         <EditorContent editor={editor} />
+
+        {editor && !disabled && !isLocked && editor.storage.characterCount ? (
+          <p className="mt-2 select-none text-right text-[11px] text-zinc-400 dark:text-zinc-600">
+            {editor.storage.characterCount.words()} palabras ·{" "}
+            {editor.storage.characterCount.characters()} caracteres
+          </p>
+        ) : null}
       </div>
 
       {/* ── Slash command menu ────────────────────────────────────────────── */}

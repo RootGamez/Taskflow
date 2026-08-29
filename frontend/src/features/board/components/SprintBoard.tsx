@@ -48,7 +48,7 @@ function DraggableCard({
       {...listeners}
       className={`select-none ${canMutate ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-30" : ""}`}
     >
-      <TicketCard ticket={ticket} onOpen={onOpen} showProject className="shadow-sm shadow-black/10" />
+      <TicketCard ticket={ticket} onOpen={onOpen} showProject />
     </div>
   );
 }
@@ -95,32 +95,40 @@ function StatusColumn({
   return (
     <section
       ref={setNodeRef}
-      className={`flex w-[320px] shrink-0 flex-col rounded-2xl border p-2 transition-colors ${
-        isOver
-          ? "border-blue-400/60 bg-blue-50/40 dark:border-blue-500/50 dark:bg-blue-950/20"
-          : "border-zinc-200/80 bg-zinc-100/30 dark:border-zinc-800 dark:bg-zinc-900/25"
+      className={`flex w-[320px] shrink-0 flex-col rounded border-2 bg-card transition-colors ${
+        isOver ? "border-primary bg-primary/5" : "border-border"
       }`}
     >
-      <div className="mb-2 flex items-center justify-between px-1">
-        <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: status.color }} />
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">{status.name}</h3>
+      <div className="flex items-center justify-between border-b-2 border-border px-2.5 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className="h-3 w-3 shrink-0 border-2 border-border"
+            style={{ backgroundColor: status.color }}
+            aria-hidden
+          />
+          <h3 className="truncate font-display text-sm font-bold tracking-tight text-foreground">
+            {status.name}
+          </h3>
         </div>
-        <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+        <span className="shrink-0 border-[1.5px] border-border bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums text-muted-foreground">
           {tickets.length}
         </span>
       </div>
 
-      <div className="max-h-[calc(100dvh-16rem)] space-y-3 overflow-y-auto pr-1">
+      <div className="max-h-[calc(100dvh-16rem)] space-y-3 overflow-y-auto p-2">
         {groups.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-zinc-300 px-2 py-6 text-center text-xs text-zinc-400 dark:border-zinc-700">
+          <p className="border-2 border-dashed border-border px-2 py-6 text-center text-xs text-muted-foreground">
             Sin tickets
           </p>
         ) : (
           groups.map((group) => (
             <div key={group.name} className="space-y-2">
-              <div className="flex items-center gap-1.5 px-1 text-[11px] font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: group.color }} />
+              <div className="flex items-center gap-1.5 border-b border-border px-1 pb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                <span
+                  className="h-2 w-2 shrink-0 border border-border"
+                  style={{ backgroundColor: group.color }}
+                  aria-hidden
+                />
                 {group.name}
               </div>
               {group.tickets.map((ticket) => (
@@ -201,7 +209,7 @@ export function SprintBoard({
       </div>
 
       {unmapped.length > 0 ? (
-        <p className="mt-2 rounded-lg border border-dashed border-amber-300 bg-amber-50/50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+        <p className="mt-2 border-2 border-mustard bg-mustard/10 px-3 py-2 text-xs text-mustard">
           {unmapped.length} ticket(s) en columnas de proyecto que no corresponden a ningún
           estado del espacio.
         </p>
@@ -209,8 +217,8 @@ export function SprintBoard({
 
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
-          <div className="w-[300px] cursor-grabbing opacity-95">
-            <TicketCard ticket={activeTicket} onOpen={onOpenTicket} showProject className="shadow-xl shadow-black/20" />
+          <div className="w-[300px] rotate-1 cursor-grabbing shadow-hard-lg dark:shadow-hard-float">
+            <TicketCard ticket={activeTicket} onOpen={onOpenTicket} showProject />
           </div>
         ) : null}
       </DragOverlay>

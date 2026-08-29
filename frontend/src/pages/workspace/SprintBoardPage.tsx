@@ -175,20 +175,21 @@ export default function SprintBoardPage() {
   );
 
   if (!workspaceSlug) {
-    return <p className="text-sm text-zinc-600">Selecciona un espacio.</p>;
+    return <p className="text-sm text-muted-foreground">Selecciona un espacio.</p>;
   }
 
   return (
     <div className="space-y-4">
       <PageHeader
+        eyebrow={activeWorkspace?.name ?? workspaceSlug}
         title="Tablero de sprint"
-        subtitle={activeWorkspace?.name ?? workspaceSlug}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <SprintBoardSelector sprints={sprints} scope={scope} onChange={setScope} />
             <Button
               size="sm"
               variant="light"
+              className="rounded-none"
               startContent={<Settings className="h-4 w-4" />}
               onPress={() => navigate(`/workspaces/${workspaceSlug}/sprints`)}
             >

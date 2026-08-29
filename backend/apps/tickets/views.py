@@ -29,8 +29,8 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 		project = self.get_project_for_user(request, project_id)
 		date_filters = parse_ticket_date_filters(request.query_params)
 		tickets = (
-			project.tickets.select_related("project", "column", "created_by", "sprint")
-			.prefetch_related("assignees", "labels", "subtasks")
+			project.tickets.select_related("project", "column", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 		)
 		tickets = apply_ticket_date_filters(tickets, date_filters)
 		tickets = tickets.order_by("column__order", "order", "created_at")
@@ -54,8 +54,8 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 
 		ticket = serializer.save()
 		ticket = (
-			project.tickets.select_related("project", "column", "created_by", "sprint")
-			.prefetch_related("assignees", "labels", "subtasks")
+			project.tickets.select_related("project", "column", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.get(id=ticket.id)
 		)
 		serialized_ticket = TicketSerializer(ticket).data
@@ -81,7 +81,8 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 		project = self.get_project_for_user(request, project_id)
 		self.assert_project_write_access(request, project)
 		ticket = (
-			project.tickets.select_related("project", "column", "created_by", "sprint")
+			project.tickets.select_related("project", "column", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.filter(id=ticket_id)
 			.first()
 		)
@@ -116,8 +117,8 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 
 		updated_ticket = serializer.save()
 		updated_ticket = (
-			Ticket.objects.select_related("project__workspace", "column", "created_by", "sprint")
-			.prefetch_related("assignees", "labels", "subtasks")
+			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.get(id=updated_ticket.id)
 		)
 
@@ -177,8 +178,8 @@ class TicketSingleView(APIView):
 
 	def get(self, request: Request, ticket_id: str) -> Response:
 		ticket = (
-			Ticket.objects.select_related("project__workspace", "column", "created_by", "sprint")
-			.prefetch_related("assignees", "labels", "subtasks")
+			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
 			.distinct()
 			.first()

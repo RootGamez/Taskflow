@@ -37,15 +37,14 @@ class Ticket(models.Model):
 		related_name="assigned_tickets",
 		blank=True,
 	)
-	# on_delete=SET_NULL no es negociable: borrar un sprint jamas debe
-	# borrar (ni desasignar en cascada de forma destructiva) sus tickets,
-	# solo mandarlos de vuelta a "Backlog" (sprint=None).
-	sprint = models.ForeignKey(
+	# Un ticket puede pertenecer a varios sprints a la vez: si no se cierra
+	# en el sprint 1, "arrastra" al sprint 2 sin perder la trazabilidad de
+	# que se empezo en el 1. Borrar un sprint solo lo quita de esta relacion
+	# (M2M), nunca borra ni toca el ticket.
+	sprints = models.ManyToManyField(
 		"sprints.Sprint",
-		on_delete=models.SET_NULL,
-		null=True,
-		blank=True,
 		related_name="tickets",
+		blank=True,
 	)
 	labels = models.ManyToManyField(
 		"labels.Label",

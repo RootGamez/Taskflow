@@ -60,13 +60,15 @@ class AnnotateSprintProgressTests(TestCase):
         )
 
     def _create_ticket(self, column: ProjectColumn, sprint: Sprint | None = None) -> Ticket:
-        return Ticket.objects.create(
+        ticket = Ticket.objects.create(
             project=self.project,
             column=column,
             created_by=self.user,
             title="Ticket",
-            sprint=sprint,
         )
+        if sprint is not None:
+            ticket.sprints.add(sprint)
+        return ticket
 
     def test_annotate_progress_counts_all_sprint_tickets(self) -> None:
         self._create_ticket(self.backlog, sprint=self.sprint)

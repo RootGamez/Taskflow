@@ -23,6 +23,8 @@ export interface ActivityActor {
 
 export interface ActivityValue {
   id: string | null;
+  /** `sprint_changed` con M2M: lista de ids de sprint (puede ir vacía). */
+  ids?: string[];
   label: string;
 }
 

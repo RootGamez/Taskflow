@@ -92,7 +92,7 @@ export function formatActivity(activity: Activity): FormattedActivity {
     case "sprint_changed":
       return {
         icon: Rocket,
-        text: `${actor} movió el ticket de ${entityLabel(activity.from_value, "Backlog")} a ${entityLabel(activity.to_value, "Backlog")}`,
+        text: `${actor} cambió los sprints del ticket: ${entityLabel(activity.from_value, "Backlog")} → ${entityLabel(activity.to_value, "Backlog")}`,
       };
 
     case "commented":

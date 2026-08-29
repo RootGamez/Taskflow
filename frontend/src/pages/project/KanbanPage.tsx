@@ -294,7 +294,7 @@ export default function KanbanPage() {
     // D19: hereda el sprint del scope actual (WYSIWYG). Si el scope es
     // "all" o "backlog" no se manda el campo (nunca se manda `null`
     // explicito): el backend ya crea el ticket sin sprint por default.
-    const sprintPayload = sprintScope.kind === "sprint" ? { sprint_id: sprintScope.sprintId } : {};
+    const sprintPayload = sprintScope.kind === "sprint" ? { sprint_ids: [sprintScope.sprintId] } : {};
 
     try {
       await createTicketMutation.mutateAsync({

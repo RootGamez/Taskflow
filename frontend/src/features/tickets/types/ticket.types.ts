@@ -22,7 +22,10 @@ export interface Ticket {
   // requeridos hubiese roto la compilacion de esos fixtures -- incluidos
   // los de `src/features/calendar/**`, que esta fase tiene prohibido
   // tocar porque otro agente esta trabajando ahi en paralelo.
-  sprint_id?: string | null;
+  // Un ticket puede pertenecer a varios sprints a la vez (arrastre de un
+  // sprint al siguiente). Opcional por el mismo motivo que los otros
+  // campos aditivos: los fixtures `buildTicket` de tests viejos no lo setean.
+  sprint_ids?: string[];
   created_by: string | null;
   title: string;
   description: string;

@@ -365,7 +365,8 @@ class TicketConsumer(BaseJWTConsumer):
     @database_sync_to_async
     def _patch_ticket(self, ticket_id: str, payload: dict):
         ticket = (
-            Ticket.objects.select_related("project", "column", "created_by", "sprint")
+            Ticket.objects.select_related("project", "column", "created_by")
+            .prefetch_related("assignees", "labels", "subtasks", "sprints")
             .filter(id=ticket_id)
             .first()
         )
@@ -391,8 +392,8 @@ class TicketConsumer(BaseJWTConsumer):
 
         # Re-fetch with all relations to ensure assignees are populated correctly
         updated_ticket = (
-            Ticket.objects.select_related("project", "column", "created_by", "sprint")
-            .prefetch_related("assignees", "labels", "subtasks")
+            Ticket.objects.select_related("project", "column", "created_by")
+            .prefetch_related("assignees", "labels", "subtasks", "sprints")
             .get(id=ticket_id)
         )
         serialized_ticket = TicketSerializer(updated_ticket).data

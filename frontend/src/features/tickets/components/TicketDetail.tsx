@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
 import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
+import { TicketSprintsRow } from "@/features/sprints/components/TicketSprintsRow";
 import { TicketRelationsSection } from "@/features/relations/components/TicketRelationsSection";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
 import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
@@ -858,6 +859,17 @@ export function TicketDetail({
                   />
                 </div>
               </div>
+
+              {/* Sprints: mismo patrón autosuficiente que Labels. Un ticket
+                  puede estar en varios sprints a la vez (arrastre). */}
+              {ticket ? (
+                <TicketSprintsRow
+                  ticketId={ticket.id}
+                  projectId={ticket.project_id}
+                  sprintIds={ticket.sprint_ids ?? []}
+                  canEdit={Boolean(canEdit)}
+                />
+              ) : null}
 
               {/* Labels: autosuficiente (D43) — llama sus propios hooks en vez de
                   props propagadas desde TicketDetail. Fuera del pipeline de

@@ -59,7 +59,7 @@ def normalize_ticket_positions(ticket: Ticket, target_column: ProjectColumn, req
 class TicketSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
     column_id = serializers.UUIDField(source="column.id", read_only=True)
-    sprint_id = serializers.SerializerMethodField()
+    sprint_ids = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
     assignees = UserSerializer(many=True, read_only=True)
     labels = serializers.SerializerMethodField()
@@ -74,7 +74,7 @@ class TicketSerializer(serializers.ModelSerializer):
             "id",
             "project_id",
             "column_id",
-            "sprint_id",
+            "sprint_ids",
             "created_by",
             "title",
             "description",
@@ -95,8 +95,9 @@ class TicketSerializer(serializers.ModelSerializer):
     def get_created_by(self, obj: Ticket):
         return str(obj.created_by_id) if obj.created_by_id else None
 
-    def get_sprint_id(self, obj: Ticket):
-        return str(obj.sprint_id) if obj.sprint_id else None
+    def get_sprint_ids(self, obj: Ticket):
+        # Asume `prefetch_related("sprints")` desde el call site.
+        return [str(sprint.id) for sprint in obj.sprints.all()]
 
     def get_labels(self, obj: Ticket):
         return LabelSerializer(obj.labels.all(), many=True).data
@@ -141,7 +142,11 @@ class TicketCreateSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
-    sprint_id = serializers.UUIDField(required=False, allow_null=True)
+    sprint_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
     label_ids = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
@@ -164,12 +169,14 @@ class TicketCreateSerializer(serializers.Serializer):
         self.context["column"] = column
         return value
 
-    def validate_sprint_id(self, value):
-        if value is None:
+    def validate_sprint_ids(self, value):
+        if not value:
             return value
         project = self.context["project"]
-        if not project.sprints.filter(id=value).exists():
-            raise serializers.ValidationError("El sprint no pertenece al proyecto.")
+        unique_ids = set(value)
+        valid_count = project.sprints.filter(id__in=unique_ids).count()
+        if valid_count != len(unique_ids):
+            raise serializers.ValidationError("Uno o mas sprints no pertenecen al proyecto.")
         return value
 
     def validate_label_ids(self, value):
@@ -226,7 +233,6 @@ class TicketCreateSerializer(serializers.Serializer):
                 priority=validated_data.get("priority", Ticket.Priority.NONE),
                 due_date=validated_data.get("due_date"),
                 order=target_order,
-                sprint_id=validated_data.get("sprint_id"),
                 number=allocate_ticket_number(project),
             )
 
@@ -235,6 +241,9 @@ class TicketCreateSerializer(serializers.Serializer):
 
             if "label_ids" in validated_data:
                 ticket.labels.set(validated_data["label_ids"])
+
+            if "sprint_ids" in validated_data:
+                ticket.sprints.set(validated_data["sprint_ids"])
 
             # D20 de docs/PHASE_4_PLAN.md: solo el checklist de la
             # plantilla se aplica en el servidor (titulo/descripcion/
@@ -280,7 +289,11 @@ class TicketUpdateSerializer(serializers.Serializer):
         required=False,
         write_only=True,
     )
-    sprint_id = serializers.UUIDField(required=False, allow_null=True)
+    sprint_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        write_only=True,
+    )
     label_ids = serializers.ListField(
         child=serializers.UUIDField(),
         required=False,
@@ -295,12 +308,14 @@ class TicketUpdateSerializer(serializers.Serializer):
         self.context["target_column"] = column
         return value
 
-    def validate_sprint_id(self, value):
-        if value is None:
+    def validate_sprint_ids(self, value):
+        if not value:
             return value
         project = self.context["project"]
-        if not project.sprints.filter(id=value).exists():
-            raise serializers.ValidationError("El sprint no pertenece al proyecto.")
+        unique_ids = set(value)
+        valid_count = project.sprints.filter(id__in=unique_ids).count()
+        if valid_count != len(unique_ids):
+            raise serializers.ValidationError("Uno o mas sprints no pertenecen al proyecto.")
         return value
 
     def validate_label_ids(self, value):
@@ -334,19 +349,12 @@ class TicketUpdateSerializer(serializers.Serializer):
         requested_order = validated_data.get("order")
         target_column = self.context.get("target_column", instance.column)
 
-        # `"sprint_id" in validated_data` (no `.get()`) a proposito: hay que
-        # distinguir "no lo mandaron" (no tocar el sprint) de "lo mandaron
-        # en null" (mandar el ticket a Backlog). Mismo patron ya usado para
-        # `assignee_ids` en este mismo metodo.
-        if "sprint_id" in validated_data:
-            fields_to_save.append("sprint")
+        # `"sprint_ids" in validated_data` (no `.get()`) a proposito: hay que
+        # distinguir "no lo mandaron" (no tocar los sprints) de "lo mandaron
+        # como []" (sacar el ticket de todos los sprints -> Backlog). Mismo
+        # patron ya usado para `assignee_ids` en este mismo metodo.
 
         with transaction.atomic():
-            if "sprint_id" in validated_data:
-                # Cambiar de sprint nunca pasa por `normalize_ticket_positions`:
-                # no es un movimiento de columna, no debe tocar `order`.
-                instance.sprint_id = validated_data["sprint_id"]
-
             if fields_to_save:
                 instance.save(update_fields=[*fields_to_save, "updated_at"])
 
@@ -359,6 +367,11 @@ class TicketUpdateSerializer(serializers.Serializer):
 
             if "label_ids" in validated_data:
                 instance.labels.set(validated_data["label_ids"])
+
+            # Cambiar de sprints nunca pasa por `normalize_ticket_positions`:
+            # no es un movimiento de columna, no debe tocar `order`.
+            if "sprint_ids" in validated_data:
+                instance.sprints.set(validated_data["sprint_ids"])
 
         # Fuera de la transacción: si algo de esto fallara no queremos
         # actividades/notificaciones huérfanas de un update que se revirtió.

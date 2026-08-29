@@ -16,10 +16,11 @@ export function filterTicketsBySprint(tickets: readonly Ticket[], scope: SprintS
   }
 
   if (scope.kind === "backlog") {
-    // `sprint_id` es `string | null | undefined` (ver ticket.types.ts):
-    // tanto `null` como `undefined` cuentan como "sin sprint" (Backlog).
-    return tickets.filter((ticket) => !ticket.sprint_id);
+    // Sin ningun sprint = Backlog. `sprint_ids` puede venir undefined en
+    // fixtures viejos; se trata como lista vacia.
+    return tickets.filter((ticket) => (ticket.sprint_ids?.length ?? 0) === 0);
   }
 
-  return tickets.filter((ticket) => ticket.sprint_id === scope.sprintId);
+  // Un ticket "arrastrado" que esta en varios sprints aparece en todos ellos.
+  return tickets.filter((ticket) => ticket.sprint_ids?.includes(scope.sprintId));
 }

@@ -374,6 +374,12 @@ class TicketSprintLabelReferenceTests(APITestCase):
 			start_date=date(2026, 1, 1),
 			end_date=date(2026, 1, 14),
 		)
+		self.later_sprint = Sprint.objects.create(
+			project=self.project,
+			name="Sprint 2",
+			start_date=date(2026, 1, 15),
+			end_date=date(2026, 1, 28),
+		)
 		self.label = Label.objects.create(project=self.project, name="Bug", color="#DC2626")
 
 		self.other_workspace = Workspace.objects.create(name="Otro", owner=self.user)
@@ -419,17 +425,17 @@ class TicketSprintLabelReferenceTests(APITestCase):
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 		self.assertIsNone(response.data["reference"])
 
-	def test_patch_sprint_id_moves_ticket_and_records_sprint_changed_activity(self) -> None:
+	def test_patch_sprint_ids_moves_ticket_and_records_sprint_changed_activity(self) -> None:
 		ticket = self._create_ticket()
 
 		response = self.client.patch(
 			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
-			{"sprint_id": str(self.sprint.id)},
+			{"sprint_ids": [str(self.sprint.id)]},
 			format="json",
 		)
 
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
-		self.assertEqual(response.data["sprint_id"], str(self.sprint.id))
+		self.assertEqual(response.data["sprint_ids"], [str(self.sprint.id)])
 		self.assertTrue(
 			Activity.objects.filter(
 				ticket_id=ticket["id"],
@@ -437,24 +443,39 @@ class TicketSprintLabelReferenceTests(APITestCase):
 			).exists()
 		)
 
-	def test_patch_sprint_id_null_sends_ticket_back_to_backlog(self) -> None:
-		ticket = self._create_ticket(sprint_id=str(self.sprint.id))
+	def test_ticket_can_belong_to_multiple_sprints(self) -> None:
+		ticket = self._create_ticket()
 
 		response = self.client.patch(
 			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
-			{"sprint_id": None},
+			{"sprint_ids": [str(self.sprint.id), str(self.later_sprint.id)]},
 			format="json",
 		)
 
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
-		self.assertIsNone(response.data["sprint_id"])
+		self.assertEqual(
+			sorted(response.data["sprint_ids"]),
+			sorted([str(self.sprint.id), str(self.later_sprint.id)]),
+		)
+
+	def test_patch_sprint_ids_empty_sends_ticket_back_to_backlog(self) -> None:
+		ticket = self._create_ticket(sprint_ids=[str(self.sprint.id)])
+
+		response = self.client.patch(
+			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
+			{"sprint_ids": []},
+			format="json",
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["sprint_ids"], [])
 
 	def test_sprint_from_another_project_returns_400(self) -> None:
 		ticket = self._create_ticket()
 
 		response = self.client.patch(
 			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
-			{"sprint_id": str(self.other_sprint.id)},
+			{"sprint_ids": [str(self.other_sprint.id)]},
 			format="json",
 		)
 
@@ -467,7 +488,7 @@ class TicketSprintLabelReferenceTests(APITestCase):
 
 		response = self.client.patch(
 			f"/api/v1/projects/{self.project.id}/tickets/{ticket['id']}/",
-			{"sprint_id": str(self.sprint.id)},
+			{"sprint_ids": [str(self.sprint.id)]},
 			format="json",
 		)
 

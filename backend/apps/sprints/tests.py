@@ -75,9 +75,11 @@ class SprintListTests(SprintApiTestCase):
 
     def test_list_sprints_includes_ticket_and_completed_counts(self) -> None:
         sprint = self._create_sprint()
-        Ticket.objects.create(project=self.project, column=self.backlog, created_by=self.user, title="A", sprint=sprint)
-        Ticket.objects.create(project=self.project, column=self.done, created_by=self.user, title="B", sprint=sprint)
-        Ticket.objects.create(project=self.project, column=self.done, created_by=self.user, title="C", sprint=sprint)
+        for title, column in [("A", self.backlog), ("B", self.done), ("C", self.done)]:
+            ticket = Ticket.objects.create(
+                project=self.project, column=column, created_by=self.user, title=title
+            )
+            ticket.sprints.add(sprint)
 
         response = self.client.get(f"/api/v1/projects/{self.project.id}/sprints/")
 
@@ -248,20 +250,22 @@ class SprintDeleteTests(SprintApiTestCase):
     def test_delete_planned_sprint_returns_204_and_sends_tickets_to_backlog(self) -> None:
         sprint = self._create_sprint()
         ticket = Ticket.objects.create(
-            project=self.project, column=self.backlog, created_by=self.user, title="T", sprint=sprint
+            project=self.project, column=self.backlog, created_by=self.user, title="T"
         )
+        ticket.sprints.add(sprint)
 
         response = self.client.delete(f"/api/v1/projects/{self.project.id}/sprints/{sprint.id}/")
 
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         ticket.refresh_from_db()
-        self.assertIsNone(ticket.sprint_id)
+        self.assertFalse(ticket.sprints.exists())
 
     def test_delete_sprint_does_not_delete_its_tickets(self) -> None:
         sprint = self._create_sprint()
         ticket = Ticket.objects.create(
-            project=self.project, column=self.backlog, created_by=self.user, title="T", sprint=sprint
+            project=self.project, column=self.backlog, created_by=self.user, title="T"
         )
+        ticket.sprints.add(sprint)
 
         response = self.client.delete(f"/api/v1/projects/{self.project.id}/sprints/{sprint.id}/")
 

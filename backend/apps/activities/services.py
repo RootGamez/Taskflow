@@ -62,8 +62,9 @@ class TicketSnapshot:
     column_name: str
     due_date: object | None  # datetime | None
     assignee_ids: frozenset[UUID]
-    sprint_id: UUID | None
-    sprint_name: str
+    # M2M: un ticket puede estar en varios sprints a la vez.
+    sprint_ids: frozenset[UUID]
+    sprint_label: str
 
 
 def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
@@ -86,6 +87,7 @@ def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
     es `None` lanzaria `AttributeError: 'NoneType' object has no attribute
     'name'`.
     """
+    sprint_pairs = list(ticket.sprints.values_list("id", "name"))
     return TicketSnapshot(
         title=ticket.title,
         priority=ticket.priority,
@@ -93,8 +95,8 @@ def take_snapshot(ticket: "Ticket") -> TicketSnapshot:
         column_name=ticket.column.name,
         due_date=ticket.due_date,
         assignee_ids=frozenset(ticket.assignees.values_list("id", flat=True)),
-        sprint_id=ticket.sprint_id,
-        sprint_name=ticket.sprint.name if ticket.sprint_id else "Backlog",
+        sprint_ids=frozenset(pair[0] for pair in sprint_pairs),
+        sprint_label=", ".join(sorted(name for _, name in sprint_pairs)) or "Backlog",
     )
 
 
@@ -212,16 +214,24 @@ def record_ticket_changes(
             )
         )
 
-    if snapshot.sprint_id != ticket.sprint_id:
+    current_sprint_pairs = list(ticket.sprints.values_list("id", "name"))
+    current_sprint_ids = frozenset(pair[0] for pair in current_sprint_pairs)
+    if snapshot.sprint_ids != current_sprint_ids:
+        current_label = ", ".join(sorted(name for _, name in current_sprint_pairs)) or "Backlog"
         to_create.append(
             Activity(
                 ticket=ticket,
                 actor=actor,
                 action=Activity.Action.SPRINT_CHANGED,
-                from_value={"id": str(snapshot.sprint_id) if snapshot.sprint_id else None, "label": snapshot.sprint_name},
+                from_value={
+                    "id": None,
+                    "ids": sorted(str(i) for i in snapshot.sprint_ids),
+                    "label": snapshot.sprint_label,
+                },
                 to_value={
-                    "id": str(ticket.sprint_id) if ticket.sprint_id else None,
-                    "label": ticket.sprint.name if ticket.sprint_id else "Backlog",
+                    "id": None,
+                    "ids": sorted(str(i) for i in current_sprint_ids),
+                    "label": current_label,
                 },
             )
         )

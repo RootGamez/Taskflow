@@ -10,7 +10,7 @@ interface CreateTicketPayload {
   column_id?: string;
   order?: number;
   assignee_ids?: string[];
-  sprint_id?: string | null;
+  sprint_ids?: string[];
   label_ids?: string[];
   // Contrato de WP-0A (docs/PHASE_4_PLAN.md D20): `required=False` en el
   // backend, aditivo -- un create sin `template_id` es identico al de
@@ -27,7 +27,7 @@ interface UpdateTicketPayload {
   column_id?: string;
   order?: number;
   assignee_ids?: string[];
-  sprint_id?: string | null;
+  sprint_ids?: string[];
   label_ids?: string[];
 }
 

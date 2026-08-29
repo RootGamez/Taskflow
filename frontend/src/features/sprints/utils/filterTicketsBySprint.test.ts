@@ -24,39 +24,41 @@ function buildTicket(overrides: Partial<Ticket> & { id: string }): Ticket {
 
 describe("filterTicketsBySprint", () => {
   test("returns the exact same array reference for scope 'all'", () => {
-    const tickets = [buildTicket({ id: "1" }), buildTicket({ id: "2", sprint_id: "sprint-1" })];
+    const tickets = [buildTicket({ id: "1" }), buildTicket({ id: "2", sprint_ids: ["sprint-1"] })];
 
     const result = filterTicketsBySprint(tickets, { kind: "all" });
 
     expect(result).toBe(tickets);
   });
 
-  test("returns only tickets with sprint_id === null for 'backlog'", () => {
-    const backlogTicket = buildTicket({ id: "1", sprint_id: null });
-    const tickets = [backlogTicket, buildTicket({ id: "2", sprint_id: "sprint-1" })];
+  test("returns only tickets with no sprints for 'backlog'", () => {
+    const backlogTicket = buildTicket({ id: "1", sprint_ids: [] });
+    const tickets = [backlogTicket, buildTicket({ id: "2", sprint_ids: ["sprint-1"] })];
 
     const result = filterTicketsBySprint(tickets, { kind: "backlog" });
 
     expect(result).toEqual([backlogTicket]);
   });
 
-  test("returns only tickets of the given sprint", () => {
-    const sprintTicket = buildTicket({ id: "1", sprint_id: "sprint-1" });
+  test("returns tickets of the given sprint, including ones carried over into several sprints", () => {
+    const sprintTicket = buildTicket({ id: "1", sprint_ids: ["sprint-1"] });
+    const carriedOver = buildTicket({ id: "4", sprint_ids: ["sprint-1", "sprint-2"] });
     const tickets = [
       sprintTicket,
-      buildTicket({ id: "2", sprint_id: "sprint-2" }),
-      buildTicket({ id: "3", sprint_id: null }),
+      buildTicket({ id: "2", sprint_ids: ["sprint-2"] }),
+      buildTicket({ id: "3", sprint_ids: [] }),
+      carriedOver,
     ];
 
     const result = filterTicketsBySprint(tickets, { kind: "sprint", sprintId: "sprint-1" });
 
-    expect(result).toEqual([sprintTicket]);
+    expect(result).toEqual([sprintTicket, carriedOver]);
   });
 
-  test("treats undefined sprint_id as backlog", () => {
+  test("treats undefined sprint_ids as backlog", () => {
     const undefinedSprintTicket = buildTicket({ id: "1" });
-    delete (undefinedSprintTicket as { sprint_id?: string | null }).sprint_id;
-    const tickets = [undefinedSprintTicket, buildTicket({ id: "2", sprint_id: "sprint-1" })];
+    delete (undefinedSprintTicket as { sprint_ids?: string[] }).sprint_ids;
+    const tickets = [undefinedSprintTicket, buildTicket({ id: "2", sprint_ids: ["sprint-1"] })];
 
     const result = filterTicketsBySprint(tickets, { kind: "backlog" });
 
@@ -64,7 +66,7 @@ describe("filterTicketsBySprint", () => {
   });
 
   test("returns an empty array for a sprint with no tickets", () => {
-    const tickets = [buildTicket({ id: "1", sprint_id: "sprint-1" })];
+    const tickets = [buildTicket({ id: "1", sprint_ids: ["sprint-1"] })];
 
     const result = filterTicketsBySprint(tickets, { kind: "sprint", sprintId: "sprint-empty" });
 

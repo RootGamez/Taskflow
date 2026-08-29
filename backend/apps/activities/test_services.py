@@ -338,24 +338,24 @@ def test_record_comment_created_uses_ticket_and_author_from_comment(project, bac
 def test_take_snapshot_with_no_sprint_does_not_raise(project, backlog, actor):
     ticket = _create_ticket(project, backlog, actor)
     ticket = Ticket.objects.select_related("column").get(id=ticket.id)
-    assert ticket.sprint_id is None
+    assert not ticket.sprints.exists()
 
     snapshot = activities_services.take_snapshot(ticket)
 
-    assert snapshot.sprint_id is None
-    assert snapshot.sprint_name == "Backlog"
+    assert snapshot.sprint_ids == frozenset()
+    assert snapshot.sprint_label == "Backlog"
 
 
 @pytest.mark.django_db
 def test_take_snapshot_with_sprint_captures_id_and_name(project, backlog, actor, sprint):
     ticket = _create_ticket(project, backlog, actor)
-    Ticket.objects.filter(id=ticket.id).update(sprint=sprint)
-    ticket = Ticket.objects.select_related("column", "sprint").get(id=ticket.id)
+    ticket.sprints.add(sprint)
+    ticket = Ticket.objects.select_related("column").get(id=ticket.id)
 
     snapshot = activities_services.take_snapshot(ticket)
 
-    assert snapshot.sprint_id == sprint.id
-    assert snapshot.sprint_name == sprint.name
+    assert snapshot.sprint_ids == frozenset({sprint.id})
+    assert snapshot.sprint_label == sprint.name
 
 
 # --- record_ticket_changes: sprint_changed ---------------------------------
@@ -366,31 +366,31 @@ def test_moving_ticket_into_a_sprint_emits_sprint_changed_from_backlog(project, 
     ticket = _create_ticket(project, backlog, actor)
     Activity.objects.all().delete()
 
-    _update_ticket(ticket, project, actor, {"sprint_id": str(sprint.id)})
+    _update_ticket(ticket, project, actor, {"sprint_ids": [str(sprint.id)]})
 
     activity = Activity.objects.get(ticket=ticket, action=Activity.Action.SPRINT_CHANGED)
-    assert activity.from_value == {"id": None, "label": "Backlog"}
-    assert activity.to_value == {"id": str(sprint.id), "label": sprint.name}
+    assert activity.from_value == {"id": None, "ids": [], "label": "Backlog"}
+    assert activity.to_value == {"id": None, "ids": [str(sprint.id)], "label": sprint.name}
 
 
 @pytest.mark.django_db
 def test_moving_ticket_back_to_backlog_emits_sprint_changed_to_backlog(project, backlog, actor, sprint):
-    ticket = _create_ticket(project, backlog, actor, sprint_id=str(sprint.id))
+    ticket = _create_ticket(project, backlog, actor, sprint_ids=[str(sprint.id)])
     Activity.objects.all().delete()
 
-    _update_ticket(ticket, project, actor, {"sprint_id": None})
+    _update_ticket(ticket, project, actor, {"sprint_ids": []})
 
     activity = Activity.objects.get(ticket=ticket, action=Activity.Action.SPRINT_CHANGED)
-    assert activity.from_value == {"id": str(sprint.id), "label": sprint.name}
-    assert activity.to_value == {"id": None, "label": "Backlog"}
+    assert activity.from_value == {"id": None, "ids": [str(sprint.id)], "label": sprint.name}
+    assert activity.to_value == {"id": None, "ids": [], "label": "Backlog"}
 
 
 @pytest.mark.django_db
 def test_patch_with_same_sprint_emits_nothing(project, backlog, actor, sprint):
-    ticket = _create_ticket(project, backlog, actor, sprint_id=str(sprint.id))
+    ticket = _create_ticket(project, backlog, actor, sprint_ids=[str(sprint.id)])
     Activity.objects.all().delete()
 
-    _update_ticket(ticket, project, actor, {"sprint_id": str(sprint.id)})
+    _update_ticket(ticket, project, actor, {"sprint_ids": [str(sprint.id)]})
 
     assert not Activity.objects.filter(ticket=ticket, action=Activity.Action.SPRINT_CHANGED).exists()
 
@@ -401,7 +401,7 @@ def test_changing_sprint_does_not_touch_order(project, backlog, actor, sprint):
     _create_ticket(project, backlog, actor, title="Otro ticket")
     original_order = Ticket.objects.get(id=ticket.id).order
 
-    _update_ticket(ticket, project, actor, {"sprint_id": str(sprint.id)})
+    _update_ticket(ticket, project, actor, {"sprint_ids": [str(sprint.id)]})
 
     assert Ticket.objects.get(id=ticket.id).order == original_order
 

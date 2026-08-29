@@ -140,7 +140,7 @@ describe("formatActivity", () => {
     const { icon, text } = formatActivity(activity);
 
     expect(icon).toBe(Rocket);
-    expect(text).toBe("Juan Perez movió el ticket de Backlog a Sprint 12");
+    expect(text).toBe("Juan Perez cambió los sprints del ticket: Backlog → Sprint 12");
   });
 
   it("sprint_changed: de un sprint a Backlog", () => {
@@ -153,7 +153,7 @@ describe("formatActivity", () => {
     const { icon, text } = formatActivity(activity);
 
     expect(icon).toBe(Rocket);
-    expect(text).toBe("Juan Perez movió el ticket de Sprint 12 a Backlog");
+    expect(text).toBe("Juan Perez cambió los sprints del ticket: Sprint 12 → Backlog");
   });
 
   it("sprint_changed: usa 'Backlog' como respaldo cuando el label viene vacio", () => {
@@ -165,7 +165,7 @@ describe("formatActivity", () => {
 
     const { text } = formatActivity(activity);
 
-    expect(text).toBe("Juan Perez movió el ticket de Backlog a Backlog");
+    expect(text).toBe("Juan Perez cambió los sprints del ticket: Backlog → Backlog");
   });
 
   it("commented: usa el icono MessageSquare", () => {

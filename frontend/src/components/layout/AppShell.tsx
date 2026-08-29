@@ -35,7 +35,13 @@ export function AppShell({ children }: AppShellProps) {
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
+    // En rutas sin `:workspaceSlug` (p. ej. /tickets/:id, /my-tasks) igual
+    // necesitamos un workspace activo para saber permisos/rol: si no hay
+    // ninguno, caemos al que el backend marca activo (o el primero).
     if (!workspaceSlug) {
+      if (!activeWorkspace && workspaces.length > 0) {
+        setActiveWorkspace(workspaces.find((workspace) => workspace.is_active) ?? workspaces[0]);
+      }
       return;
     }
 
@@ -43,7 +49,7 @@ export function AppShell({ children }: AppShellProps) {
     if (routeWorkspace && activeWorkspace?.id !== routeWorkspace.id) {
       setActiveWorkspace(routeWorkspace);
     }
-  }, [activeWorkspace?.id, setActiveWorkspace, workspaceSlug, workspaces]);
+  }, [activeWorkspace, setActiveWorkspace, workspaceSlug, workspaces]);
 
   const closeModal = useCallback(() => {
     setDeletedWorkspaceName(null);

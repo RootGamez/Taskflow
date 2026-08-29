@@ -40,7 +40,7 @@ export default function ListPage() {
   const canMutate = canMutateWorkspace(activeWorkspace?.role);
   const dateFilter = useTicketFilterStore((state) => state.dateFilter);
   const clearDateFilter = useTicketFilterStore((state) => state.clear);
-  const { data: sprints = [] } = useSprints(projectId);
+  const { data: sprints = [] } = useSprints(workspaceSlug);
   const sprintScope = useSprintScopeStore((state) => state.scope);
   const clearSprintScope = useSprintScopeStore((state) => state.clear);
   const activeSprint = useMemo(() => sprints.find((sprint) => sprint.status === "active") ?? null, [sprints]);
@@ -328,7 +328,7 @@ export default function ListPage() {
           </div>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <SprintSelector projectId={projectId} canMutate={canMutate} />
+          <SprintSelector workspaceSlug={workspaceSlug} canMutate={canMutate} />
           <TicketDateFilter />
           <Tabs
             selectedKey="list"

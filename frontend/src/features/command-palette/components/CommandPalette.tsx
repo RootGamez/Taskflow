@@ -50,7 +50,7 @@ export function CommandPalette() {
   });
 
   const { data: projects = [] } = useProjects(workspaceSlug);
-  const { data: sprints = [] } = useSprints(params.projectId ?? "");
+  const { data: sprints = [] } = useSprints(workspaceSlug);
   const activeSprint = sprints.find((sprint) => sprint.status === "active") ?? null;
 
   const { results, isLoading } = useGlobalSearch(query, workspaceSlug || undefined);

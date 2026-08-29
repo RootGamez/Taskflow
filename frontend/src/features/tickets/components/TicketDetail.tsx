@@ -68,6 +68,12 @@ interface TicketDetailProps {
   currentUserId?: string | null;
   fieldLocks?: FieldLockMap;
   remoteLiveValues?: RemoteLiveMap;
+  /**
+   * Enfoca y selecciona el campo de título al hidratar (creación instantánea,
+   * docs/BRUTALIST_REDESIGN_PLAN.md §9): el usuario escribe encima del
+   * placeholder "Ticket sin título" sin un clic extra.
+   */
+  autoFocusTitle?: boolean;
   onOpenChange: (open: boolean) => void;
   onPatch?: (payload: Partial<TicketPatchPayload>) => Promise<void>;
   onLockField?: (field: CollaborativeField) => void;
@@ -274,6 +280,7 @@ export function TicketDetail({
     assignees: null,
   },
   remoteLiveValues,
+  autoFocusTitle = false,
   onOpenChange,
   onPatch,
   onLockField,
@@ -302,6 +309,7 @@ export function TicketDetail({
   const queuedDraftRef = useRef<TicketPatchPayload | null>(null);
   const dialogContentRef = useRef<HTMLDivElement | null>(null);
   const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const autoFocusedTitleForRef = useRef<string | null>(null);
 
   // Auto-size the title textarea when value changes externally (hydration, remote)
   useEffect(() => {
@@ -501,6 +509,19 @@ export function TicketDetail({
     setIsHydrated(true);
     hydratedTicketIdRef.current = ticket.id;
   }, [isOpen, onUnlockField, ticket]);
+
+  // Creación instantánea (§9): al abrir el detalle de un ticket recién
+  // creado, se enfoca el título y se selecciona su texto para escribir
+  // encima del placeholder sin un clic extra. Una sola vez por ticket.
+  useEffect(() => {
+    if (!autoFocusTitle || !isHydrated || !isOpen || !canEdit || !ticket) return;
+    if (autoFocusedTitleForRef.current === ticket.id) return;
+    const el = titleTextareaRef.current;
+    if (!el || el.disabled) return;
+    autoFocusedTitleForRef.current = ticket.id;
+    el.focus();
+    el.select();
+  }, [autoFocusTitle, canEdit, isHydrated, isOpen, ticket]);
 
   const draft = useMemo<TicketPatchPayload>(() => toPatchPayload(draftState), [draftState]);
 

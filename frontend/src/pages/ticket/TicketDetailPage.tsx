@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import toast from "react-hot-toast";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useProject } from "@/features/projects/hooks/useProjects";
@@ -14,8 +14,12 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 
 export default function TicketDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { ticketId = "" } = useParams();
   const { data: ticket, isLoading } = useTicket(ticketId);
+  // Creación instantánea (docs/BRUTALIST_REDESIGN_PLAN.md §9): al llegar
+  // desde el "+" se pasa `state.justCreated` para auto-enfocar el título.
+  const justCreated = Boolean((location.state as { justCreated?: boolean } | null)?.justCreated);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
   const canEdit = canMutateWorkspace(activeWorkspace?.role);
@@ -68,6 +72,7 @@ export default function TicketDetailPage() {
       canEdit={canEdit}
       columns={columns}
       currentUserId={currentUserId}
+      autoFocusTitle={justCreated}
       onPatch={handlePatch}
       onDelete={ticket && canEdit ? handleDeleteTicket : undefined}
       onOpenChange={(open) => {

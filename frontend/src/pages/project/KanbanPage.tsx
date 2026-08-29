@@ -9,18 +9,17 @@ import { useMembers } from "@/features/members/hooks/useMembers";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
 import { KanbanBoardMobile } from "@/features/tickets/components/KanbanBoardMobile";
-import { CreateTicketModal } from "@/features/tickets/components/CreateTicketModal";
 import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
 import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import {
-  useCreateTicket,
   useDeleteTicket,
   useTicketsSuspense,
   useUpdateTicket,
 } from "@/features/tickets/hooks/useTickets";
+import { useCreateTicketInstant } from "@/features/tickets/hooks/useCreateTicketInstant";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
 import { useRegisterCommandAction } from "@/features/shortcuts/hooks/useRegisterCommandAction";
@@ -44,7 +43,7 @@ export default function KanbanPage() {
   const { data: tickets } = useTicketsSuspense(projectId);
   const accessToken = useAuthStore((state) => state.accessToken);
   const currentUserId = useAuthStore((state) => state.user?.id ?? null);
-  const createTicketMutation = useCreateTicket(projectId);
+  const { createTicketInstant, isCreating } = useCreateTicketInstant(projectId);
   const updateTicketMutation = useUpdateTicket(projectId);
   const deleteTicketMutation = useDeleteTicket(projectId);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
@@ -75,7 +74,6 @@ export default function KanbanPage() {
   }, [projectId, clearDateFilter, clearSprintScope]);
 
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [createColumnId, setCreateColumnId] = useState<string | null>(null);
   const { upsertTicketInCache, removeTicketFromCache } = useTicketRealtimeCache(projectId);
   const [fieldLocks, setFieldLocks] = useState<{
     title: { userId: string; userName: string } | null;
@@ -125,7 +123,33 @@ export default function KanbanPage() {
     [project?.columns],
   );
 
-  const selectedCreateColumn = projectColumns.find((column) => column.id === createColumnId);
+  // Creación instantánea (docs/BRUTALIST_REDESIGN_PLAN.md §9): el "+"
+  // dispara la mutación de una vez con la plantilla por defecto y navega al
+  // detalle del ticket recién creado. Sin modal, sin pantalla intermedia.
+  const handleCreateTicket = useCallback(
+    async (columnId: string | null) => {
+      if (!canMutate) {
+        toast.error("No tienes permisos para crear tickets en este espacio");
+        return;
+      }
+
+      const targetColumnId = columnId ?? projectColumns[0]?.id ?? null;
+      if (!targetColumnId) {
+        return;
+      }
+
+      // D19: hereda el sprint del scope activo (WYSIWYG). Si el scope es
+      // "all"/"backlog" no se manda el campo.
+      const sprintIds = sprintScope.kind === "sprint" ? [sprintScope.sprintId] : undefined;
+
+      try {
+        await createTicketInstant({ columnId: targetColumnId, sprintIds });
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "No se pudo crear el ticket"));
+      }
+    },
+    [canMutate, createTicketInstant, projectColumns, sprintScope],
+  );
 
   // D8/D53 de docs/PHASE_3_PLAN.md (WP-D, Wave 2): registra la accion
   // "create-ticket" para que el command palette (WP-A) y el atajo `c`
@@ -135,8 +159,8 @@ export default function KanbanPage() {
   // desregistra automaticamente al desmontar (RD5) o si `canMutate` pasa
   // a `false`.
   const handleShortcutCreateTicket = useCallback(() => {
-    setCreateColumnId(projectColumns[0]?.id ?? null);
-  }, [projectColumns]);
+    void handleCreateTicket(null);
+  }, [handleCreateTicket]);
   useRegisterCommandAction("create-ticket", canMutate ? handleShortcutCreateTicket : null);
 
   useEffect(() => {
@@ -271,44 +295,6 @@ export default function KanbanPage() {
     }
   }, [ticketSocketRef]);
 
-  const handleCreateTicket = async (payload: {
-    title: string;
-    priority: "urgent" | "high" | "medium" | "low" | "none";
-    due_date: string | null;
-    description?: Record<string, unknown>;
-    assignee_ids?: string[];
-    // D20/I11 de docs/PHASE_4_PLAN.md: `template_id` viaja tal cual hasta
-    // `createTicketMutation` -- sin logica nueva, ya lo resuelve el spread
-    // de abajo (`...payload`).
-    template_id?: string;
-  }) => {
-    if (!canMutate) {
-      toast.error("No tienes permisos para crear tickets en este espacio");
-      return;
-    }
-
-    if (!createColumnId) {
-      return;
-    }
-
-    // D19: hereda el sprint del scope actual (WYSIWYG). Si el scope es
-    // "all" o "backlog" no se manda el campo (nunca se manda `null`
-    // explicito): el backend ya crea el ticket sin sprint por default.
-    const sprintPayload = sprintScope.kind === "sprint" ? { sprint_ids: [sprintScope.sprintId] } : {};
-
-    try {
-      await createTicketMutation.mutateAsync({
-        ...payload,
-        ...sprintPayload,
-        column_id: createColumnId,
-      });
-      setCreateColumnId(null);
-      toast.success("Ticket creado");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo crear el ticket"));
-    }
-  };
-
   const handleMoveTicket = async ({
     ticketId,
     toColumnId,
@@ -439,8 +425,8 @@ export default function KanbanPage() {
           {canMutate && !isMobile ? (
             <Button
               color="primary"
-              onPress={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
-              isDisabled={projectColumns.length === 0}
+              onPress={() => void handleCreateTicket(null)}
+              isDisabled={projectColumns.length === 0 || isCreating}
             >
               Nuevo ticket
             </Button>
@@ -453,8 +439,8 @@ export default function KanbanPage() {
         <button
           type="button"
           aria-label="Nuevo ticket"
-          onClick={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
-          disabled={projectColumns.length === 0}
+          onClick={() => void handleCreateTicket(null)}
+          disabled={projectColumns.length === 0 || isCreating}
           className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center border-2 border-foreground bg-primary text-2xl font-light text-primary-foreground shadow-hard transition-transform active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50 motion-reduce:transition-none"
         >
           +
@@ -470,7 +456,7 @@ export default function KanbanPage() {
           allTickets={tickets}
           canMutate={canMutate}
           onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
-          onCreateTicket={(columnId) => setCreateColumnId(columnId)}
+          onCreateTicket={(columnId) => void handleCreateTicket(columnId)}
           onMoveTicket={handleMoveTicket}
         />
       ) : (
@@ -480,7 +466,7 @@ export default function KanbanPage() {
           allTickets={tickets}
           canMutate={canMutate}
           onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
-          onCreateTicket={(columnId) => setCreateColumnId(columnId)}
+          onCreateTicket={(columnId) => void handleCreateTicket(columnId)}
           onMoveTicket={handleMoveTicket}
         />
       )}
@@ -501,13 +487,6 @@ export default function KanbanPage() {
         mentionItems={mentionItems}
         onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
-      />
-      <CreateTicketModal
-        isOpen={Boolean(createColumnId) && canMutate}
-        isLoading={createTicketMutation.isPending}
-        columnName={selectedCreateColumn?.name}
-        onClose={() => setCreateColumnId(null)}
-        onCreate={handleCreateTicket}
       />
     </div>
   );

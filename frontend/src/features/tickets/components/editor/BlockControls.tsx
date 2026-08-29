@@ -25,7 +25,9 @@ import { Plus, GripVertical } from "lucide-react";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useBreakpoint";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
+import { createTapSelectHandlers } from "./tapSelect";
 
 // ── ProseMirror helpers ───────────────────────────────────────────────────────
 
@@ -128,11 +130,16 @@ function BlockMenuPopup({ options, onSelect, onClose, x, y }: BlockMenuProps) {
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
+  const pressRef = useRef<{ index: number; x: number; y: number; time: number } | null>(null);
 
   useEffect(() => {
+    // En móvil no autoenfocamos: abriría el teclado virtual encima de la
+    // hoja de bloques. El usuario puede tocar el campo para buscar.
+    if (isMobile) return;
     const t = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
-  }, []);
+  }, [isMobile]);
 
   const grouped = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -190,12 +197,22 @@ function BlockMenuPopup({ options, onSelect, onClose, x, y }: BlockMenuProps) {
 
   let globalIndex = 0;
 
+  const outerStyle: React.CSSProperties = isMobile
+    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999, pointerEvents: "auto" }
+    : { position: "fixed", top, left: x, zIndex: 9999, pointerEvents: "auto" };
+
+  const panelClass = isMobile
+    ? "w-full rounded-t-2xl border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+    : "w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900";
+
   return (
-    <div
-      style={{ position: "fixed", top, left: x, zIndex: 9999, pointerEvents: "auto" }}
-      ref={containerRef}
-    >
-      <div className="w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+    // `data-ticket-editor-floating` -> el Dialog del panel de ticket no se
+    // cierra al tocar esta hoja (portaleada fuera del contenido del Dialog).
+    <div style={outerStyle} ref={containerRef} data-ticket-editor-floating="true">
+      <div className={panelClass}>
+        {isMobile ? (
+          <div className="mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+        ) : null}
         <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
           <input
             ref={inputRef}
@@ -205,7 +222,10 @@ function BlockMenuPopup({ options, onSelect, onClose, x, y }: BlockMenuProps) {
             className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
         </div>
-        <div className="max-h-72 overflow-y-auto overscroll-contain p-1">
+        <div
+          className="tf-scroll-contain max-h-[58dvh] overflow-y-auto p-1 sm:max-h-72"
+          style={{ touchAction: "pan-y" }}
+        >
           {grouped.length === 0 ? (
             <p className="px-3 py-2 text-sm text-zinc-400">Sin resultados</p>
           ) : (
@@ -217,23 +237,30 @@ function BlockMenuPopup({ options, onSelect, onClose, x, y }: BlockMenuProps) {
                 {group.items.map((option) => {
                   const idx = globalIndex++;
                   const Icon = option.icon;
+                  const tap = createTapSelectHandlers(
+                    idx,
+                    () => onSelect(flatFiltered[idx]),
+                    pressRef,
+                  );
                   return (
                     <button
                       key={option.id}
                       type="button"
                       data-bm-idx={idx}
                       className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors",
+                        "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                        isMobile ? "py-2.5" : "py-1.5",
                         idx === activeIndex
                           ? "bg-zinc-100 dark:bg-zinc-800"
                           : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                       )}
                       onMouseEnter={() => setActiveIndex(idx)}
                       onPointerDown={(e) => {
-                        e.preventDefault();
                         e.stopPropagation();
-                        onSelect(option);
+                        tap.onPointerDown(e);
                       }}
+                      onPointerUp={tap.onPointerUp}
+                      onPointerCancel={tap.onPointerCancel}
                     >
                       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                         <Icon className="h-4 w-4" />
@@ -276,6 +303,7 @@ function BlockActionsMenuPopup({
   y,
 }: BlockActionsMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const handleClick = (e: PointerEvent) => {
@@ -285,12 +313,23 @@ function BlockActionsMenuPopup({
     return () => window.removeEventListener("pointerdown", handleClick);
   }, [onClose]);
 
+  const outerStyle: React.CSSProperties = isMobile
+    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999, pointerEvents: "auto" }
+    : { position: "fixed", top: y, left: x, zIndex: 9999, pointerEvents: "auto" };
+
   return (
-    <div
-      style={{ position: "fixed", top: y, left: x, zIndex: 9999, pointerEvents: "auto" }}
-      ref={ref}
-    >
-      <div className="w-44 overflow-hidden rounded-lg border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 flex flex-col">
+    <div style={outerStyle} ref={ref} data-ticket-editor-floating="true">
+      <div
+        className={cn(
+          "flex flex-col border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900",
+          isMobile
+            ? "w-full rounded-t-2xl border-t py-2 pb-[env(safe-area-inset-bottom)] [&>button]:py-3"
+            : "w-44 overflow-hidden rounded-lg border py-1",
+        )}
+      >
+        {isMobile ? (
+          <div className="mx-auto mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+        ) : null}
         <button
           type="button"
           className="flex w-full items-start px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
@@ -340,6 +379,7 @@ export function BlockControls({
   const [controlsTop, setControlsTop] = useState(0);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
+  const isMobile = useIsMobile();
 
   const [blockMenu, setBlockMenu] = useState({ open: false, x: 0, y: 0 });
   const [actionsMenu, setActionsMenu] = useState({ open: false, x: 0, y: 0 });
@@ -404,6 +444,7 @@ export function BlockControls({
   );
 
   useEffect(() => {
+    if (isMobile) return;
     const editorEl = editor.view.dom;
     editorEl.addEventListener("mousemove", handleMouseMove as EventListener);
     editorEl.addEventListener("mouseleave", scheduleHide);
@@ -411,7 +452,7 @@ export function BlockControls({
       editorEl.removeEventListener("mousemove", handleMouseMove as EventListener);
       editorEl.removeEventListener("mouseleave", scheduleHide);
     };
-  }, [editor, handleMouseMove, scheduleHide]);
+  }, [editor, handleMouseMove, scheduleHide, isMobile]);
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
@@ -484,13 +525,33 @@ export function BlockControls({
       .run();
   }, [editor, hoveredBlockIndex]);
 
+  const openBlockMenuMobile = useCallback(() => {
+    editor.chain().focus().run();
+    setActionsMenu((s) => ({ ...s, open: false }));
+    setBlockMenu({ open: true, x: 0, y: 0 });
+  }, [editor]);
+
   if (disabled) return null;
 
   const showControls =
-    hoveredBlockIndex !== null || blockMenu.open || actionsMenu.open;
+    !isMobile && (hoveredBlockIndex !== null || blockMenu.open || actionsMenu.open);
 
   return (
     <>
+      {/* Móvil: no hay hover, así que un botón "+" persistente abre la hoja
+          de bloques en la posición actual del cursor. */}
+      {isMobile && (
+        <button
+          type="button"
+          aria-label="Insertar bloque"
+          className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-500 shadow-md transition active:scale-95 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={openBlockMenuMobile}
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+      )}
+
       {/* Absolute-positioned controls (relative to wrapper) */}
       {showControls && (
         <div

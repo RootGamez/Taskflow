@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/useBreakpoint";
+import { createTapSelectHandlers } from "./tapSelect";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,6 +38,8 @@ export function SlashCommandMenu({
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [position, setPosition] = useState({ top: 0, left: 0 });
+  const isMobile = useIsMobile();
+  const pressRef = useRef<{ index: number; x: number; y: number; time: number } | null>(null);
 
   // Group items by category
   const grouped = useMemo(() => {
@@ -123,15 +127,31 @@ export function SlashCommandMenu({
 
   let globalIndex = 0;
 
+  const outerStyle: React.CSSProperties = isMobile
+    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999 }
+    : { position: "fixed", top: position.top, left: position.left, zIndex: 9999 };
+
+  const panelClass = isMobile
+    ? "w-full rounded-t-2xl border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
+    : "w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900";
+
+  const scrollClass = isMobile
+    ? "tf-scroll-contain max-h-[60dvh] overflow-y-auto p-1.5"
+    : "tf-scroll-contain max-h-72 overflow-y-auto p-1";
+
   return createPortal(
-    <div
-      style={{ position: "fixed", top: position.top, left: position.left, zIndex: 9999 }}
-      ref={containerRef}
-    >
-      <div className="w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900">
+    // `data-ticket-editor-floating` evita que el Dialog del panel de ticket
+    // (Radix) se cierre al tocar este menú, que está portaleado a <body>.
+    <div style={outerStyle} ref={containerRef} data-ticket-editor-floating="true">
+      <div className={panelClass}>
+        {isMobile ? (
+          <div className="mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
+        ) : null}
         <div
-          className="max-h-72 overflow-y-auto overscroll-contain p-1"
+          className={scrollClass}
+          style={{ touchAction: "pan-y" }}
           onWheel={(e) => {
+            if (isMobile) return;
             const el = e.currentTarget;
             const max = el.scrollHeight - el.clientHeight;
             if ((e.deltaY > 0 && el.scrollTop < max) || (e.deltaY < 0 && el.scrollTop > 0)) {
@@ -148,22 +168,27 @@ export function SlashCommandMenu({
               {group.items.map((item) => {
                 const idx = globalIndex++;
                 const Icon = item.icon;
+                const tap = createTapSelectHandlers(
+                  idx,
+                  () => command(flatItems[idx]),
+                  pressRef,
+                );
                 return (
                   <button
                     key={item.id}
                     data-slash-index={idx}
                     type="button"
                     className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors",
+                      "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                      isMobile ? "py-2.5" : "py-1.5",
                       idx === activeIndex
                         ? "bg-zinc-100 dark:bg-zinc-800"
                         : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
                     )}
                     onMouseEnter={() => setActiveIndex(idx)}
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      command(item);
-                    }}
+                    onPointerDown={tap.onPointerDown}
+                    onPointerUp={tap.onPointerUp}
+                    onPointerCancel={tap.onPointerCancel}
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
                       <Icon className="h-4 w-4" />

@@ -779,7 +779,9 @@ export function TicketRichEditor({
         ref={wrapperRef}
         className={cn(
           "tf-editor relative cursor-text",
-          "pl-14 sm:pl-16",
+          // En móvil no hay columna de controles +/⠿ (BlockControls muestra
+          // un FAB), así que no reservamos ese padding izquierdo.
+          "pl-0 sm:pl-16",
           disabled && "pointer-events-none opacity-60"
         )}
         onClick={(e) => {

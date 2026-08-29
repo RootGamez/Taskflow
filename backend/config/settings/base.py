@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.notifications",
     "apps.sprints",
     "apps.labels",
+    "apps.goals",
     "apps.subtasks",
     "apps.relations",
     "apps.pages",

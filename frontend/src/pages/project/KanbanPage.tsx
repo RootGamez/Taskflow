@@ -5,7 +5,9 @@ import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { useProjectSuspense } from "@/features/projects/hooks/useProjects";
+import { useIsMobile } from "@/hooks/useBreakpoint";
 import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
+import { KanbanBoardMobile } from "@/features/tickets/components/KanbanBoardMobile";
 import { CreateTicketModal } from "@/features/tickets/components/CreateTicketModal";
 import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
@@ -35,6 +37,7 @@ type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "des
 
 export default function KanbanPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { workspaceSlug = "", projectId = "" } = useParams();
   const { data: project } = useProjectSuspense(workspaceSlug, projectId);
   const { data: tickets } = useTicketsSuspense(projectId);
@@ -405,18 +408,22 @@ export default function KanbanPage() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <SprintSelector projectId={projectId} canMutate={canMutate} />
           <TicketDateFilter />
-          <Tabs selectedKey="board" onSelectionChange={(key) => {
-            if (key === "list") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/list`);
-            if (key === "calendar") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/calendar`);
-          }}>
+          <Tabs
+            size={isMobile ? "sm" : "md"}
+            selectedKey="board"
+            onSelectionChange={(key) => {
+              if (key === "list") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/list`);
+              if (key === "calendar") navigate(`/workspaces/${workspaceSlug}/projects/${projectId}/calendar`);
+            }}
+          >
             <Tab key="board" title="Tablero" />
             <Tab key="list" title="Lista" />
             <Tab key="calendar" title="Calendario" />
           </Tabs>
-          {canMutate ? (
+          {canMutate && !isMobile ? (
             <Button
               color="primary"
               onPress={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
@@ -428,17 +435,42 @@ export default function KanbanPage() {
         </div>
       </div>
 
+      {/* FAB de creación en móvil (un solo CTA primario por pantalla). */}
+      {canMutate && isMobile ? (
+        <button
+          type="button"
+          aria-label="Nuevo ticket"
+          onClick={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
+          disabled={projectColumns.length === 0}
+          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl font-light text-white shadow-lg transition active:scale-95 disabled:opacity-50"
+        >
+          +
+        </button>
+      ) : null}
+
       <SprintSummaryCard sprint={activeSprint} />
 
-      <KanbanBoard
-        columns={projectColumns}
-        tickets={filteredTickets}
-        allTickets={tickets}
-        canMutate={canMutate}
-        onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
-        onCreateTicket={(columnId) => setCreateColumnId(columnId)}
-        onMoveTicket={handleMoveTicket}
-      />
+      {isMobile ? (
+        <KanbanBoardMobile
+          columns={projectColumns}
+          tickets={filteredTickets}
+          allTickets={tickets}
+          canMutate={canMutate}
+          onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
+          onCreateTicket={(columnId) => setCreateColumnId(columnId)}
+          onMoveTicket={handleMoveTicket}
+        />
+      ) : (
+        <KanbanBoard
+          columns={projectColumns}
+          tickets={filteredTickets}
+          allTickets={tickets}
+          canMutate={canMutate}
+          onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
+          onCreateTicket={(columnId) => setCreateColumnId(columnId)}
+          onMoveTicket={handleMoveTicket}
+        />
+      )}
       <TicketDetail
         ticket={selectedTicket}
         isOpen={Boolean(selectedTicket)}

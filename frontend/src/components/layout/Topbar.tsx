@@ -1,6 +1,8 @@
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Menu, Search } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useMemo } from "react";
+
+import { useUIStore } from "@/store/uiStore";
 
 import { UserMenu } from "@/features/auth/components/UserMenu";
 import { useProject } from "@/features/projects/hooks/useProjects";
@@ -15,6 +17,7 @@ export function Topbar() {
   const { workspaceSlug, projectId } = useParams();
   const user = useAuthStore((state) => state.user);
   const openCommandPalette = useCommandPaletteStore((state) => state.open);
+  const setMobileNavOpen = useUIStore((state) => state.setMobileNavOpen);
   const { data: workspaces = [] } = useWorkspaces();
   const { data: project } = useProject(workspaceSlug ?? "", projectId ?? "");
 
@@ -32,20 +35,33 @@ export function Topbar() {
       : "Inicio";
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex min-w-0 items-center gap-1.5 text-sm">
+    <header className="flex h-14 items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 dark:border-zinc-800 dark:bg-zinc-900 sm:px-4">
+      <button
+        type="button"
+        aria-label="Abrir navegación"
+        onClick={() => setMobileNavOpen(true)}
+        className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 lg:hidden"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
         <Link
           to="/workspaces"
-          className="rounded-full px-2 py-1 font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+          className="hidden shrink-0 rounded-full px-2 py-1 font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 sm:inline-flex"
         >
           Espacios
         </Link>
         {workspaceSlug ? (
           <>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-zinc-400 sm:block" />
             <Link
               to={getWorkspaceDashboardPath(workspaceSlug)}
-              className="truncate rounded-full px-2 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className={
+                "truncate rounded-full px-2 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50" +
+                // En móvil, si hay un proyecto abierto el nombre del proyecto es
+                // el contexto relevante: ocultamos el del espacio para no amontonar.
+                (projectId ? " hidden sm:inline-flex" : "")
+              }
             >
               {currentWorkspace?.name ?? workspaceSlug}
             </Link>
@@ -53,19 +69,19 @@ export function Topbar() {
         ) : null}
         {projectId ? (
           <>
-            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-zinc-400 sm:block" />
             <Link
               to={`/workspaces/${workspaceSlug}/projects/${projectId}/board`}
               className="truncate rounded-full px-2 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
             >
               {project?.name ?? "Proyecto"}
             </Link>
-            <span className="rounded-full bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900/30 dark:text-brand-200">
+            <span className="hidden shrink-0 rounded-full bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900/30 dark:text-brand-200 sm:inline-flex">
               {currentViewLabel}
             </span>
           </>
         ) : workspaceSlug ? (
-          <span className="rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
             Vista del espacio
           </span>
         ) : null}

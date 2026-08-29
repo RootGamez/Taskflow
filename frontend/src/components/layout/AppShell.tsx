@@ -5,6 +5,9 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/Sheet";
+import { useIsCompactNav } from "@/hooks/useBreakpoint";
+import { useUIStore } from "@/store/uiStore";
 import { CommandPalette } from "@/features/command-palette/components/CommandPalette";
 import { GlobalShortcutsProvider } from "@/features/shortcuts/components/GlobalShortcutsProvider";
 import { KeyboardShortcutsDialog } from "@/features/shortcuts/components/KeyboardShortcutsDialog";
@@ -19,6 +22,9 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const navigate = useNavigate();
+  const isCompactNav = useIsCompactNav();
+  const mobileNavOpen = useUIStore((state) => state.mobileNavOpen);
+  const setMobileNavOpen = useUIStore((state) => state.setMobileNavOpen);
   const { workspaceSlug = "" } = useParams();
   const accessToken = useAuthStore((state) => state.accessToken);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
@@ -110,11 +116,22 @@ export function AppShell({ children }: AppShellProps) {
     // Sidebar/Topbar (y por lo tanto UserMenu, que abre el mismo dialogo
     // de ayuda via `shortcutsHelpDialogStore`).
     <GlobalShortcutsProvider>
-      <div className="flex h-screen bg-zinc-50 dark:bg-zinc-950">
-        <Sidebar />
+      <div className="flex h-[100dvh] bg-zinc-50 dark:bg-zinc-950">
+        {/* Sidebar fijo solo en desktop (>= lg); en móvil/tablet va como drawer. */}
+        {!isCompactNav ? <Sidebar /> : null}
+
+        {isCompactNav ? (
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+            <SheetContent side="left" className="p-0" showGrabber={false}>
+              <SheetTitle className="sr-only">Navegación</SheetTitle>
+              <Sidebar variant="drawer" onNavigate={() => setMobileNavOpen(false)} />
+            </SheetContent>
+          </Sheet>
+        ) : null}
+
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar />
-          <main className="min-w-0 flex-1 overflow-auto p-6">{children}</main>
+          <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6">{children}</main>
         </div>
 
         {/* Overlay global, montado una sola vez (I6/D4 de

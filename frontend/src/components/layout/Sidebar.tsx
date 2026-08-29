@@ -9,22 +9,37 @@ import { useUIStore } from "@/store/uiStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+interface SidebarProps {
+  /** En el drawer móvil el sidebar va siempre expandido y sin botón de colapsar. */
+  variant?: "fixed" | "drawer";
+  /** Se llama al navegar (para cerrar el drawer). */
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ variant = "fixed", onNavigate }: SidebarProps = {}) {
   const location = useLocation();
   const params = useParams();
   const { data: workspaces = [] } = useWorkspaces();
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const workspaceSlug = params.workspaceSlug ?? activeWorkspace?.slug ?? workspaces.find((workspace) => workspace.is_active)?.slug ?? workspaces[0]?.slug ?? "";
   const { data: projects = [] } = useProjects(workspaceSlug);
-  const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
+  const sidebarCollapsedStore = useUIStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const setTheme = useUIStore((state) => state.setTheme);
+
+  const isDrawer = variant === "drawer";
+  const sidebarCollapsed = isDrawer ? false : sidebarCollapsedStore;
 
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-zinc-200 bg-white transition-all dark:border-zinc-800 dark:bg-zinc-900",
-        sidebarCollapsed ? "w-[60px]" : "w-[260px]",
+        "flex h-full flex-col bg-white dark:bg-zinc-900",
+        isDrawer
+          ? "w-full"
+          : cn(
+              "border-r border-zinc-200 transition-all dark:border-zinc-800",
+              sidebarCollapsed ? "w-[60px]" : "w-[260px]",
+            ),
       )}
     >
       <div className="flex items-center justify-between px-3 py-4">
@@ -32,9 +47,11 @@ export function Sidebar() {
           <KanbanSquare className="h-5 w-5" />
           {!sidebarCollapsed ? <span>TaskFlow</span> : null}
         </div>
-        <Button isIconOnly variant="light" onPress={toggleSidebar}>
-          {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </Button>
+        {!isDrawer ? (
+          <Button isIconOnly variant="light" onPress={toggleSidebar}>
+            {sidebarCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
+        ) : null}
       </div>
 
       <div className="px-3">
@@ -44,7 +61,8 @@ export function Sidebar() {
             <Link
               key={project.id}
               to={`/workspaces/${workspaceSlug}/projects/${project.id}/board`}
-              className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              onClick={onNavigate}
+              className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
               {!sidebarCollapsed ? <span className="truncate">{project.name}</span> : null}
@@ -77,8 +95,9 @@ export function Sidebar() {
             <Link
               key={item.to}
               to={item.to}
+              onClick={onNavigate}
               className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-2 text-sm",
+                "flex items-center gap-2 rounded-md px-2 py-2.5 text-sm",
                 active
                   ? "bg-brand-50 font-medium text-brand-700"
                   : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",

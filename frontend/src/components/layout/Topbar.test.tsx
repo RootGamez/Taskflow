@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Topbar } from "@/components/layout/Topbar";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
+import { useUIStore } from "@/store/uiStore";
 
 vi.mock("@/features/workspaces/hooks/useWorkspaces", () => ({
   useWorkspaces: () => ({ data: [] }),
@@ -50,5 +51,15 @@ describe("Topbar", () => {
     await user.click(screen.getByRole("button", { name: /buscar tickets/i }));
 
     expect(useCommandPaletteStore.getState().isOpen).toBe(true);
+  });
+
+  it("el botón de menú abre el drawer de navegación móvil", async () => {
+    const user = userEvent.setup();
+    useUIStore.setState({ mobileNavOpen: false });
+    renderTopbar();
+
+    await user.click(screen.getByRole("button", { name: /abrir navegación/i }));
+
+    expect(useUIStore.getState().mobileNavOpen).toBe(true);
   });
 });

@@ -38,9 +38,12 @@ function persistTheme(theme: ThemeMode): void {
 
 interface UIStore {
   sidebarCollapsed: boolean;
+  /** Drawer de navegación en móvil/tablet (`< lg`). No persiste. */
+  mobileNavOpen: boolean;
   theme: ThemeMode;
   activeModal: string | null;
   toggleSidebar: () => void;
+  setMobileNavOpen: (open: boolean) => void;
   setTheme: (theme: ThemeMode) => void;
   openModal: (modalId: string) => void;
   closeModal: () => void;
@@ -48,9 +51,11 @@ interface UIStore {
 
 export const useUIStore = create<UIStore>((set) => ({
   sidebarCollapsed: false,
+  mobileNavOpen: false,
   theme: getInitialTheme(),
   activeModal: null,
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  setMobileNavOpen: (open) => set({ mobileNavOpen: open }),
   setTheme: (theme) => {
     persistTheme(theme);
     set({ theme });

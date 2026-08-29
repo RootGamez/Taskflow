@@ -38,7 +38,7 @@ export function CalendarToolbar({ year, month, onPrevMonth, onNextMonth, onToday
   const monthLabel = capitalize(MONTH_NAMES_ES[month] ?? "");
 
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex items-center justify-between gap-2 border-2 border-border bg-secondary px-2 py-1.5">
       <div className="flex items-center gap-1">
         <Button type="button" variant="outline" size="icon" aria-label="Mes anterior" onClick={onPrevMonth}>
           <ChevronLeft className="h-4 w-4" />
@@ -47,7 +47,10 @@ export function CalendarToolbar({ year, month, onPrevMonth, onNextMonth, onToday
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-      <h2 className="text-base font-semibold text-foreground" aria-live="polite">
+      <h2
+        className="font-mono text-sm font-bold uppercase tracking-[0.12em] tabular-nums text-foreground"
+        aria-live="polite"
+      >
         {monthLabel} {year}
       </h2>
       <Button type="button" variant="outline" size="sm" onClick={onToday}>

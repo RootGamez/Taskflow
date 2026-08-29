@@ -121,20 +121,20 @@ export function SprintSelector({ workspaceSlug, canMutate }: SprintSelectorProps
           <button
             type="button"
             onClick={() => handleSelect({ kind: "all" })}
-            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${scope.kind === "all" ? "font-semibold" : ""}`}
+            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent ${scope.kind === "all" ? "font-semibold" : ""}`}
           >
             Todos
           </button>
           <button
             type="button"
             onClick={() => handleSelect({ kind: "backlog" })}
-            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${scope.kind === "backlog" ? "font-semibold" : ""}`}
+            className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent ${scope.kind === "backlog" ? "font-semibold" : ""}`}
           >
             <Layers className="h-3.5 w-3.5" />
             Backlog
           </button>
 
-          {orderedSprints.length > 0 ? <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" /> : null}
+          {orderedSprints.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
 
           {orderedSprints.map((sprint) => {
             const isSelected = scope.kind === "sprint" && scope.sprintId === sprint.id;
@@ -149,17 +149,17 @@ export function SprintSelector({ workspaceSlug, canMutate }: SprintSelectorProps
                     handleSelect({ kind: "sprint", sprintId: sprint.id });
                   }
                 }}
-                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${isSelected ? "font-semibold" : ""}`}
+                className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent ${isSelected ? "font-semibold" : ""}`}
               >
                 <Rocket
-                  className={`h-3.5 w-3.5 shrink-0 ${sprint.status === "active" ? "text-primary" : "text-zinc-400"}`}
+                  className={`h-3.5 w-3.5 shrink-0 ${sprint.status === "active" ? "text-primary" : "text-muted-foreground"}`}
                 />
                 <span className="min-w-0 flex-1 truncate">{sprint.name}</span>
                 {canMutate && sprint.status !== "active" ? (
                   <button
                     type="button"
                     onClick={(event) => void handleActivate(sprint, event)}
-                    className="shrink-0 text-[10px] text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                    className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground"
                   >
                     Activar
                   </button>
@@ -169,7 +169,7 @@ export function SprintSelector({ workspaceSlug, canMutate }: SprintSelectorProps
                     type="button"
                     aria-label={`Eliminar ${sprint.name}`}
                     onClick={(event) => handleRequestDelete(sprint, event)}
-                    className="shrink-0 text-zinc-300 hover:text-red-600 dark:hover:text-red-400"
+                    className="shrink-0 text-muted-foreground hover:text-destructive"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -180,14 +180,14 @@ export function SprintSelector({ workspaceSlug, canMutate }: SprintSelectorProps
 
           {canMutate ? (
             <>
-              <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" />
+              <div className="my-1 h-px bg-border" />
               <button
                 type="button"
                 onClick={() => {
                   setIsCreateOpen(true);
                   setIsMenuOpen(false);
                 }}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm font-medium text-primary hover:bg-accent"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nuevo sprint

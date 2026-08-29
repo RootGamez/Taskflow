@@ -23,6 +23,7 @@ import type { Column } from "@/features/projects/types/project.types";
 import { TicketCard } from "@/features/tickets/components/TicketCard";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { resolveDropOrder } from "@/features/tickets/utils/resolveDropOrder";
+import { cn } from "@/lib/utils";
 
 interface KanbanBoardMobileProps {
   columns: Column[];
@@ -39,34 +40,12 @@ interface KanbanBoardMobileProps {
   }) => void | Promise<void>;
 }
 
-type ColumnTone = "backlog" | "progress" | "done" | "default";
-
-function getColumnTone(name: string): ColumnTone {
-  const n = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
-  if (/(backlog|pendiente|por hacer|to do|sin empezar)/.test(n)) return "backlog";
-  if (/(progreso|in progress|doing|en curso)/.test(n)) return "progress";
-  if (/(hecho|done|completado|finalizado|listo)/.test(n)) return "done";
-  return "default";
-}
-
-const badgeToneClass: Record<ColumnTone, string> = {
-  backlog: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-  progress: "bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-300",
-  done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-300",
-  default: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-};
-
 function SortableMobileCard({
   ticket,
-  tone,
   onOpen,
   onRequestMove,
 }: {
   ticket: Ticket;
-  tone: ColumnTone;
   onOpen: (ticket: Ticket) => void;
   onRequestMove: (ticket: Ticket) => void;
 }) {
@@ -84,15 +63,16 @@ function SortableMobileCard({
   return (
     <div ref={setNodeRef} style={style} className="relative">
       {/* El drag handle es toda la tarjeta con press-and-hold (TouchSensor
-          delay), pero dejamos el tap para abrir el ticket. */}
+          delay), pero dejamos el tap para abrir el ticket. Sin sombra en
+          reposo — solo el DragOverlay lleva `shadow-hard`. */}
       <div {...attributes} {...listeners} className="touch-pan-y">
-        <TicketCard ticket={ticket} onOpen={onOpen} tone={tone} className="shadow-sm shadow-black/10 pr-12" />
+        <TicketCard ticket={ticket} onOpen={onOpen} className="pr-12" />
       </div>
       <button
         type="button"
         aria-label={`Mover ${ticket.title} a otra columna`}
         onClick={() => onRequestMove(ticket)}
-        className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white/80 text-zinc-500 shadow-sm backdrop-blur transition active:scale-95 dark:bg-zinc-800/80 dark:text-zinc-300"
+        className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center border-2 border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:translate-x-px active:translate-y-px"
       >
         <ArrowLeftRight className="h-4 w-4" />
       </button>
@@ -172,7 +152,6 @@ export function KanbanBoardMobile({
   );
 
   const activeColumn = orderedColumns.find((column) => column.id === activeColumnId) ?? null;
-  const activeTone = activeColumn ? getColumnTone(activeColumn.name) : "default";
 
   const visibleTickets = useMemo(
     () =>
@@ -239,7 +218,7 @@ export function KanbanBoardMobile({
 
   if (orderedColumns.length === 0) {
     return (
-      <div className="rounded-xl bg-white/70 p-6 text-center text-sm text-zinc-500 dark:bg-zinc-900/70 dark:text-zinc-400">
+      <div className="border-2 border-border bg-card p-6 text-center text-sm text-muted-foreground">
         Este proyecto todavía no tiene columnas.
       </div>
     );
@@ -256,7 +235,6 @@ export function KanbanBoardMobile({
         {orderedColumns.map((column) => {
           const isActive = column.id === activeColumnId;
           const count = filteredCountByColumn.get(column.id) ?? 0;
-          const tone = getColumnTone(column.name);
           return (
             <button
               key={column.id}
@@ -268,26 +246,20 @@ export function KanbanBoardMobile({
               role="tab"
               aria-selected={isActive}
               onClick={() => setActiveColumnId(column.id)}
-              className={
-                "flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors " +
-                (isActive
-                  ? "border-transparent bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                  : "border-zinc-200 bg-white text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300")
-              }
+              className={cn(
+                "flex shrink-0 items-center gap-2 border-2 px-3.5 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                isActive
+                  ? "border-foreground bg-secondary font-semibold text-foreground shadow-hard-sm"
+                  : "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground",
+              )}
             >
               <span
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: column.color }}
+                aria-hidden
               />
               <span className="max-w-[9rem] truncate">{column.name}</span>
-              <span
-                className={
-                  "rounded-full px-1.5 text-xs " +
-                  (isActive ? "bg-white/20 text-white dark:bg-zinc-900/20 dark:text-zinc-900" : badgeToneClass[tone])
-                }
-              >
-                {count}
-              </span>
+              <span className="font-mono text-xs tabular-nums">{count}</span>
             </button>
           );
         })}
@@ -309,14 +281,13 @@ export function KanbanBoardMobile({
               <SortableMobileCard
                 key={ticket.id}
                 ticket={ticket}
-                tone={activeTone}
                 onOpen={onOpenTicket}
                 onRequestMove={setMoveTarget}
               />
             ))}
 
             {visibleTickets.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-zinc-300 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              <p className="border-2 border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
                 {hadTicketsBeforeFilter
                   ? "Ningún ticket de esta columna coincide con el filtro."
                   : "No hay tickets en esta columna."}
@@ -330,7 +301,7 @@ export function KanbanBoardMobile({
             <TicketCard
               ticket={draggedTicket}
               onOpen={onOpenTicket}
-              className="shadow-xl shadow-black/20"
+              className="shadow-hard dark:shadow-hard-float"
             />
           ) : null}
         </DragOverlay>
@@ -340,7 +311,7 @@ export function KanbanBoardMobile({
         <button
           type="button"
           onClick={() => onCreateTicket(activeColumn.id)}
-          className="w-full rounded-xl border border-dashed border-zinc-300 py-3 text-sm font-medium text-zinc-600 transition active:scale-[0.99] dark:border-zinc-700 dark:text-zinc-300"
+          className="w-full border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           + Crear tarea en {activeColumn.name}
         </button>
@@ -351,7 +322,7 @@ export function KanbanBoardMobile({
         <SheetContent side="bottom" className="pb-6">
           <SheetHeader>
             <SheetTitle>Mover ticket</SheetTitle>
-            <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{moveTarget?.title}</p>
+            <p className="truncate text-sm text-muted-foreground">{moveTarget?.title}</p>
           </SheetHeader>
           <div className="tf-scroll-contain max-h-[50dvh] overflow-y-auto px-2 pb-2">
             {orderedColumns.map((column) => {
@@ -362,21 +333,21 @@ export function KanbanBoardMobile({
                   type="button"
                   disabled={isCurrent}
                   onClick={() => void handleConfirmMove(column.id)}
-                  className={
-                    "flex w-full items-center justify-between rounded-lg px-3 py-3 text-left text-sm transition-colors " +
-                    (isCurrent
-                      ? "cursor-default text-zinc-400 dark:text-zinc-600"
-                      : "text-zinc-800 hover:bg-zinc-100 dark:text-zinc-100 dark:hover:bg-zinc-800")
-                  }
+                  className={cn(
+                    "flex w-full items-center justify-between rounded px-3 py-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    isCurrent
+                      ? "cursor-default text-muted-foreground"
+                      : "text-foreground hover:bg-accent",
+                  )}
                 >
                   <span className="flex items-center gap-2.5">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color }} />
+                    <span className="boxed-icon h-4 w-4" style={{ backgroundColor: column.color }} aria-hidden />
                     {column.name}
                   </span>
                   {isCurrent ? (
-                    <span className="text-xs">Actual</span>
+                    <span className="eyebrow">Actual</span>
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-zinc-400" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   )}
                 </button>
               );

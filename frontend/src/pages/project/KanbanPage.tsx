@@ -396,7 +396,7 @@ export default function KanbanPage() {
   }, [projectId, selectedTicketId]);
 
   if (!project) {
-    return <p className="text-sm text-zinc-600">No se encontro el proyecto.</p>;
+    return <p className="text-sm text-muted-foreground">No se encontro el proyecto.</p>;
   }
 
   return (
@@ -406,15 +406,17 @@ export default function KanbanPage() {
           <Button
             size="sm"
             variant="light"
-            className="text-zinc-600 dark:text-zinc-300"
+            className="rounded-none text-muted-foreground"
             startContent={<ArrowLeft className="h-4 w-4" />}
             onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
           >
             Volver al espacio
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">{project.name}</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <h1 className="font-display text-fluid-xl font-bold tracking-tight text-foreground">
+              {project.name}
+            </h1>
+            <p className="text-sm text-muted-foreground">
               {activeWorkspace?.name ?? workspaceSlug} · {projectColumns.length} columnas
             </p>
           </div>
@@ -453,7 +455,7 @@ export default function KanbanPage() {
           aria-label="Nuevo ticket"
           onClick={() => setCreateColumnId(projectColumns[0]?.id ?? null)}
           disabled={projectColumns.length === 0}
-          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-brand-600 text-2xl font-light text-white shadow-lg transition active:scale-95 disabled:opacity-50"
+          className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-14 w-14 items-center justify-center border-2 border-foreground bg-primary text-2xl font-light text-primary-foreground shadow-hard transition-transform active:translate-x-0.5 active:translate-y-0.5 disabled:opacity-50 motion-reduce:transition-none"
         >
           +
         </button>

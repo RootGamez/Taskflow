@@ -100,11 +100,13 @@ export function CalendarGrid({ tickets, canMutate, onOpenTicket, onDropTicket, n
       />
 
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-7 gap-1">
+        {/* Grilla con líneas visibles a propósito (§11): borde exterior grueso +
+            gaps de 1px que dejan ver el color de tinta entre celdas. */}
+        <div className="grid grid-cols-7 gap-px border-2 border-border bg-border">
           {WEEKDAY_LABELS.map((label) => (
             <div
               key={label}
-              className="px-1 pb-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+              className="bg-secondary py-1.5 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
             >
               {label}
             </div>

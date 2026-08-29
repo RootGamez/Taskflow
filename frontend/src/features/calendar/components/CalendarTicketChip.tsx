@@ -34,8 +34,10 @@ export function CalendarTicketChip({ ticket, canDrag, onOpen }: CalendarTicketCh
       onClick={() => onOpen(ticket)}
       title={ticket.title}
       className={cn(
-        "block w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium transition-opacity",
-        isOverdue ? "bg-priority-urgent-bg text-priority-urgent" : "bg-muted text-foreground",
+        "block w-full truncate rounded border px-1.5 py-0.5 text-left text-xs font-medium transition-opacity",
+        isOverdue
+          ? "border-priority-urgent bg-priority-urgent-bg text-priority-urgent"
+          : "border-border bg-muted text-foreground",
         canDrag ? "cursor-grab touch-none active:cursor-grabbing" : "cursor-pointer",
         isDragging && "opacity-40",
       )}

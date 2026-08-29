@@ -53,11 +53,12 @@ export function TicketDeleteDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+          <p className="border-2 border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
             Para confirmar, escribe el título exacto del ticket.
           </p>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Título: <span className="font-semibold text-zinc-800 dark:text-zinc-100">{deleteKeyword || "(sin título)"}</span>
+          <p className="text-sm text-muted-foreground">
+            Título:{" "}
+            <span className="font-semibold text-foreground">{deleteKeyword || "(sin título)"}</span>
           </p>
           <Input
             aria-label="Confirmación de eliminación"

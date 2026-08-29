@@ -14,18 +14,24 @@ interface MyTasksSummaryProps {
  */
 export function MyTasksSummary({ tasks, now = new Date() }: MyTasksSummaryProps) {
   if (tasks.length === 0) {
-    return <p className="text-sm text-zinc-500 dark:text-zinc-400">No tienes tareas asignadas.</p>;
+    return <p className="text-sm text-muted-foreground">No tienes tareas asignadas.</p>;
   }
 
   const overdueCount = tasks.filter((task) => isDueDateOverdue(task.due_date, now)).length;
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
-      <span data-testid="my-tasks-summary-total" className="text-zinc-600 dark:text-zinc-300">
+      <span
+        data-testid="my-tasks-summary-total"
+        className="font-mono tabular-nums text-muted-foreground"
+      >
         {tasks.length} tareas asignadas
       </span>
       {overdueCount > 0 ? (
-        <span data-testid="my-tasks-summary-overdue" className="text-destructive">
+        <span
+          data-testid="my-tasks-summary-overdue"
+          className="font-mono tabular-nums font-semibold text-destructive"
+        >
           {overdueCount} vencidas
         </span>
       ) : null}

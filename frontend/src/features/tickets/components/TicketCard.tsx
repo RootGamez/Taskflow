@@ -1,5 +1,6 @@
 import { ListChecks, Paperclip } from "lucide-react";
 
+import { Badge } from "@/components/ui/shadcn/badge";
 import { LabelChip } from "@/features/labels/components/LabelChip";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import { SubtaskProgressBar } from "@/features/subtasks/components/SubtaskProgressBar";
@@ -7,20 +8,24 @@ import { TicketReferenceBadge } from "@/features/tickets/components/TicketRefere
 import { PRIORITY_STYLES } from "@/features/tickets/lib/priorityStyles";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { formatDueDateDayMonth, isDueDateOverdue } from "@/features/tickets/utils/dueDate";
+import { cn } from "@/lib/utils";
 
 const MAX_VISIBLE_LABELS = 3;
 
 interface TicketCardProps {
   ticket: Ticket;
   onOpen: (ticket: Ticket) => void;
-  tone?: "backlog" | "progress" | "done" | "default";
+  /**
+   * Clases extra. En reposo la tarjeta NO lleva sombra (el borde grueso da
+   * el peso); `shadow-hard` se pasa por acá solo mientras se arrastra.
+   */
   className?: string;
   /** Muestra a qué proyecto pertenece el ticket. Se usa en el tablero de
    * sprint, que cruza proyectos. Si se omite, usa `ticket.project`. */
   showProject?: boolean;
 }
 
-export function TicketCard({ ticket, onOpen, tone = "default", className = "", showProject = false }: TicketCardProps) {
+export function TicketCard({ ticket, onOpen, className = "", showProject = false }: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
   const priorityStyle = PRIORITY_STYLES[ticket.priority];
@@ -32,35 +37,41 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "", s
         ? ticket.assignees[0].full_name
         : `${ticket.assignees[0].full_name} +${ticket.assignees.length - 1}`;
 
-  const toneCardClass: Record<"backlog" | "progress" | "done" | "default", string> = {
-    backlog: "bg-white/85 dark:bg-zinc-900/90",
-    progress: "bg-blue-50/75 dark:bg-blue-950/35",
-    done: "bg-emerald-50/75 dark:bg-emerald-950/35",
-    default: "bg-white/85 dark:bg-zinc-900/90",
-  };
-
   return (
     <button
       type="button"
       onClick={() => onOpen(ticket)}
-      className={`w-full rounded-xl p-3 text-left transition-[box-shadow,background-color] duration-150 hover:shadow-md ${toneCardClass[tone]} ${className}`}
+      className={cn(
+        "w-full border-2 border-border bg-card p-3 text-left transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
+      )}
     >
       {showProject && ticket.project ? (
-        <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+        <span className="mb-1.5 inline-flex items-center gap-1.5 border border-border bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ticket.project.color }} />
           {ticket.project.key ?? ticket.project.name}
         </span>
       ) : null}
-      <p className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">{ticket.title}</p>
-      <div className="mt-3 flex items-center justify-between">
-        <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${priorityStyle.bgClass} ${priorityStyle.textClass}`}>
-          <PriorityIcon className="h-4 w-4" />
-          {priorityStyle.label}
-        </div>
+      <p className="line-clamp-2 text-sm font-medium text-foreground">{ticket.title}</p>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        {ticket.priority === "urgent" ? (
+          <Badge variant="stamp">
+            <PriorityIcon />
+            {priorityStyle.label}
+          </Badge>
+        ) : (
+          <Badge
+            variant="secondary"
+            className={cn(priorityStyle.bgClass, priorityStyle.textClass, priorityStyle.borderClass)}
+          >
+            <PriorityIcon />
+            {priorityStyle.label}
+          </Badge>
+        )}
         {/* Esquina superior derecha, junto al Paperclip (DESIGN_SYSTEM.md 8.5, D46) */}
         <div className="flex items-center gap-1.5">
           <TicketReferenceBadge reference={ticket.reference} />
-          <Paperclip className="h-4 w-4 text-zinc-400" />
+          <Paperclip className="h-4 w-4 text-muted-foreground" />
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between">
@@ -69,20 +80,23 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "", s
             <MemberAvatar key={assignee.id} user={assignee} size="sm" />
           ))}
           {ticket.assignees.length > 3 ? (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-white bg-zinc-200 text-xs text-zinc-700">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-border bg-muted text-xs text-muted-foreground">
               +{ticket.assignees.length - 3}
             </span>
           ) : null}
         </div>
         {ticket.due_date ? (
-          <span className={`text-xs ${isOverdue ? "text-destructive" : "text-zinc-500"}`}>
+          <span
+            className={cn(
+              "font-mono text-xs tabular-nums",
+              isOverdue ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
             {dueDateLabel}
           </span>
         ) : null}
       </div>
-      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-        Responsable: {assigneeLabel}
-      </p>
+      <p className="mt-2 text-xs text-muted-foreground">Responsable: {assigneeLabel}</p>
       {/* D36 (docs/PHASE_3_PLAN.md): la barra sale de los contadores que ya
           vienen en el payload del ticket -- ningun hook nuevo aca. Se oculta
           por completo cuando el ticket no tiene subtareas (0/undefined),
@@ -90,7 +104,7 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "", s
           preexistentes sin `subtask_count` (D13). */}
       {ticket.subtask_count ? (
         <div className="mt-2 flex items-center gap-1.5">
-          <ListChecks className="h-3.5 w-3.5 shrink-0 text-zinc-400" />
+          <ListChecks className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <SubtaskProgressBar
             done={ticket.completed_subtask_count ?? 0}
             total={ticket.subtask_count}
@@ -104,7 +118,7 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "", s
             <LabelChip key={label.id} label={label} />
           ))}
           {ticket.labels.length > MAX_VISIBLE_LABELS ? (
-            <span className="inline-flex items-center rounded-full border border-zinc-200 px-2 py-0.5 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+            <span className="inline-flex items-center border border-border px-2 py-0.5 text-xs text-muted-foreground">
               +{ticket.labels.length - MAX_VISIBLE_LABELS}
             </span>
           ) : null}

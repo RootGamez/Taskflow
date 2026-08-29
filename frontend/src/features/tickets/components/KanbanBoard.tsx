@@ -17,11 +17,13 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useMemo, useState } from "react";
 
+import { Badge } from "@/components/ui/shadcn/badge";
 import type { Column } from "@/features/projects/types/project.types";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import { TicketCard } from "@/features/tickets/components/TicketCard";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { resolveDropOrder } from "@/features/tickets/utils/resolveDropOrder";
+import { cn } from "@/lib/utils";
 
 interface KanbanBoardProps {
   columns: Column[];
@@ -44,8 +46,6 @@ interface KanbanBoardProps {
   }) => void | Promise<void>;
 }
 
-type ColumnTone = "backlog" | "progress" | "done" | "default";
-
 interface CollaboratorLane {
   id: string;
   name: string;
@@ -53,45 +53,6 @@ interface CollaboratorLane {
 }
 
 const UNASSIGNED_LANE_ID = "__unassigned__";
-
-function getColumnTone(name: string): ColumnTone {
-  const normalizedName = name
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-  if (
-    normalizedName.includes("backlog") ||
-    normalizedName.includes("pendiente") ||
-    normalizedName.includes("por hacer") ||
-    normalizedName.includes("to do") ||
-    normalizedName.includes("sin empezar")
-  ) {
-    return "backlog";
-  }
-
-  if (
-    normalizedName.includes("en progreso") ||
-    normalizedName.includes("progreso") ||
-    normalizedName.includes("in progress") ||
-    normalizedName.includes("doing") ||
-    normalizedName.includes("en curso")
-  ) {
-    return "progress";
-  }
-
-  if (
-    normalizedName.includes("hecho") ||
-    normalizedName.includes("done") ||
-    normalizedName.includes("completado") ||
-    normalizedName.includes("finalizado") ||
-    normalizedName.includes("listo")
-  ) {
-    return "done";
-  }
-
-  return "default";
-}
 
 function getCellDropId(laneId: string, columnId: string) {
   return `cell::${laneId}::${columnId}`;
@@ -111,12 +72,10 @@ function parseCellDropId(id: string): { laneId: string; columnId: string } | nul
 function SortableTicketCard({
   ticket,
   laneId,
-  tone,
   onOpen,
 }: {
   ticket: Ticket;
   laneId: string;
-  tone: ColumnTone;
   onOpen: (ticket: Ticket) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -144,12 +103,9 @@ function SortableTicketCard({
       {...listeners}
       className="touch-none cursor-grab active:cursor-grabbing select-none"
     >
-      <TicketCard
-        ticket={ticket}
-        onOpen={onOpen}
-        tone={tone}
-        className="shadow-sm shadow-black/10"
-      />
+      {/* Sin sombra en reposo — el borde grueso da el peso. La sombra dura
+          solo aparece en el DragOverlay mientras se arrastra. */}
+      <TicketCard ticket={ticket} onOpen={onOpen} />
     </div>
   );
 }
@@ -159,7 +115,6 @@ function TicketCell({
   column,
   columnTickets,
   canMutate,
-  tone,
   isFilteredEmpty,
   onOpenTicket,
   onCreateTicket,
@@ -168,7 +123,6 @@ function TicketCell({
   column: Column;
   columnTickets: Ticket[];
   canMutate: boolean;
-  tone: ColumnTone;
   /** true cuando esta celda no tiene tickets visibles SOLO por el filtro de fecha activo. */
   isFilteredEmpty: boolean;
   onOpenTicket: (ticket: Ticket) => void;
@@ -184,21 +138,13 @@ function TicketCell({
     },
   });
 
-  const cellToneClass: Record<ColumnTone, string> = {
-    backlog: "border-zinc-200/90 bg-zinc-100/30 dark:border-zinc-800 dark:bg-zinc-900/25",
-    progress: "border-blue-200/80 bg-blue-50/25 dark:border-blue-900 dark:bg-blue-950/20",
-    done: "border-emerald-200/80 bg-emerald-50/25 dark:border-emerald-900 dark:bg-emerald-950/20",
-    default: "border-zinc-200/80 bg-zinc-100/20 dark:border-zinc-800 dark:bg-zinc-900/20",
-  };
-
-  const overRingClass = isOver
-    ? "ring-2 ring-blue-400/60 dark:ring-blue-500/50"
-    : "ring-1 ring-transparent";
-
   return (
     <section
       ref={setNodeRef}
-      className={`rounded-2xl border p-2 transition-colors ${cellToneClass[tone]} ${overRingClass}`}
+      className={cn(
+        "border-2 bg-background p-2 transition-colors",
+        isOver ? "border-primary ring-2 ring-ring" : "border-border",
+      )}
     >
       <SortableContext
         id={dropId}
@@ -211,12 +157,11 @@ function TicketCell({
               key={getTicketDragId(ticket.id, laneId)}
               ticket={ticket}
               laneId={laneId}
-              tone={tone}
               onOpen={onOpenTicket}
             />
           ))}
           {isFilteredEmpty ? (
-            <p className="rounded-lg border border-dashed border-zinc-300 px-2 py-3 text-center text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+            <p className="border-2 border-dashed border-border px-2 py-3 text-center text-xs text-muted-foreground">
               Ningún ticket coincide con el filtro de fecha
             </p>
           ) : null}
@@ -227,7 +172,7 @@ function TicketCell({
         <button
           type="button"
           onClick={() => onCreateTicket(column.id)}
-          className="mt-2 w-full rounded-xl bg-white/70 px-3 py-2 text-left text-sm text-zinc-600 transition hover:bg-white dark:bg-zinc-900/50 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          className="mt-2 w-full border-2 border-dashed border-border bg-card px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:border-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           + Crear tarea
         </button>
@@ -398,20 +343,6 @@ export function KanbanBoard({
     return totals;
   }, [collaboratorLanes, ticketsByLaneAndColumn]);
 
-  const headerToneClass: Record<ColumnTone, string> = {
-    backlog: "bg-zinc-100/70 dark:bg-zinc-900/75",
-    progress: "bg-blue-50/55 dark:bg-blue-950/40",
-    done: "bg-emerald-50/55 dark:bg-emerald-950/40",
-    default: "bg-zinc-100/60 dark:bg-zinc-900/55",
-  };
-
-  const badgeToneClass: Record<ColumnTone, string> = {
-    backlog: "bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
-    progress: "bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-300",
-    done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/70 dark:text-emerald-300",
-    default: "bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
-  };
-
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveTicketId(null);
 
@@ -472,7 +403,7 @@ export function KanbanBoard({
 
   if (collaboratorLanes.length === 0) {
     return (
-      <div className="rounded-xl bg-white/70 p-6 text-center text-sm text-zinc-500 shadow-sm dark:bg-zinc-900/70 dark:text-zinc-400">
+      <div className="border-2 border-border bg-card p-6 text-center text-sm text-muted-foreground">
         No hay tickets asignados para mostrar el tablero por colaboradores.
       </div>
     );
@@ -493,28 +424,28 @@ export function KanbanBoard({
       <div className="overflow-x-auto pb-2">
         <div className="min-w-[1280px] space-y-3">
           <div className="grid gap-3" style={{ gridTemplateColumns }}>
-            <div className="px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                Colaboradores
-              </span>
+            <div className="flex items-end px-3 py-2">
+              <span className="eyebrow">Colaboradores</span>
             </div>
             {orderedColumns.map((column) => {
-              const tone = getColumnTone(column.name);
               const count = filteredCountByColumn.get(column.id) ?? 0;
 
               return (
-                <div
-                  key={`header-${column.id}`}
-                  className={`rounded-2xl px-3 py-2 shadow-sm ${headerToneClass[tone]}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: column.color }} />
-                      <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">{column.name}</h3>
-                    </div>
-                    <span className={`rounded-full px-2 py-0.5 text-xs ${badgeToneClass[tone]}`}>
+                <div key={`header-${column.id}`} className="border-2 border-border bg-card">
+                  {/* Color arbitrario del usuario: barra superior de 3px, nunca
+                      fondo del texto (DESIGN_SYSTEM.md §3). */}
+                  <div
+                    className="h-[3px] w-full"
+                    style={{ backgroundColor: column.color }}
+                    aria-hidden
+                  />
+                  <div className="flex items-center justify-between gap-2 px-3 py-2">
+                    <h3 className="truncate font-display text-sm font-bold uppercase tracking-wide text-foreground">
+                      {column.name}
+                    </h3>
+                    <Badge variant="secondary" mono>
                       {count}
-                    </span>
+                    </Badge>
                   </div>
                 </div>
               );
@@ -527,22 +458,21 @@ export function KanbanBoard({
 
             return (
               <div key={lane.id} className="grid gap-3" style={{ gridTemplateColumns }}>
-                <aside className="rounded-2xl bg-white/85 p-3 shadow-sm dark:bg-zinc-900/75">
+                <aside className="border-2 border-border bg-card p-3">
                   <div className="mb-1 flex min-w-0 items-center gap-2">
                     {lane.user ? (
                       <MemberAvatar user={lane.user} size="sm" />
                     ) : (
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-semibold text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-border bg-muted text-xs font-semibold text-muted-foreground">
                         SA
                       </div>
                     )}
-                    <h4 className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">{lane.name}</h4>
+                    <h4 className="truncate text-sm font-semibold text-foreground">{lane.name}</h4>
                   </div>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">{total} tickets</p>
+                  <p className="font-mono text-xs tabular-nums text-muted-foreground">{total} tickets</p>
                 </aside>
 
                 {orderedColumns.map((column) => {
-                  const tone = getColumnTone(column.name);
                   const columnTickets = laneColumns?.get(column.id) ?? [];
                   const hadTicketsBeforeFilter =
                     (allTicketsCountByLaneColumn.get(`${lane.id}::${column.id}`) ?? 0) > 0;
@@ -555,7 +485,6 @@ export function KanbanBoard({
                       column={column}
                       columnTickets={columnTickets}
                       canMutate={canMutate}
-                      tone={tone}
                       isFilteredEmpty={isFilteredEmpty}
                       onOpenTicket={onOpenTicket}
                       onCreateTicket={onCreateTicket}
@@ -570,7 +499,12 @@ export function KanbanBoard({
       <DragOverlay adjustScale={false} dropAnimation={null}>
         {activeTicket ? (
           <div className="w-[300px] cursor-grabbing opacity-95">
-            <TicketCard ticket={activeTicket} onOpen={onOpenTicket} className="shadow-xl shadow-black/20" />
+            {/* Sombra dura SOLO mientras se arrastra (dark: sombra flotante). */}
+            <TicketCard
+              ticket={activeTicket}
+              onOpen={onOpenTicket}
+              className="shadow-hard dark:shadow-hard-float"
+            />
           </div>
         ) : null}
       </DragOverlay>

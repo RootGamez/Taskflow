@@ -37,11 +37,10 @@ function getTriggerLabel(preset: DateFilterPreset, from: string | null, to: stri
 }
 
 const chipBaseClass =
-  "rounded-full border px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400";
-const chipActiveClass =
-  "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/50 dark:text-blue-300";
+  "border-2 px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const chipActiveClass = "border-primary bg-primary/10 text-primary";
 const chipInactiveClass =
-  "border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-zinc-800";
+  "border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground";
 
 export function TicketDateFilter() {
   const [open, setOpen] = useState(false);
@@ -99,10 +98,7 @@ export function TicketDateFilter() {
           variant="outline"
           size="sm"
           aria-label="Filtrar tickets por fecha"
-          className={cn(
-            "h-9 gap-2",
-            isActive && "border-blue-400 text-blue-700 dark:border-blue-600 dark:text-blue-300",
-          )}
+          className={cn("h-9 gap-2", isActive && "border-primary text-primary")}
         >
           <CalendarRange className="h-4 w-4" />
           {triggerLabel}
@@ -110,9 +106,7 @@ export function TicketDateFilter() {
       </PopoverTrigger>
       <PopoverContent className="w-72 space-y-3" align="start">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-            Filtrar por fecha
-          </span>
+          <span className="eyebrow">Filtrar por fecha</span>
           {isActive ? (
             <Button
               type="button"
@@ -144,7 +138,7 @@ export function TicketDateFilter() {
           })}
         </div>
 
-        <div className="space-y-2 border-t border-zinc-100 pt-2 dark:border-zinc-800/50">
+        <div className="space-y-2 border-t-2 border-border pt-2">
           <button
             type="button"
             aria-pressed={isCustomActive}

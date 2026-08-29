@@ -665,7 +665,7 @@ export function TicketDetail({
         <DialogContent
           ref={dialogContentRef}
           showCloseButton={false}
-          className="flex max-h-[90dvh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 shadow-2xl dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:left-0 max-sm:top-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
+          className="flex h-[100dvh] max-h-[100dvh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 shadow-2xl dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:w-full max-sm:max-w-none max-sm:rounded-none"
           onInteractOutside={(event) => {
             if (shouldKeepDialogOpen(event.target)) {
               event.preventDefault();

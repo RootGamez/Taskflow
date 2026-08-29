@@ -4,6 +4,7 @@ import { Rocket } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/shadcn/popover";
 import { useSprints } from "@/features/sprints/hooks/useSprints";
 import { useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import { useWorkspaceStore } from "@/store/workspaceStore";
 
 interface TicketSprintsRowProps {
   ticketId: string;
@@ -29,7 +30,8 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export function TicketSprintsRow({ ticketId, projectId, sprintIds, canEdit }: TicketSprintsRowProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: sprints = [] } = useSprints(projectId);
+  const workspaceSlug = useWorkspaceStore((state) => state.activeWorkspace?.slug ?? "");
+  const { data: sprints = [] } = useSprints(workspaceSlug);
   const updateTicket = useUpdateTicket(projectId);
 
   const selected = useMemo(() => new Set(sprintIds), [sprintIds]);
@@ -78,7 +80,7 @@ export function TicketSprintsRow({ ticketId, projectId, sprintIds, canEdit }: Ti
               sideOffset={4}
             >
               {sprints.length === 0 ? (
-                <p className="px-3 py-2 text-sm text-zinc-400">Este proyecto no tiene sprints.</p>
+                <p className="px-3 py-2 text-sm text-zinc-400">Este espacio no tiene sprints.</p>
               ) : (
                 <ul className="max-h-64 overflow-y-auto">
                   {sprints.map((sprint) => {

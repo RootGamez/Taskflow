@@ -9,7 +9,7 @@ export {
   completeSprint,
   createSprint,
   deleteSprint,
-  getSprintsByProject,
+  getSprintsByWorkspace,
   updateSprint,
 } from "@/features/sprints/api/sprintsApi";
 export type { CreateSprintPayload, UpdateSprintPayload } from "@/features/sprints/api/sprintsApi";
@@ -24,4 +24,4 @@ export {
 export { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
 export { filterTicketsBySprint } from "@/features/sprints/utils/filterTicketsBySprint";
 export { daysRemaining, progressPercent } from "@/features/sprints/utils/sprintProgress";
-export type { Sprint, SprintScope, SprintStatus } from "@/features/sprints/types/sprint.types";
+export type { Sprint, SprintScope, SprintStatus, WorkspaceStatus } from "@/features/sprints/types/sprint.types";

@@ -15,9 +15,12 @@ interface TicketCardProps {
   onOpen: (ticket: Ticket) => void;
   tone?: "backlog" | "progress" | "done" | "default";
   className?: string;
+  /** Muestra a qué proyecto pertenece el ticket. Se usa en el tablero de
+   * sprint, que cruza proyectos. Si se omite, usa `ticket.project`. */
+  showProject?: boolean;
 }
 
-export function TicketCard({ ticket, onOpen, tone = "default", className = "" }: TicketCardProps) {
+export function TicketCard({ ticket, onOpen, tone = "default", className = "", showProject = false }: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
   const priorityStyle = PRIORITY_STYLES[ticket.priority];
@@ -42,6 +45,12 @@ export function TicketCard({ ticket, onOpen, tone = "default", className = "" }:
       onClick={() => onOpen(ticket)}
       className={`w-full rounded-xl p-3 text-left transition-[box-shadow,background-color] duration-150 hover:shadow-md ${toneCardClass[tone]} ${className}`}
     >
+      {showProject && ticket.project ? (
+        <span className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ticket.project.color }} />
+          {ticket.project.key ?? ticket.project.name}
+        </span>
+      ) : null}
       <p className="line-clamp-2 text-sm font-medium text-zinc-900 dark:text-zinc-50">{ticket.title}</p>
       <div className="mt-3 flex items-center justify-between">
         <div className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs ${priorityStyle.bgClass} ${priorityStyle.textClass}`}>

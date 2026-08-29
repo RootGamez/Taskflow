@@ -9,10 +9,25 @@ export interface Label {
   color: string;
 }
 
+/** Proyecto embebido en el payload del ticket (lo agrega el backend en
+ * TicketSerializer). El tablero de sprint cruza proyectos, asi que cada
+ * ticket necesita saber a cual pertenece. Opcional: fixtures viejos de
+ * tests no lo setean. */
+export interface TicketProject {
+  id: string;
+  name: string;
+  key: string | null;
+  color: string;
+}
+
 export interface Ticket {
   id: string;
   project_id: string;
+  project?: TicketProject;
   column_id: string;
+  /** Estado del espacio (columna del tablero de sprint) al que mapea la
+   * columna de proyecto del ticket. `null` si la columna no esta mapeada. */
+  workspace_status_id?: string | null;
   // Opcionales (no solo `| null`) a proposito: varios fixtures de tests
   // preexistentes (Fase 1, ej. `filterTicketsByDate.test.ts`,
   // `resolveDropOrder.test.ts`, y los de `src/features/calendar/**` del

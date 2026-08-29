@@ -26,7 +26,7 @@ beforeAll(() => {
 function buildSprint(overrides: Partial<Sprint> = {}): Sprint {
   return {
     id: "sprint-1",
-    project_id: "project-1",
+    workspace_id: "project-1",
     name: "Sprint 1",
     goal: "",
     start_date: "2026-09-01",
@@ -45,7 +45,7 @@ function renderSelector(canMutate = true) {
   function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
-  return render(<SprintSelector projectId="project-1" canMutate={canMutate} />, { wrapper: Wrapper });
+  return render(<SprintSelector workspaceSlug="space-1" canMutate={canMutate} />, { wrapper: Wrapper });
 }
 
 describe("SprintSelector", () => {
@@ -55,7 +55,7 @@ describe("SprintSelector", () => {
   });
 
   it('renders "Todos" and "Backlog" even with zero sprints', async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const user = userEvent.setup();
     renderSelector();
 
@@ -68,7 +68,7 @@ describe("SprintSelector", () => {
   it("highlights the active sprint first in the list", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
     const active = buildSprint({ id: "sprint-active", name: "Activo", status: "active" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned, active]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned, active]);
     const user = userEvent.setup();
     renderSelector();
 
@@ -81,7 +81,7 @@ describe("SprintSelector", () => {
 
   it("calls setScope when a sprint is selected", async () => {
     const sprint = buildSprint({ id: "sprint-1", name: "Sprint 1" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([sprint]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([sprint]);
     const user = userEvent.setup();
     renderSelector();
 
@@ -92,7 +92,7 @@ describe("SprintSelector", () => {
   });
 
   it('hides "+ Nuevo sprint" when canMutate is false', async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const user = userEvent.setup();
     renderSelector(false);
 
@@ -104,7 +104,7 @@ describe("SprintSelector", () => {
 
   it("hides activate/delete affordances for a planned sprint when canMutate is false", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const user = userEvent.setup();
     renderSelector(false);
 
@@ -117,7 +117,7 @@ describe("SprintSelector", () => {
 
   it("activates a planned sprint when 'Activar' is clicked", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const activateSpy = vi.spyOn(sprintsApi, "activateSprint").mockResolvedValue({
       ...planned,
       status: "active",
@@ -128,12 +128,12 @@ describe("SprintSelector", () => {
     await user.click(screen.getByRole("button", { name: "Filtrar tickets por sprint" }));
     await user.click(await screen.findByText("Activar"));
 
-    expect(activateSpy).toHaveBeenCalledWith("project-1", "sprint-planned");
+    expect(activateSpy).toHaveBeenCalledWith("space-1", "sprint-planned");
   });
 
   it("opens the delete dialog and confirms deletion for a sprint", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned", ticket_count: 2 });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const deleteSpy = vi.spyOn(sprintsApi, "deleteSprint").mockResolvedValue(undefined);
     useSprintScopeStore.setState({ scope: { kind: "sprint", sprintId: "sprint-planned" } });
     const user = userEvent.setup();
@@ -143,12 +143,12 @@ describe("SprintSelector", () => {
     await user.click(await screen.findByLabelText("Eliminar Planeado"));
     await user.click(await screen.findByRole("button", { name: "Eliminar sprint" }));
 
-    expect(deleteSpy).toHaveBeenCalledWith("project-1", "sprint-planned");
+    expect(deleteSpy).toHaveBeenCalledWith("space-1", "sprint-planned");
     expect(useSprintScopeStore.getState().scope).toEqual({ kind: "all" });
   });
 
   it("creates a sprint through the '+ Nuevo sprint' flow and selects it", async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const createSpy = vi.spyOn(sprintsApi, "createSprint").mockResolvedValue(
       buildSprint({ id: "sprint-new", name: "Sprint nuevo" }),
     );
@@ -163,7 +163,7 @@ describe("SprintSelector", () => {
     await user.type(screen.getByLabelText("Fin"), "2026-09-14");
     await user.click(screen.getByRole("button", { name: "Crear sprint" }));
 
-    expect(createSpy).toHaveBeenCalledWith("project-1", {
+    expect(createSpy).toHaveBeenCalledWith("space-1", {
       name: "Sprint nuevo",
       start_date: "2026-09-01",
       end_date: "2026-09-14",
@@ -173,7 +173,7 @@ describe("SprintSelector", () => {
   });
 
   it("surfaces an error toast when creating a sprint fails", async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     vi.spyOn(sprintsApi, "createSprint").mockRejectedValue(new Error("network error"));
     const user = userEvent.setup();
     renderSelector();
@@ -191,7 +191,7 @@ describe("SprintSelector", () => {
   });
 
   it('selecting "Todos" updates the trigger label', async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     useSprintScopeStore.setState({ scope: { kind: "backlog" } });
     const user = userEvent.setup();
     renderSelector();
@@ -206,7 +206,7 @@ describe("SprintSelector", () => {
   });
 
   it('selecting "Backlog" updates the trigger label', async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const user = userEvent.setup();
     renderSelector();
 
@@ -221,7 +221,7 @@ describe("SprintSelector", () => {
 
   it("selects a sprint via keyboard (Enter)", async () => {
     const sprint = buildSprint({ id: "sprint-1", name: "Sprint 1" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([sprint]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([sprint]);
     const user = userEvent.setup();
     renderSelector();
 
@@ -236,7 +236,7 @@ describe("SprintSelector", () => {
 
   it("surfaces an error toast when activating a sprint fails", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const activateSpy = vi.spyOn(sprintsApi, "activateSprint").mockRejectedValue(new Error("boom"));
     const user = userEvent.setup();
     renderSelector();
@@ -249,7 +249,7 @@ describe("SprintSelector", () => {
 
   it("surfaces an error toast when deleting a sprint fails", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const deleteSpy = vi.spyOn(sprintsApi, "deleteSprint").mockRejectedValue(new Error("boom"));
     const user = userEvent.setup();
     renderSelector();
@@ -264,7 +264,7 @@ describe("SprintSelector", () => {
   });
 
   it("closes the create modal without creating when 'Cancelar' is clicked", async () => {
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const createSpy = vi.spyOn(sprintsApi, "createSprint");
     const user = userEvent.setup();
     renderSelector();
@@ -279,7 +279,7 @@ describe("SprintSelector", () => {
 
   it("closes the delete dialog without deleting when 'Cancelar' is clicked", async () => {
     const planned = buildSprint({ id: "sprint-planned", name: "Planeado", status: "planned" });
-    vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([planned]);
+    vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([planned]);
     const deleteSpy = vi.spyOn(sprintsApi, "deleteSprint");
     const user = userEvent.setup();
     renderSelector();

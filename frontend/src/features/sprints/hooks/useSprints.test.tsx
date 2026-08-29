@@ -13,7 +13,6 @@ import {
   useUpdateSprint,
 } from "@/features/sprints/hooks/useSprints";
 import { sprintQueryKeys } from "@/features/sprints/lib/sprintQueryKeys";
-import { ticketQueryKeys } from "@/features/tickets/lib/ticketQueryKeys";
 import type { Sprint } from "@/features/sprints/types/sprint.types";
 
 function createWrapper(queryClient: QueryClient) {
@@ -31,7 +30,7 @@ describe("useSprints", () => {
     const sprints: Sprint[] = [
       {
         id: "sprint-1",
-        project_id: "project-1",
+        workspace_id: "project-1",
         name: "Sprint 1",
         goal: "",
         start_date: "2026-09-01",
@@ -43,7 +42,7 @@ describe("useSprints", () => {
         updated_at: "2026-01-01T00:00:00Z",
       },
     ];
-    const spy = vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue(sprints);
+    const spy = vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue(sprints);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const { result } = renderHook(() => useSprints("project-1"), { wrapper: createWrapper(queryClient) });
@@ -55,7 +54,7 @@ describe("useSprints", () => {
   });
 
   it("does not fire when projectId is empty", () => {
-    const spy = vi.spyOn(sprintsApi, "getSprintsByProject").mockResolvedValue([]);
+    const spy = vi.spyOn(sprintsApi, "getSprintsByWorkspace").mockResolvedValue([]);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const { result } = renderHook(() => useSprints(""), { wrapper: createWrapper(queryClient) });
@@ -142,6 +141,6 @@ describe("useSprints", () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sprintQueryKeys.list("project-1") });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ticketQueryKeys.list("project-1") });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["tickets"] });
   });
 });

@@ -17,7 +17,7 @@ import type { Sprint, SprintScope } from "@/features/sprints/types/sprint.types"
 import { getApiErrorMessage } from "@/lib/errors";
 
 interface SprintSelectorProps {
-  projectId: string;
+  workspaceSlug: string;
   canMutate: boolean;
 }
 
@@ -37,20 +37,24 @@ function scopeLabel(scope: SprintScope, sprints: Sprint[]): string {
   if (scope.kind === "backlog") {
     return "Backlog";
   }
+  if (scope.kind === "current") {
+    const active = sprints.find((sprint) => sprint.status === "active");
+    return active ? active.name : "Sprint actual";
+  }
   return sprints.find((sprint) => sprint.id === scope.sprintId)?.name ?? "Sprint";
 }
 
-export function SprintSelector({ projectId, canMutate }: SprintSelectorProps) {
+export function SprintSelector({ workspaceSlug, canMutate }: SprintSelectorProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Sprint | null>(null);
 
-  const { data: sprints = [] } = useSprints(projectId);
+  const { data: sprints = [] } = useSprints(workspaceSlug);
   const scope = useSprintScopeStore((state) => state.scope);
   const setScope = useSprintScopeStore((state) => state.setScope);
-  const createSprintMutation = useCreateSprint(projectId);
-  const activateSprintMutation = useActivateSprint(projectId);
-  const deleteSprintMutation = useDeleteSprint(projectId);
+  const createSprintMutation = useCreateSprint(workspaceSlug);
+  const activateSprintMutation = useActivateSprint(workspaceSlug);
+  const deleteSprintMutation = useDeleteSprint(workspaceSlug);
 
   const orderedSprints = useMemo(() => sortSprintsForMenu(sprints), [sprints]);
 

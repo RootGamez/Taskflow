@@ -5,32 +5,33 @@ import {
   completeSprint,
   createSprint,
   deleteSprint,
-  getSprintsByProject,
+  getSprintsByWorkspace,
   updateSprint,
 } from "@/features/sprints/api/sprintsApi";
 import { sprintQueryKeys } from "@/features/sprints/lib/sprintQueryKeys";
-import { ticketQueryKeys } from "@/features/tickets/lib/ticketQueryKeys";
 
-export function useSprints(projectId: string) {
+/** Sprints del espacio. `workspaceSlug` reemplaza al `projectId` de antes:
+ * un sprint ya no pertenece a un proyecto sino al espacio entero. */
+export function useSprints(workspaceSlug: string) {
   return useQuery({
-    queryKey: sprintQueryKeys.list(projectId),
-    queryFn: () => getSprintsByProject(projectId),
-    enabled: Boolean(projectId),
+    queryKey: sprintQueryKeys.list(workspaceSlug),
+    queryFn: () => getSprintsByWorkspace(workspaceSlug),
+    enabled: Boolean(workspaceSlug),
   });
 }
 
-export function useCreateSprint(projectId: string) {
+export function useCreateSprint(workspaceSlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: Parameters<typeof createSprint>[1]) => createSprint(projectId, payload),
+    mutationFn: (payload: Parameters<typeof createSprint>[1]) => createSprint(workspaceSlug, payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(workspaceSlug) });
     },
   });
 }
 
-export function useUpdateSprint(projectId: string) {
+export function useUpdateSprint(workspaceSlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -40,46 +41,46 @@ export function useUpdateSprint(projectId: string) {
     }: {
       sprintId: string;
       payload: Parameters<typeof updateSprint>[2];
-    }) => updateSprint(projectId, sprintId, payload),
+    }) => updateSprint(workspaceSlug, sprintId, payload),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(workspaceSlug) });
     },
   });
 }
 
-export function useActivateSprint(projectId: string) {
+export function useActivateSprint(workspaceSlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sprintId: string) => activateSprint(projectId, sprintId),
+    mutationFn: (sprintId: string) => activateSprint(workspaceSlug, sprintId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(workspaceSlug) });
     },
   });
 }
 
-export function useCompleteSprint(projectId: string) {
+export function useCompleteSprint(workspaceSlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sprintId: string) => completeSprint(projectId, sprintId),
+    mutationFn: (sprintId: string) => completeSprint(workspaceSlug, sprintId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(workspaceSlug) });
     },
   });
 }
 
-export function useDeleteSprint(projectId: string) {
+export function useDeleteSprint(workspaceSlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (sprintId: string) => deleteSprint(projectId, sprintId),
+    mutationFn: (sprintId: string) => deleteSprint(workspaceSlug, sprintId),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(projectId) });
-      // Borrar un sprint manda sus tickets de vuelta al Backlog (SET_NULL
-      // en el backend, RA1): la lista de tickets cacheada queda con
-      // `sprint_id` viejo hasta que tambien se invalide.
-      void queryClient.invalidateQueries({ queryKey: ticketQueryKeys.list(projectId) });
+      void queryClient.invalidateQueries({ queryKey: sprintQueryKeys.list(workspaceSlug) });
+      // Borrar un sprint saca sus tickets del sprint: hay que refrescar
+      // cualquier lista de tickets cacheada.
+      void queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      void queryClient.invalidateQueries({ queryKey: ["sprint-board"] });
     },
   });
 }

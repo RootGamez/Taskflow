@@ -1,5 +1,5 @@
 import { Button } from "@heroui/react";
-import { ChevronLeft, ChevronRight, FileText, FolderKanban, KanbanSquare, LayoutDashboard, ListTodo, Settings, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, FolderKanban, FolderOpen, KanbanSquare, LayoutDashboard, ListTodo, Rocket, Settings, SlidersHorizontal, Users } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { PageTreeNav } from "@/features/pages/components/PageTreeNav";
@@ -54,22 +54,53 @@ export function Sidebar({ variant = "fixed", onNavigate }: SidebarProps = {}) {
         ) : null}
       </div>
 
-      <div className="px-3">
-        {!sidebarCollapsed ? <p className="mb-2 text-xs font-medium text-zinc-500">Proyectos</p> : null}
-        <div className="space-y-1">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              to={`/workspaces/${workspaceSlug}/projects/${project.id}/board`}
-              onClick={onNavigate}
-              className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
-              {!sidebarCollapsed ? <span className="truncate">{project.name}</span> : null}
-            </Link>
-          ))}
+      {workspaceSlug ? (
+        <nav className="space-y-1 px-3">
+          {[
+            { to: `/workspaces/${workspaceSlug}`, icon: Rocket, label: "Tablero de sprint" },
+            { to: `/workspaces/${workspaceSlug}/sprints`, icon: KanbanSquare, label: "Sprints" },
+            { to: `/workspaces/${workspaceSlug}/statuses`, icon: SlidersHorizontal, label: "Estados" },
+            { to: `/workspaces/${workspaceSlug}/projects`, icon: FolderOpen, label: "Proyectos" },
+          ].map((item) => {
+            const active = location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                onClick={onNavigate}
+                className={cn(
+                  "flex items-center gap-2 rounded-md px-2 py-2.5 text-sm",
+                  active
+                    ? "bg-brand-50 font-medium text-brand-700"
+                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {!sidebarCollapsed ? <span>{item.label}</span> : null}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
+
+      {projects.length > 0 ? (
+        <div className="mt-4 px-3">
+          {!sidebarCollapsed ? <p className="mb-2 text-xs font-medium text-zinc-500">Proyectos</p> : null}
+          <div className="space-y-1">
+            {projects.map((project) => (
+              <Link
+                key={project.id}
+                to={`/workspaces/${workspaceSlug}/projects/${project.id}/board`}
+                onClick={onNavigate}
+                className="flex items-center gap-2 rounded-md px-2 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: project.color }} />
+                {!sidebarCollapsed ? <span className="truncate">{project.name}</span> : null}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <nav className="mt-4 space-y-1 px-3">
         {[

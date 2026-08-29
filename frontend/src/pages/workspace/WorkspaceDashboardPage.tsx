@@ -7,6 +7,9 @@ import { useParams } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Button as ShadcnButton } from "@/components/ui/shadcn/button";
+import { WeeklyBoardWidget } from "@/features/goals/components/WeeklyBoardWidget";
+import { QuickCreatePopover } from "@/features/tickets/components/QuickCreatePopover";
 import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
 import { ProjectDeleteDialog } from "@/features/projects/components/ProjectDeleteDialog";
 import { ProjectList } from "@/features/projects/components/ProjectList";
@@ -113,11 +116,30 @@ export default function WorkspaceDashboardPage() {
   };
 
   return (
-    <div>
+    <div className="space-y-6">
+      {workspaceSlug ? <WeeklyBoardWidget workspaceSlug={workspaceSlug} /> : null}
+
       <PageHeader
+        eyebrow="Espacio"
         title="Panel del espacio"
         subtitle={`Espacio: ${workspaceSlug}`}
-        actions={canMutate ? <Button color="primary" onPress={() => setCreateModalOpen(true)}>Nuevo proyecto</Button> : undefined}
+        actions={
+          canMutate ? (
+            <div className="flex items-center gap-2">
+              {/* RD-7 §9: sin contexto de columna, un popover chico (Proyecto +
+                  Columna) — no un modal — resuelve dónde va el ticket y navega
+                  directo a su detalle. */}
+              <QuickCreatePopover workspaceSlug={workspaceSlug}>
+                <ShadcnButton type="button" variant="outline">
+                  Nuevo ticket
+                </ShadcnButton>
+              </QuickCreatePopover>
+              <Button color="primary" className="rounded-none" onPress={() => setCreateModalOpen(true)}>
+                Nuevo proyecto
+              </Button>
+            </div>
+          ) : undefined
+        }
       />
       {projects.length === 0 ? (
         <EmptyState

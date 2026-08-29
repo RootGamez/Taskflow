@@ -48,9 +48,12 @@ export default function MyTasksPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-border pb-4">
         <div className="space-y-1">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Mis tareas</h1>
+          <p className="eyebrow mb-1">Legajo personal</p>
+          <h1 className="font-display text-fluid-xl font-bold tracking-tight text-foreground">
+            Mis tareas
+          </h1>
           <MyTasksSummary tasks={filteredTasks} />
         </div>
         <TicketDateFilter />

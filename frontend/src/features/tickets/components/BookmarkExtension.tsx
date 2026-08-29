@@ -69,7 +69,7 @@ export function BookmarkNode({ node }: NodeViewProps) {
         contentEditable={false}
         role="link"
         tabIndex={0}
-        className="my-4 flex cursor-pointer select-none flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white transition hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:bg-zinc-800/80 sm:flex-row"
+        className="my-4 flex cursor-pointer select-none flex-col overflow-hidden rounded border-2 border-border bg-card transition hover:bg-accent sm:flex-row"
         onClick={() => window.open(safeUrl, "_blank", "noopener,noreferrer")}
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
@@ -81,26 +81,26 @@ export function BookmarkNode({ node }: NodeViewProps) {
         <div className="flex flex-1 flex-col justify-center p-4">
           {loading ? (
             <div className="animate-pulse space-y-3">
-              <div className="h-4 w-3/4 rounded bg-zinc-200 dark:bg-zinc-700" />
-              <div className="h-3 w-1/2 rounded bg-zinc-100 dark:bg-zinc-800" />
-              <div className="h-3 w-1/4 rounded bg-zinc-100 dark:bg-zinc-800" />
+              <div className="h-4 w-3/4 rounded bg-muted" />
+              <div className="h-3 w-1/2 rounded bg-muted" />
+              <div className="h-3 w-1/4 rounded bg-muted" />
             </div>
           ) : error ? (
-            <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
               <span className="truncate">No se pudo cargar la vista previa de {safeHostname(safeUrl)}</span>
             </div>
           ) : (
             <div className="space-y-1">
-              <h4 className="mb-1 line-clamp-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              <h4 className="mb-1 line-clamp-1 text-sm font-semibold text-foreground">
                 {data?.title || safeHostname(safeUrl)}
               </h4>
               {data?.description ? (
-                <p className="line-clamp-2 text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="line-clamp-2 text-xs text-muted-foreground">
                   {data.description}
                 </p>
               ) : null}
-              <div className="mt-2 flex items-center gap-2 text-xs text-zinc-400">
+              <div className="mt-2 flex items-center gap-2 font-mono text-xs text-muted-foreground">
                 <LinkIcon className="h-3 w-3" />
                 <span className="truncate">{data?.publisher || safeHostname(safeUrl)}</span>
               </div>
@@ -108,7 +108,7 @@ export function BookmarkNode({ node }: NodeViewProps) {
           )}
         </div>
         {previewImage && !loading && !error ? (
-          <div className="h-32 w-full shrink-0 border-t border-zinc-100 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-950 sm:h-auto sm:w-1/3 sm:border-l sm:border-t-0">
+          <div className="h-32 w-full shrink-0 border-t-2 border-border bg-muted sm:h-auto sm:w-1/3 sm:border-l-2 sm:border-t-0">
             <img
               src={previewImage}
               alt={data?.title || "Vista previa"}

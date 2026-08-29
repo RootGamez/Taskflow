@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Button, Input } from "@heroui/react";
+import { Button } from "@heroui/react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
 
+import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getApiErrorMessage } from "@/lib/errors";
 
@@ -40,22 +42,28 @@ export function ForgotPasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={onSubmit} noValidate>
-      <Input
-        label="Email"
-        type="email"
-        value={email}
-        onValueChange={setEmail}
-      />
+      <div className="space-y-1.5">
+        <Label htmlFor="forgot-email">Email</Label>
+        <Input
+          id="forgot-email"
+          type="email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+        />
+      </div>
       <Button
         color="primary"
         type="submit"
-        className="w-full"
+        className="w-full rounded-none"
         isLoading={requestPasswordResetMutation.isPending}
       >
         Enviar enlace de recuperacion
       </Button>
-      <p className="text-sm text-zinc-500">
-        ¿Recordaste tu contraseña? <Link to="/login" className="text-brand-600">Inicia sesión</Link>
+      <p className="text-sm text-muted-foreground">
+        ¿Recordaste tu contraseña?{" "}
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          Inicia sesión
+        </Link>
       </p>
     </form>
   );

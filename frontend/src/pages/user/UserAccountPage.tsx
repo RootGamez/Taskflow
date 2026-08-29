@@ -1,4 +1,4 @@
-import { Button, Card, Switch } from "@heroui/react";
+import { Button, Switch } from "@heroui/react";
 import { Settings } from "lucide-react";
 import { useState } from "react";
 import { toast } from "react-hot-toast";
@@ -42,67 +42,71 @@ export function UserAccountPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold dark:text-zinc-50">
-          <Settings className="h-6 w-6" />
+      <div className="border-b-2 border-border pb-4">
+        <p className="eyebrow mb-1">Cuenta</p>
+        <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-foreground">
+          <span className="boxed-icon h-8 w-8">
+            <Settings className="h-4 w-4" />
+          </span>
           Configuración de cuenta
         </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Gestiona las preferencias de tu cuenta</p>
+        <p className="mt-1 text-sm text-muted-foreground">Gestiona las preferencias de tu cuenta</p>
       </div>
 
       {/* Información de la cuenta */}
-      <Card className="p-6 dark:bg-zinc-800">
-        <h2 className="mb-4 text-lg font-semibold dark:text-zinc-50">Información de tu cuenta</h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between rounded-lg bg-zinc-100 p-3 dark:bg-zinc-700">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">Email</span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-50">{user?.email}</span>
+      <section className="space-y-3">
+        <p className="eyebrow text-foreground">Información de tu cuenta</p>
+        <dl className="divide-y-2 divide-border border-2 border-border">
+          <div className="flex items-center justify-between gap-3 bg-card px-3 py-2.5">
+            <dt className="text-sm text-muted-foreground">Email</dt>
+            <dd className="font-mono text-sm font-medium text-foreground">{user?.email}</dd>
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-zinc-100 p-3 dark:bg-zinc-700">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">Nombre</span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-50">{user?.full_name}</span>
+          <div className="flex items-center justify-between gap-3 bg-card px-3 py-2.5">
+            <dt className="text-sm text-muted-foreground">Nombre</dt>
+            <dd className="text-sm font-medium text-foreground">{user?.full_name}</dd>
           </div>
-          <div className="flex items-center justify-between rounded-lg bg-zinc-100 p-3 dark:bg-zinc-700">
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">Cuenta creada</span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-50">{new Date(user?.created_at ?? "").toLocaleDateString()}</span>
+          <div className="flex items-center justify-between gap-3 bg-card px-3 py-2.5">
+            <dt className="text-sm text-muted-foreground">Cuenta creada</dt>
+            <dd className="font-mono text-sm font-medium text-foreground">
+              {new Date(user?.created_at ?? "").toLocaleDateString()}
+            </dd>
           </div>
-        </div>
-      </Card>
+        </dl>
+      </section>
 
       {/* Preferencias de notificaciones */}
-      <Card className="p-6 dark:bg-zinc-800">
-        <h2 className="mb-4 text-lg font-semibold dark:text-zinc-50">Notificaciones</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-zinc-900 dark:text-zinc-50">Notificaciones por email</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">Recibe actualizaciones por email</p>
-            </div>
-            <Switch isSelected={emailNotifications} onValueChange={setEmailNotifications} />
+      <section className="space-y-4 border-t-2 border-border pt-6">
+        <p className="eyebrow text-foreground">Notificaciones</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-foreground">Notificaciones por email</p>
+            <p className="text-sm text-muted-foreground">Recibe actualizaciones por email</p>
           </div>
-          <div className="flex items-center justify-between border-t border-zinc-200 pt-4 dark:border-zinc-700">
-            <div>
-              <p className="font-medium text-zinc-900 dark:text-zinc-50">Notificaciones push</p>
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">Recibe notificaciones del navegador</p>
-            </div>
-            <Switch isSelected={pushNotifications} onValueChange={setPushNotifications} />
-          </div>
-          <Button color="primary" onPress={handleSaveNotifications} className="mt-4">
-            Guardar preferencias
-          </Button>
+          <Switch isSelected={emailNotifications} onValueChange={setEmailNotifications} />
         </div>
-      </Card>
+        <div className="flex items-center justify-between border-t-2 border-border pt-4">
+          <div>
+            <p className="font-medium text-foreground">Notificaciones push</p>
+            <p className="text-sm text-muted-foreground">Recibe notificaciones del navegador</p>
+          </div>
+          <Switch isSelected={pushNotifications} onValueChange={setPushNotifications} />
+        </div>
+        <Button color="primary" className="rounded-none" onPress={handleSaveNotifications}>
+          Guardar preferencias
+        </Button>
+      </section>
 
       {/* Zona de peligro */}
-      <Card className="border-red-200 p-6 dark:border-red-900 dark:bg-zinc-800">
-        <h2 className="mb-4 text-lg font-semibold text-red-600 dark:text-red-400">Zona de peligro</h2>
-        <p className="mb-4 text-sm text-zinc-600 dark:text-zinc-400">
-          Una vez que desactives tu cuenta, no hay vuelta atrás. Por favor, asegúrate de que esto es lo que deseas.
+      <section className="space-y-3 border-2 border-destructive bg-destructive/5 p-4">
+        <p className="eyebrow text-destructive">Zona de peligro</p>
+        <p className="text-sm text-foreground">
+          Una vez que desactives tu cuenta, no hay vuelta atrás. Por favor, asegúrate de que esto es
+          lo que deseas.
         </p>
-        <Button color="danger" onPress={handleDeactivateAccount}>
+        <Button color="danger" className="rounded-none" onPress={handleDeactivateAccount}>
           Desactivar cuenta
         </Button>
-      </Card>
+      </section>
     </div>
   );
 }

@@ -122,7 +122,7 @@ export function AppShell({ children }: AppShellProps) {
     // Sidebar/Topbar (y por lo tanto UserMenu, que abre el mismo dialogo
     // de ayuda via `shortcutsHelpDialogStore`).
     <GlobalShortcutsProvider>
-      <div className="flex h-[100dvh] bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex h-[100dvh] bg-background text-foreground">
         {/* Sidebar fijo solo en desktop (>= lg); en móvil/tablet va como drawer. */}
         {!isCompactNav ? <Sidebar /> : null}
 
@@ -151,22 +151,21 @@ export function AppShell({ children }: AppShellProps) {
         <KeyboardShortcutsDialog />
 
         {deletedWorkspaceName ? (
-          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/45 p-4 backdrop-blur-sm">
-            <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Espacio eliminado</h3>
-              <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4">
+            <div className="w-full max-w-md rounded border-2 border-border bg-card p-5 text-card-foreground shadow-hard-lg dark:shadow-hard-float">
+              <h3 className="font-display text-base font-bold tracking-tight text-foreground">
+                Espacio eliminado
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
                 {deletedWorkspaceName} fue eliminado.
               </p>
               <div className="mt-4 flex gap-3 justify-end">
-                <Button
-                  color="default"
-                  variant="light"
-                  onPress={closeModal}
-                >
+                <Button color="default" variant="bordered" className="rounded-none" onPress={closeModal}>
                   Entendido
                 </Button>
                 <Button
                   color="primary"
+                  className="rounded-none"
                   onPress={() => void redirectToFallbackWorkspace()}
                   isLoading={isRedirecting}
                 >

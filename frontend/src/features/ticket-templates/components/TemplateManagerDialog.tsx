@@ -85,14 +85,14 @@ export function TemplateManagerDialog({ projectId, isOpen, onOpenChange }: Templ
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] w-full max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-zinc-100 px-5 py-4 dark:border-zinc-800">
+        <DialogHeader className="border-b-2 border-border px-5 py-4">
           <DialogTitle>Administrar plantillas</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-zinc-100 p-3 dark:border-zinc-800">
+          <div className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r-2 border-border p-3">
             {templates.length === 0 ? (
-              <p className="px-1 py-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              <p className="px-1 py-2 text-center text-xs text-muted-foreground">
                 Este proyecto no tiene plantillas todavia. Crea la primera para reusar checklists comunes.
               </p>
             ) : (
@@ -101,19 +101,19 @@ export function TemplateManagerDialog({ projectId, isOpen, onOpenChange }: Templ
                   <li key={template.id}>
                     {pendingDeleteId === template.id ? (
                       <div className="flex flex-col gap-1 rounded px-2 py-1.5 text-xs">
-                        <span className="text-zinc-500 dark:text-zinc-400">¿Eliminar "{template.name}"?</span>
+                        <span className="text-muted-foreground">¿Eliminar "{template.name}"?</span>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             onClick={() => confirmDelete(template.id)}
-                            className="font-medium text-red-500 hover:text-red-600"
+                            className="font-medium text-destructive transition-colors hover:text-destructive/80"
                           >
                             Si, eliminar
                           </button>
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(null)}
-                            className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                            className="text-muted-foreground transition-colors hover:text-foreground"
                           >
                             Cancelar
                           </button>
@@ -124,9 +124,9 @@ export function TemplateManagerDialog({ projectId, isOpen, onOpenChange }: Templ
                         type="button"
                         onClick={() => handleSelect(template)}
                         aria-current={selectedId === template.id}
-                        className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800 ${
+                        className={`flex w-full items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent ${
                           selectedId === template.id
-                            ? "bg-violet-50 font-medium text-violet-700 dark:bg-violet-950/30 dark:text-violet-300"
+                            ? "bg-secondary font-medium text-foreground"
                             : ""
                         }`}
                       >
@@ -145,7 +145,7 @@ export function TemplateManagerDialog({ projectId, isOpen, onOpenChange }: Templ
                               requestDelete(template.id);
                             }
                           }}
-                          className="text-zinc-400 hover:text-red-500 dark:hover:text-red-400"
+                          className="text-muted-foreground transition-colors hover:text-destructive"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </span>
@@ -159,7 +159,7 @@ export function TemplateManagerDialog({ projectId, isOpen, onOpenChange }: Templ
             <button
               type="button"
               onClick={handleCreateNew}
-              className="mt-1 flex items-center gap-1 rounded px-2 py-1.5 text-left text-xs font-medium text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+              className="mt-1 flex items-center gap-1 rounded px-2 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-accent"
             >
               <Plus className="h-3.5 w-3.5" />
               Nueva plantilla

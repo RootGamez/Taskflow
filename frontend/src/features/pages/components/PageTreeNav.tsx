@@ -42,7 +42,7 @@ export function PageTreeNav({ workspaceSlug }: PageTreeNavProps) {
   const tree = buildPageTree(pages ?? []);
 
   if (tree.length === 0) {
-    return <p className="px-2 py-1.5 text-xs text-zinc-400">Sin páginas todavía.</p>;
+    return <p className="px-2 py-1.5 text-xs text-muted-foreground">Sin páginas todavía.</p>;
   }
 
   const expandableIds = collectExpandableIds(tree);

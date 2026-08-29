@@ -35,14 +35,14 @@ export function TicketSubtasksSection({ ticketId, projectId, canEdit }: TicketSu
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <ListChecks className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Subtareas</span>
+        <ListChecks className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium text-foreground">Subtareas</span>
       </div>
 
       <SubtaskProgressBar done={doneCount} total={subtasks.length} />
 
       {subtasks.length === 0 ? (
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">No hay subtareas todavia.</p>
+        <p className="text-xs text-muted-foreground">No hay subtareas todavia.</p>
       ) : (
         <ul className="flex flex-col gap-0.5">
           {subtasks.map((subtask) => (

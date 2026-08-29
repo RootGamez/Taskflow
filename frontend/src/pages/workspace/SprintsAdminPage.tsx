@@ -6,6 +6,7 @@ import { useNavigate, useParams } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Badge } from "@/components/ui/shadcn/badge";
 import { CreateSprintModal, type CreateSprintInput } from "@/features/sprints/components/CreateSprintModal";
 import { SprintDeleteDialog } from "@/features/sprints/components/SprintDeleteDialog";
 import {
@@ -24,6 +25,12 @@ const STATUS_LABEL: Record<Sprint["status"], string> = {
   planned: "Planeado",
   active: "Actual",
   completed: "Completado",
+};
+
+const STATUS_BADGE: Record<Sprint["status"], "primary" | "success" | "outline"> = {
+  planned: "outline",
+  active: "primary",
+  completed: "success",
 };
 
 export default function SprintsAdminPage() {
@@ -63,15 +70,16 @@ export default function SprintsAdminPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Espacio"
         title="Sprints del espacio"
         subtitle="El sprint marcado como actual es el que se abre al entrar al espacio"
         actions={
           <div className="flex gap-2">
-            <Button variant="light" onPress={() => navigate(`/workspaces/${workspaceSlug}`)}>
+            <Button variant="light" className="rounded-none" onPress={() => navigate(`/workspaces/${workspaceSlug}`)}>
               Ver tablero
             </Button>
             {canMutate ? (
-              <Button color="primary" onPress={() => setIsCreateOpen(true)}>
+              <Button color="primary" className="rounded-none" onPress={() => setIsCreateOpen(true)}>
                 Nuevo sprint
               </Button>
             ) : null}
@@ -87,23 +95,23 @@ export default function SprintsAdminPage() {
           action={canMutate ? { label: "Nuevo sprint", onClick: () => setIsCreateOpen(true) } : undefined}
         />
       ) : (
-        <ul className="space-y-2">
+        <ul className="divide-y-2 divide-border border-2 border-border">
           {sprints.map((sprint) => (
             <li
               key={sprint.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-zinc-200 bg-white p-3 dark:border-zinc-800 dark:bg-zinc-900"
+              className="flex flex-wrap items-center justify-between gap-3 bg-card p-3"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Rocket
-                    className={`h-4 w-4 ${sprint.status === "active" ? "text-primary" : "text-zinc-400"}`}
+                    className={`h-4 w-4 ${sprint.status === "active" ? "text-primary" : "text-muted-foreground"}`}
                   />
-                  <span className="font-medium text-zinc-900 dark:text-zinc-50">{sprint.name}</span>
-                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[11px] uppercase tracking-wide text-zinc-500 dark:bg-zinc-800">
+                  <span className="font-medium text-foreground">{sprint.name}</span>
+                  <Badge variant={STATUS_BADGE[sprint.status]} mono>
                     {STATUS_LABEL[sprint.status]}
-                  </span>
+                  </Badge>
                 </div>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1 font-mono text-xs text-muted-foreground">
                   {sprint.start_date} → {sprint.end_date} · {sprint.completed_ticket_count}/
                   {sprint.ticket_count} completados
                 </p>
@@ -115,6 +123,7 @@ export default function SprintsAdminPage() {
                     <Button
                       size="sm"
                       variant="flat"
+                      className="rounded-none"
                       startContent={<Circle className="h-3.5 w-3.5" />}
                       onPress={() =>
                         runAction(
@@ -130,6 +139,7 @@ export default function SprintsAdminPage() {
                     <Button
                       size="sm"
                       variant="flat"
+                      className="rounded-none"
                       startContent={<CheckCircle2 className="h-3.5 w-3.5" />}
                       onPress={() =>
                         runAction(
@@ -146,10 +156,11 @@ export default function SprintsAdminPage() {
                     isIconOnly
                     size="sm"
                     variant="light"
+                    className="rounded-none"
                     aria-label={`Eliminar ${sprint.name}`}
                     onPress={() => setDeleteTarget(sprint)}
                   >
-                    <Trash2 className="h-4 w-4 text-zinc-400" />
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </div>
               ) : null}

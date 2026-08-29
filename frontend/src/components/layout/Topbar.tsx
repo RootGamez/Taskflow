@@ -12,6 +12,9 @@ import { getWorkspaceDashboardPath } from "@/features/workspaces/lib/workspaceRo
 import { useAuthStore } from "@/store/authStore";
 import { useCommandPaletteStore } from "@/store/commandPaletteStore";
 
+const crumbLink =
+  "shrink-0 rounded-none px-1.5 py-1 font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
 export function Topbar() {
   const location = useLocation();
   const { workspaceSlug, projectId } = useParams();
@@ -35,31 +38,26 @@ export function Topbar() {
       : "Inicio";
 
   return (
-    <header className="flex h-14 items-center justify-between gap-2 border-b border-zinc-200 bg-white px-3 dark:border-zinc-800 dark:bg-zinc-900 sm:px-4">
+    <header className="flex h-14 items-center justify-between gap-2 border-b-2 border-border bg-card px-3 sm:px-4">
       <button
         type="button"
         aria-label="Abrir navegación"
         onClick={() => setMobileNavOpen(true)}
-        className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800 lg:hidden"
+        className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded border-2 border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground lg:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-        <Link
-          to="/workspaces"
-          className="hidden shrink-0 rounded-full px-2 py-1 font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 sm:inline-flex"
-        >
+      <div className="flex min-w-0 flex-1 items-center gap-1 text-sm">
+        <Link to="/workspaces" className={`${crumbLink} hidden sm:inline-flex`}>
           Espacios
         </Link>
         {workspaceSlug ? (
           <>
-            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-zinc-400 sm:block" />
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
             <Link
               to={getWorkspaceDashboardPath(workspaceSlug)}
               className={
-                "truncate rounded-full px-2 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50" +
-                // En móvil, si hay un proyecto abierto el nombre del proyecto es
-                // el contexto relevante: ocultamos el del espacio para no amontonar.
+                `${crumbLink} truncate text-foreground` +
                 (projectId ? " hidden sm:inline-flex" : "")
               }
             >
@@ -69,42 +67,41 @@ export function Topbar() {
         ) : null}
         {projectId ? (
           <>
-            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-zinc-400 sm:block" />
+            <ChevronRight className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground sm:block" />
             <Link
               to={`/workspaces/${workspaceSlug}/projects/${projectId}/board`}
-              className="truncate rounded-full px-2 py-1 font-medium text-zinc-700 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+              className={`${crumbLink} truncate text-foreground`}
             >
               {project?.name ?? "Proyecto"}
             </Link>
-            <span className="hidden shrink-0 rounded-full bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-900/30 dark:text-brand-200 sm:inline-flex">
+            <span className="hidden shrink-0 rounded border-[1.5px] border-primary bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-primary sm:inline-flex">
               {currentViewLabel}
             </span>
           </>
         ) : workspaceSlug ? (
-          <span className="shrink-0 rounded-full bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+          <span className="shrink-0 rounded border-[1.5px] border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             Vista del espacio
           </span>
         ) : null}
       </div>
       <div className="mx-4 hidden max-w-md flex-1 md:block">
-        {/* D26 de docs/PHASE_3_PLAN.md: el input muerto (sin `value`/
-            `onChange`) se reemplaza por un boton que abre el command
-            palette -- una sola caja de busqueda, dos formas de abrirla
-            (click aca o el atajo `Cmd/Ctrl+K` de WP-D). */}
+        {/* D26 de docs/PHASE_3_PLAN.md: el input muerto se reemplaza por un
+            boton que abre el command palette -- una sola caja de busqueda,
+            dos formas de abrirla. */}
         <button
           type="button"
           onClick={openCommandPalette}
           aria-label="Buscar tickets, proyectos y acciones"
-          className="flex w-full items-center gap-2 rounded-md border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-400 transition-colors hover:border-zinc-300 hover:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+          className="flex w-full items-center gap-2 rounded border-2 border-border bg-card px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:border-primary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Search className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left">Buscar tickets...</span>
-          <kbd className="hidden shrink-0 rounded border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-700 dark:bg-zinc-800 sm:inline-block">
+          <kbd className="hidden shrink-0 rounded border-[1.5px] border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-block">
             ⌘K
           </kbd>
         </button>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <NotificationBell />
         <UserMenu user={user} />
       </div>

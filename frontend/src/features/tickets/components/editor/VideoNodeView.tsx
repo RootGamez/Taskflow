@@ -34,23 +34,23 @@ export function VideoNodeView({ node, selected, deleteNode }: NodeViewProps) {
       {selected && !isUploading && (
         <div
           contentEditable={false}
-          className="mb-1.5 flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-fit"
+          className="mb-1.5 flex w-fit items-center gap-0.5 rounded border-2 border-border bg-card/95 p-0.5 shadow-hard dark:shadow-hard-float"
         >
           <button
             type="button"
             title="Copiar URL"
             onPointerDown={(e) => { e.preventDefault(); handleCopyUrl(); }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
           >
             <Copy className="h-3.5 w-3.5" />
             Copiar URL
           </button>
-          <div className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+          <div className="mx-1 h-4 w-px bg-border" />
           <button
             type="button"
             title="Eliminar video"
             onPointerDown={(e) => { e.preventDefault(); deleteNode(); }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Eliminar
@@ -62,20 +62,20 @@ export function VideoNodeView({ node, selected, deleteNode }: NodeViewProps) {
       <div
         contentEditable={false}
         style={{
-          border: selected ? "2px solid #3b82f6" : "2px solid transparent",
-          borderRadius: "0.5rem",
+          border: selected ? "2px solid hsl(var(--ring))" : "2px solid hsl(var(--border))",
+          borderRadius: "var(--radius)",
           overflow: "hidden",
-          boxShadow: selected ? "0 0 0 4px #bfdbfe55" : "0 1px 6px rgba(0,0,0,0.10)",
+          boxShadow: selected ? "0 0 0 4px hsl(var(--ring) / 0.25)" : "none",
           transition: "border-color 0.15s, box-shadow 0.15s",
         }}
       >
         {isUploading ? (
           <div
-            className="flex w-full items-center justify-center gap-2 text-sm text-zinc-400 dark:text-zinc-500"
+            className="flex w-full items-center justify-center gap-2 text-sm text-muted-foreground"
             style={{
               minHeight: "200px",
               background:
-                "linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%)",
+                "linear-gradient(90deg, hsl(var(--card)) 25%, hsl(var(--muted)) 50%, hsl(var(--card)) 75%)",
               backgroundSize: "200% 100%",
               animation: "tf-shimmer 1.4s infinite",
             }}
@@ -96,7 +96,7 @@ export function VideoNodeView({ node, selected, deleteNode }: NodeViewProps) {
             }}
           />
         ) : (
-          <div className="flex w-full items-center justify-center gap-2 min-h-[120px] text-sm text-zinc-400 bg-zinc-100 dark:bg-zinc-800">
+          <div className="flex w-full items-center justify-center gap-2 min-h-[120px] text-sm text-muted-foreground bg-muted">
             <VideoIcon className="h-5 w-5" />
             Video no disponible
           </div>

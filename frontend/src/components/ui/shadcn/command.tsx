@@ -12,7 +12,7 @@ const Command = React.forwardRef<
   <CommandPrimitive
     ref={ref}
     className={cn(
-      "flex h-full w-full flex-col overflow-hidden rounded-md bg-white text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50",
+      "flex h-full w-full flex-col overflow-hidden rounded bg-popover text-popover-foreground",
       className
     )}
     {...props}
@@ -24,12 +24,12 @@ const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
 >(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b border-zinc-200 px-3 dark:border-zinc-800" cmdk-input-wrapper="">
+  <div className="flex items-center border-b border-border px-3" cmdk-input-wrapper="">
     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
     <CommandPrimitive.Input
       ref={ref}
       className={cn(
-        "flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-zinc-500 disabled:cursor-not-allowed disabled:opacity-50 dark:placeholder:text-zinc-400",
+        "flex h-9 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
         className
       )}
       {...props}
@@ -69,7 +69,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-zinc-950 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 dark:text-zinc-50 dark:[&_[cmdk-group-heading]]:text-zinc-400",
+      "overflow-hidden p-1 text-popover-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-[0.12em] [&_[cmdk-group-heading]]:text-muted-foreground",
       className
     )}
     {...props}
@@ -84,7 +84,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-zinc-100 aria-selected:text-zinc-900 data-[disabled='true']:pointer-events-none data-[disabled='true']:opacity-50 dark:aria-selected:bg-zinc-800 dark:aria-selected:text-zinc-50",
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none aria-selected:bg-accent aria-selected:text-accent-foreground data-[disabled='true']:pointer-events-none data-[disabled='true']:opacity-50",
       className
     )}
     {...props}
@@ -97,11 +97,10 @@ CommandItem.displayName = CommandPrimitive.Item.displayName
 // Append-only a partir de aca: `Command`, `CommandInput`, `CommandList`,
 // `CommandEmpty`, `CommandGroup` y `CommandItem` de arriba son contrato
 // vivo de `CommentComposer.tsx` (popup de menciones) y
-// `TicketAssigneeSelect.tsx` (selector de asignados) -- prohibido
-// tocarlos en esta fase (docs/PHASE_3_PLAN.md, hallazgo 0.1). Los colores
-// `zinc-*` hardcodeados de las primitivas existentes tampoco se migran a
-// tokens semanticos aca: es deuda documentada de `DESIGN_SYSTEM.md §1`,
-// fuera de scope de Fase 3.
+// `TicketAssigneeSelect.tsx` (selector de asignados) -- no cambiar su
+// estructura/props (docs/PHASE_3_PLAN.md, hallazgo 0.1). Los colores se
+// migraron a tokens semanticos en el rediseño brutalista (solo clases de
+// color, sin tocar estructura).
 
 const CommandDialog = ({
   children,
@@ -109,7 +108,7 @@ const CommandDialog = ({
 }: React.ComponentPropsWithoutRef<typeof Dialog>) => (
   <Dialog {...props}>
     <DialogContent className="overflow-hidden p-0 shadow-lg">
-      <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-zinc-500 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5 dark:[&_[cmdk-group-heading]]:text-zinc-400">
+      <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
         {children}
       </Command>
     </DialogContent>
@@ -123,7 +122,7 @@ const CommandSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.Separator
     ref={ref}
-    className={cn("-mx-1 h-px bg-zinc-200 dark:bg-zinc-800", className)}
+    className={cn("-mx-1 h-px bg-border", className)}
     {...props}
   />
 ))
@@ -135,7 +134,7 @@ const CommandShortcut = ({
 }: React.HTMLAttributes<HTMLSpanElement>) => (
   <span
     className={cn(
-      "ml-auto text-xs tracking-widest text-zinc-500 dark:text-zinc-400",
+      "ml-auto font-mono text-xs tracking-widest text-muted-foreground",
       className
     )}
     {...props}

@@ -68,27 +68,28 @@ export default function CalendarPage() {
   };
 
   if (!project) {
-    return <p className="text-sm text-zinc-600">No se encontro el proyecto.</p>;
+    return <p className="text-sm text-muted-foreground">No se encontro el proyecto.</p>;
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b-2 border-border pb-4">
         <div className="min-w-0 space-y-2">
           <Button
             size="sm"
             variant="light"
-            className="text-zinc-600 dark:text-zinc-300"
+            className="rounded-none text-muted-foreground"
             startContent={<ArrowLeft className="h-4 w-4" />}
             onPress={() => navigate(`/workspaces/${workspaceSlug}`)}
           >
             Volver al espacio
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-              Calendario {project ? `- ${project.name}` : ""}
+            <p className="eyebrow mb-1">Calendario</p>
+            <h1 className="font-display text-fluid-xl font-bold tracking-tight text-foreground">
+              {project ? project.name : "Calendario"}
             </h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-sm text-muted-foreground">
               {activeWorkspace?.name ?? workspaceSlug} · {projectColumns.length} columnas
             </p>
           </div>

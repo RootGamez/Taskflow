@@ -181,7 +181,7 @@ const EDITOR_STYLES = `
   flex-shrink: 0; margin-top: 0.25rem;
 }
 .tf-editor .tiptap ul[data-type="taskList"] input[type="checkbox"] {
-  width: 1rem; height: 1rem; cursor: pointer; accent-color: #2563eb;
+  width: 1rem; height: 1rem; cursor: pointer; accent-color: hsl(var(--primary));
 }
 .tf-editor .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
   text-decoration: line-through; color: #9ca3af;
@@ -216,14 +216,13 @@ const EDITOR_STYLES = `
 .dark .tf-editor .tiptap hr { border-top-color: #3f3f46; }
 
 .tf-editor .tiptap a {
-  color: #2563eb; text-decoration: underline; text-underline-offset: 2px;
+  color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 2px;
 }
-.tf-editor .tiptap a:hover { color: #1d4ed8; }
+.tf-editor .tiptap a:hover { opacity: 0.8; }
 
-.tf-editor .tiptap ::selection { background: #bfdbfe; }
-.dark .tf-editor .tiptap ::selection { background: #1e40af40; }
+.tf-editor .tiptap ::selection { background: hsl(var(--primary) / 0.22); }
 
-.tf-editor .tiptap .ProseMirror-dropcursor { border-top: 2px solid #3b82f6; }
+.tf-editor .tiptap .ProseMirror-dropcursor { border-top: 2px solid hsl(var(--primary)); }
 
 /* Slash suggestion decoration */
 .tf-editor .tiptap .suggestion { color: #a1a1aa; }
@@ -602,7 +601,7 @@ export function TicketRichEditor({
         defaultProtocol: "https",
         HTMLAttributes: {
           class:
-            "cursor-pointer font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline underline-offset-2",
+            "cursor-pointer font-medium text-primary hover:opacity-80 underline underline-offset-2",
         },
       }),
 
@@ -613,7 +612,7 @@ export function TicketRichEditor({
         showOnlyCurrent: false,
       }),
 
-      Dropcursor.configure({ color: "#3b82f6", width: 2 }),
+      Dropcursor.configure({ color: "hsl(var(--primary))", width: 2 }),
       TaskList,
       TaskItem.configure({ nested: true }),
       BookmarkExtension,
@@ -764,7 +763,7 @@ export function TicketRichEditor({
       <style suppressHydrationWarning>{EDITOR_STYLES}</style>
 
       {isLocked && (
-        <p className="mb-2 text-xs text-zinc-500 dark:text-zinc-400">
+        <p className="mb-2 text-xs text-muted-foreground">
           {lockHint ?? "Otro usuario está editando este contenido."}
         </p>
       )}
@@ -831,8 +830,8 @@ export function TicketRichEditor({
 
       {/* Upload indicator */}
       {isUploading && (
-        <div className="mb-2 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-300 border-t-blue-500" />
+        <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-border border-t-primary" />
           Subiendo imagen...
         </div>
       )}
@@ -872,7 +871,7 @@ export function TicketRichEditor({
         <EditorContent editor={editor} />
 
         {editor && !disabled && !isLocked && editor.storage.characterCount ? (
-          <p className="mt-2 select-none text-right text-[11px] text-zinc-400 dark:text-zinc-600">
+          <p className="mt-2 select-none text-right text-[11px] text-muted-foreground">
             {editor.storage.characterCount.words()} palabras ·{" "}
             {editor.storage.characterCount.characters()} caracteres
           </p>
@@ -914,7 +913,7 @@ export function TicketRichEditor({
           pluginKey="tableBubble"
           tippyOptions={{ duration: 100, placement: "top" }}
           shouldShow={({ editor: e }) => e.isActive("table")}
-          className="flex items-center gap-0.5 rounded-xl border border-zinc-200 bg-white p-1 text-xs shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50"
+          className="flex items-center gap-0.5 rounded border-2 border-border bg-popover p-1 text-xs text-popover-foreground shadow-hard dark:shadow-hard-float z-50"
         >
           {[
             { icon: Columns3, label: "Columna +", run: () => editor.chain().focus().addColumnAfter().run() },
@@ -929,20 +928,20 @@ export function TicketRichEditor({
               aria-label={label}
               onMouseDown={(e) => e.preventDefault()}
               onClick={run}
-              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex items-center gap-1 rounded px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <Icon className="h-3.5 w-3.5" />
               {label}
             </button>
           ))}
-          <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+          <div className="mx-0.5 h-5 w-px bg-border" />
           <button
             type="button"
             title="Eliminar tabla"
             aria-label="Eliminar tabla"
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => editor.chain().focus().deleteTable().run()}
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            className="flex items-center gap-1 rounded px-2 py-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -962,7 +961,7 @@ export function TicketRichEditor({
             if (e.isActive("codeBlock")) return false;
             return !state.doc.textBetween(from, to).trim().length ? false : true;
           }}
-          className="flex items-center gap-0.5 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50"
+          className="flex items-center gap-0.5 overflow-hidden rounded border-2 border-border bg-popover p-1 text-popover-foreground shadow-hard dark:shadow-hard-float z-50"
         >
           {!editingLink && !editor.isActive("link") ? (
             <div className="flex items-center gap-0.5">
@@ -983,16 +982,16 @@ export function TicketRichEditor({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={run}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    "flex h-8 w-8 items-center justify-center rounded transition-colors",
                     editor.isActive(is)
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"
-                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
                 </button>
               ))}
-              <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="mx-0.5 h-5 w-px bg-border" />
               {[
                 { icon: AlignLeft, label: "Alinear a la izquierda", value: "left" },
                 { icon: AlignCenter, label: "Centrar", value: "center" },
@@ -1007,16 +1006,16 @@ export function TicketRichEditor({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => editor.chain().focus().setTextAlign(value).run()}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    "flex h-8 w-8 items-center justify-center rounded transition-colors",
                     editor.isActive({ textAlign: value })
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"
-                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
                 </button>
               ))}
-              <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="mx-0.5 h-5 w-px bg-border" />
               <button
                 type="button"
                 aria-label="Añadir enlace"
@@ -1026,7 +1025,7 @@ export function TicketRichEditor({
                   setLinkInputUrl("");
                   setEditingLink(true);
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                className="flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <LinkIcon className="h-4 w-4" />
               </button>
@@ -1045,11 +1044,7 @@ export function TicketRichEditor({
                 className="w-64 h-8"
                 placeholder="https://..."
               />
-              <Button
-                onClick={applyLink}
-                size="sm"
-                className="bg-blue-600 text-white hover:bg-blue-700"
-              >
+              <Button onClick={applyLink} size="sm">
                 Guardar
               </Button>
             </div>
@@ -1059,12 +1054,12 @@ export function TicketRichEditor({
                 href={editor.getAttributes("link").href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 max-w-[200px] truncate px-3 py-1.5 text-sm text-blue-600 hover:bg-zinc-100 dark:text-blue-400 dark:hover:bg-zinc-800 rounded-md transition"
+                className="flex items-center gap-2 max-w-[200px] truncate px-3 py-1.5 text-sm text-primary hover:bg-accent rounded transition"
               >
                 <ExternalLink className="h-4 w-4 shrink-0" />
                 <span className="truncate">{editor.getAttributes("link").href}</span>
               </a>
-              <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+              <div className="w-px h-5 bg-border mx-1" />
               <Button
                 variant="ghost"
                 size="icon"
@@ -1074,7 +1069,7 @@ export function TicketRichEditor({
                   setLinkInputUrl(editor.getAttributes("link").href || "");
                   setEditingLink(true);
                 }}
-                className="h-7 w-7 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition rounded-md"
+                className="h-7 w-7 text-muted-foreground hover:bg-accent hover:text-foreground transition rounded"
                 title="Editar enlace"
               >
                 <LinkIcon className="h-4 w-4" />
@@ -1083,7 +1078,7 @@ export function TicketRichEditor({
                 variant="ghost"
                 size="icon"
                 onClick={() => editor.chain().focus().unsetLink().run()}
-                className="h-7 w-7 text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 transition rounded-md"
+                className="h-7 w-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition rounded"
                 title="Eliminar enlace"
               >
                 <Trash2 className="h-4 w-4" />

@@ -134,13 +134,13 @@ export function EditorMenuSurface({
           }}
           style={{ position: "fixed", top: pos.top, left: pos.left, zIndex: 9999 }}
           className={cn(
-            "flex w-72 flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:border-zinc-700 dark:bg-zinc-900",
+            "flex w-72 flex-col overflow-hidden rounded border-2 border-border bg-popover text-popover-foreground shadow-hard outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 dark:shadow-hard-float",
             className,
           )}
         >
           <DialogPrimitive.Title className="sr-only">{ariaLabel}</DialogPrimitive.Title>
           {header ? (
-            <div className="shrink-0 border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
+            <div className="shrink-0 border-b border-border px-3 py-2">
               {header}
             </div>
           ) : null}

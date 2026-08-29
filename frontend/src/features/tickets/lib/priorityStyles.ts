@@ -6,6 +6,9 @@ export interface PriorityStyle {
   label: string;
   textClass: string;
   bgClass: string;
+  /** Borde sólido 1.5px del mismo color que el texto (badge "sello",
+   * docs/BRUTALIST_DESIGN_CONTRACT.md §Primitivas). */
+  borderClass: string;
   Icon: LucideIcon;
 }
 
@@ -29,30 +32,35 @@ export const PRIORITY_STYLES: Record<Priority, PriorityStyle> = {
     label: "Urgente",
     textClass: "text-priority-urgent",
     bgClass: "bg-priority-urgent-bg",
+    borderClass: "border-priority-urgent",
     Icon: AlertTriangle,
   },
   high: {
     label: "Alta",
     textClass: "text-priority-high",
     bgClass: "bg-priority-high-bg",
+    borderClass: "border-priority-high",
     Icon: SignalHigh,
   },
   medium: {
     label: "Media",
     textClass: "text-priority-medium",
     bgClass: "bg-priority-medium-bg",
+    borderClass: "border-priority-medium",
     Icon: SignalMedium,
   },
   low: {
     label: "Baja",
     textClass: "text-priority-low",
     bgClass: "bg-priority-low-bg",
+    borderClass: "border-priority-low",
     Icon: SignalLow,
   },
   none: {
     label: "Sin prioridad",
     textClass: "text-priority-none",
     bgClass: "bg-priority-none-bg",
+    borderClass: "border-priority-none",
     Icon: CircleDashed,
   },
 };

@@ -1,6 +1,8 @@
 import { useState, type KeyboardEvent } from "react";
 import { Plus } from "lucide-react";
 
+import { Button } from "@/components/ui/shadcn/button";
+
 interface SubtaskComposerProps {
   onSubmit: (title: string) => void;
   isSubmitting?: boolean;
@@ -38,17 +40,12 @@ export function SubtaskComposer({ onSubmit, isSubmitting = false }: SubtaskCompo
         placeholder="Agregar subtarea..."
         aria-label="Agregar subtarea"
         disabled={isSubmitting}
-        className="flex-1 rounded border border-zinc-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
+        className="h-9 flex-1 rounded border-2 border-border bg-card px-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary disabled:opacity-50"
       />
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        className="flex items-center gap-1 rounded bg-violet-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <Button type="button" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
         <Plus className="h-3.5 w-3.5" />
         Agregar
-      </button>
+      </Button>
     </div>
   );
 }

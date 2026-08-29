@@ -34,8 +34,10 @@ export function SprintBoardSelector({ sprints, scope, onChange }: SprintBoardSel
   };
 
   const rowClass = (selected: boolean) =>
-    `flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-      selected ? "font-semibold" : ""
+    `flex w-full items-center gap-2 rounded border-l-[3px] px-2 py-1.5 text-left text-sm transition-colors ${
+      selected
+        ? "border-primary bg-primary/10 font-semibold text-foreground"
+        : "border-transparent text-muted-foreground hover:border-border hover:bg-accent hover:text-foreground"
     }`;
 
   const isCurrent =
@@ -71,7 +73,7 @@ export function SprintBoardSelector({ sprints, scope, onChange }: SprintBoardSel
           Todos los sprints
         </button>
 
-        {sprints.length > 0 ? <div className="my-1 h-px bg-zinc-100 dark:bg-zinc-800" /> : null}
+        {sprints.length > 0 ? <div className="my-1 h-0.5 bg-border" /> : null}
 
         {sprints.map((sprint) => {
           const selected = scope.kind === "sprint" && scope.sprintId === sprint.id && !isCurrent;
@@ -83,10 +85,10 @@ export function SprintBoardSelector({ sprints, scope, onChange }: SprintBoardSel
               onClick={() => pick({ kind: "sprint", sprintId: sprint.id })}
             >
               <Rocket
-                className={`h-3.5 w-3.5 shrink-0 ${sprint.status === "active" ? "text-primary" : "text-zinc-400"}`}
+                className={`h-3.5 w-3.5 shrink-0 ${sprint.status === "active" ? "text-primary" : "text-muted-foreground"}`}
               />
               <span className="min-w-0 flex-1 truncate">{sprint.name}</span>
-              <span className="shrink-0 text-[10px] uppercase tracking-wide text-zinc-400">
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                 {sprint.status}
               </span>
             </button>

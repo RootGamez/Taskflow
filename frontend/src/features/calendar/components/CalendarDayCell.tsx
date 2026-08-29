@@ -45,14 +45,14 @@ export function CalendarDayCell({
       ref={setNodeRef}
       data-testid={`calendar-day-cell-${dayKey}`}
       className={cn(
-        "flex min-h-[68px] flex-col gap-1 overflow-hidden rounded-lg border border-border p-1 transition-colors sm:min-h-[104px] sm:p-1.5",
-        isCurrentMonth ? "bg-card" : "bg-muted/40",
-        isOver && "ring-2 ring-ring",
+        "flex min-h-[68px] flex-col gap-1 overflow-hidden p-1 transition-colors sm:min-h-[104px] sm:p-1.5",
+        isCurrentMonth ? "bg-card" : "bg-muted",
+        isOver && "relative z-10 ring-2 ring-inset ring-ring",
       )}
     >
       <span
         className={cn(
-          "inline-flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium",
+          "inline-flex h-5 min-w-5 items-center justify-center px-1 font-mono text-xs font-semibold tabular-nums",
           isCurrentMonth ? "text-foreground" : "text-muted-foreground",
           isToday && "bg-primary text-primary-foreground",
         )}
@@ -65,7 +65,7 @@ export function CalendarDayCell({
           <CalendarTicketChip key={ticket.id} ticket={ticket} canDrag={canMutate} onOpen={onOpenTicket} />
         ))}
         {overflowCount > 0 ? (
-          <span className="px-1 text-xs text-muted-foreground">+{overflowCount} más</span>
+          <span className="px-1 font-mono text-xs text-muted-foreground">+{overflowCount} más</span>
         ) : null}
       </div>
     </div>

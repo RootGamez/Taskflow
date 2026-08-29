@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { Button, Input } from "@heroui/react";
+import { Button } from "@heroui/react";
 import toast from "react-hot-toast";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
+import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getApiErrorMessage } from "@/lib/errors";
 
@@ -47,8 +49,8 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="space-y-4">
-        <p className="text-sm text-zinc-600">El enlace no es valido o esta incompleto.</p>
-        <Link to="/forgot-password" className="text-brand-600 text-sm">
+        <p className="text-sm text-muted-foreground">El enlace no es valido o esta incompleto.</p>
+        <Link to="/forgot-password" className="text-sm font-medium text-primary hover:underline">
           Solicitar un nuevo enlace
         </Link>
       </div>
@@ -57,28 +59,36 @@ export function ResetPasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={onSubmit} noValidate>
-      <Input
-        label="Nueva contraseña"
-        type="password"
-        value={password}
-        onValueChange={setPassword}
-      />
-      <Input
-        label="Confirmar nueva contraseña"
-        type="password"
-        value={confirmPassword}
-        onValueChange={setConfirmPassword}
-      />
+      <div className="space-y-1.5">
+        <Label htmlFor="reset-password">Nueva contraseña</Label>
+        <Input
+          id="reset-password"
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="reset-confirm-password">Confirmar nueva contraseña</Label>
+        <Input
+          id="reset-confirm-password"
+          type="password"
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+        />
+      </div>
       <Button
         color="primary"
         type="submit"
-        className="w-full"
+        className="w-full rounded-none"
         isLoading={confirmPasswordResetMutation.isPending}
       >
         Restablecer contraseña
       </Button>
-      <p className="text-sm text-zinc-500">
-        <Link to="/login" className="text-brand-600">Volver al login</Link>
+      <p className="text-sm text-muted-foreground">
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          Volver al login
+        </Link>
       </p>
     </form>
   );

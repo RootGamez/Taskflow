@@ -24,19 +24,30 @@ export function UserMenu({ user }: UserMenuProps) {
   };
 
   return (
-    <Dropdown>
+    <Dropdown
+      // Lenguaje de sello/borde (docs/BRUTALIST_REDESIGN_PLAN.md §13.2.7):
+      // borde 2px en tinta, sombra dura sin blur, esquinas casi rectas.
+      classNames={{
+        content:
+          "min-w-[13rem] rounded-none border-2 border-border bg-card p-1 shadow-hard dark:shadow-hard-float",
+      }}
+    >
       <DropdownTrigger asChild>
         <Button isIconOnly className="h-10 w-10 rounded-full" variant="light" size="sm">
           {user ? (
             <MemberAvatar user={user} size="sm" showTooltip={false} />
           ) : (
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-border bg-secondary text-muted-foreground">
               <UserIcon className="h-4 w-4" />
             </span>
           )}
         </Button>
       </DropdownTrigger>
-      <DropdownMenu aria-label="User menu" variant="flat">
+      <DropdownMenu
+        aria-label="User menu"
+        variant="flat"
+        itemClasses={{ base: "rounded-none data-[hover=true]:bg-accent" }}
+      >
         <DropdownItem key="profile" startContent={<UserIcon className="h-4 w-4" />} onPress={() => navigate("/settings/profile")}>
           Mi perfil
         </DropdownItem>
@@ -49,7 +60,7 @@ export function UserMenu({ user }: UserMenuProps) {
         <DropdownItem key="shortcuts" startContent={<Keyboard className="h-4 w-4" />} onPress={openShortcutsDialog}>
           Atajos de teclado
         </DropdownItem>
-        <DropdownItem key="logout" color="danger" startContent={<LogOut className="h-4 w-4" />} onPress={handleLogout}>
+        <DropdownItem key="logout" color="danger" className="text-destructive" startContent={<LogOut className="h-4 w-4" />} onPress={handleLogout}>
           Cerrar sesión
         </DropdownItem>
       </DropdownMenu>

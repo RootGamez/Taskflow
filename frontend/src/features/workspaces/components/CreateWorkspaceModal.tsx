@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/shadcn/dialog";
 import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import { Button } from "@/components/ui/shadcn/button";
 
 interface CreateWorkspaceModalProps {
@@ -55,7 +56,8 @@ export function CreateWorkspaceModal({
             Dale un nombre al espacio de trabajo para empezar.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <div className="grid gap-2 py-4">
+          <Label htmlFor="name">Nombre del espacio</Label>
           <Input
             id="name"
             placeholder="Ej: Producto Mobile"

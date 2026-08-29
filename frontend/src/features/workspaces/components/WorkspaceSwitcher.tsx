@@ -84,14 +84,14 @@ export function WorkspaceSwitcher() {
   return (
     <>
       <div className="space-y-3">
-        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/40">
+        <div className="border-2 border-border bg-secondary p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">Espacio actual</p>
-              <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+              <p className="eyebrow">Espacio actual</p>
+              <p className="truncate text-sm font-semibold text-foreground">
                 {activeWorkspace?.name ?? (isLoading ? "Cargando espacios..." : "Sin espacio seleccionado")}
               </p>
-              <p className="truncate text-xs capitalize text-zinc-500 dark:text-zinc-400">
+              <p className="truncate font-mono text-xs uppercase text-muted-foreground">
                 {activeWorkspace?.role ?? "Crea o selecciona uno"}
               </p>
             </div>
@@ -99,7 +99,7 @@ export function WorkspaceSwitcher() {
               <Button
                 size="sm"
                 variant="flat"
-                className="shrink-0"
+                className="shrink-0 rounded-none"
                 onPress={() => navigate(getWorkspaceDashboardPath(activeWorkspace.slug))}
               >
                 Abrir
@@ -110,8 +110,8 @@ export function WorkspaceSwitcher() {
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">Cambiar espacio</p>
-            <span className="text-xs text-zinc-400">{workspaces.length}</span>
+            <p className="eyebrow">Cambiar espacio</p>
+            <span className="font-mono text-xs text-muted-foreground">{workspaces.length}</span>
           </div>
 
           <div className="space-y-1.5">
@@ -125,10 +125,10 @@ export function WorkspaceSwitcher() {
                     type="button"
                     variant="light"
                     className={cn(
-                      "h-auto w-full justify-between rounded-xl border px-3 py-2 text-left",
+                      "h-auto w-full justify-between rounded-none border-2 px-3 py-2 text-left",
                       isActive
-                        ? "border-brand-200 bg-brand-50 text-brand-800 dark:border-brand-900/70 dark:bg-brand-900/20 dark:text-brand-100"
-                        : "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800/70",
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border bg-card text-foreground hover:bg-accent",
                     )}
                     isDisabled={selectActiveWorkspaceMutation.isPending || isLoading}
                     onPress={() => {
@@ -138,32 +138,34 @@ export function WorkspaceSwitcher() {
                     <span className="flex min-w-0 items-center gap-3">
                       <span
                         className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                          "boxed-icon h-8 w-8 shrink-0",
                           isActive
-                            ? "border-brand-200 bg-brand-100 text-brand-700 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-200"
-                            : "border-zinc-200 bg-zinc-100 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-muted-foreground",
                         )}
                       >
                         <FolderKanban className="h-4 w-4" />
                       </span>
                       <span className="min-w-0 text-left">
                         <span className="block truncate text-sm font-medium">{workspace.name}</span>
-                        <span className="block text-xs capitalize text-zinc-500 dark:text-zinc-400">{workspace.role}</span>
+                        <span className="block font-mono text-xs uppercase text-muted-foreground">
+                          {workspace.role}
+                        </span>
                       </span>
                     </span>
-                    {isActive ? <Check className="h-4 w-4 shrink-0 text-brand-600" /> : null}
+                    {isActive ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
                   </Button>
                 );
               })
             ) : (
-              <p className="rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              <p className="border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
                 Aún no tienes espacios de trabajo.
               </p>
             )}
           </div>
 
           {hasMoreWorkspaces ? (
-            <p className="px-1 text-[11px] text-zinc-400">
+            <p className="px-1 font-mono text-[11px] text-muted-foreground">
               Mostrando {visibleWorkspaces.length} de {workspaces.length} espacios.
             </p>
           ) : null}
@@ -173,7 +175,7 @@ export function WorkspaceSwitcher() {
           <Button
             type="button"
             variant="flat"
-            className="w-full justify-start text-brand-700 dark:text-brand-300"
+            className="w-full justify-start rounded-none text-primary"
             startContent={<Plus className="h-4 w-4" />}
             onPress={handleOpenCreateModal}
           >
@@ -182,7 +184,7 @@ export function WorkspaceSwitcher() {
           <Button
             type="button"
             variant="light"
-            className="w-full justify-start"
+            className="w-full justify-start rounded-none"
             onPress={() => navigate("/workspaces")}
           >
             Ver todos

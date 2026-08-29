@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/v1/', include('apps.activities.urls')),
     path('api/v1/', include('apps.sprints.urls')),
     path('api/v1/', include('apps.labels.urls')),
+    path('api/v1/', include('apps.goals.urls')),
     path('api/v1/', include('apps.subtasks.urls')),
     path('api/v1/', include('apps.relations.urls')),
     path('api/v1/', include('apps.pages.urls')),

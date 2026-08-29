@@ -4,25 +4,31 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// "Brutalismo Corporativo" (docs/BRUTALIST_REDESIGN_PLAN.md §6): borde grueso
+// en tinta, sombra dura sin blur, y al presionar el elemento se desplaza
+// `translate(2px,2px)` hacia su sombra — "botón físico presionado contra la
+// mesa". Con `prefers-reduced-motion` solo cambia la sombra (ver index.css).
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "btn-brutal inline-flex items-center justify-center gap-2 whitespace-nowrap rounded border-2 text-sm font-medium transition-[transform,box-shadow,background-color,border-color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-700",
+        default:
+          "border-foreground bg-primary text-primary-foreground shadow-hard hover:-translate-x-px hover:-translate-y-px hover:shadow-hard-lg active:translate-x-0.5 active:translate-y-0.5 active:shadow-hard-press dark:hover:shadow-hard-accent",
         destructive:
-          "bg-red-600 text-white hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-700",
+          "border-foreground bg-destructive text-destructive-foreground shadow-hard hover:-translate-x-px hover:-translate-y-px hover:shadow-hard-lg active:translate-x-0.5 active:translate-y-0.5 active:shadow-hard-press",
         outline:
-          "border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-50 hover:bg-gray-100 dark:hover:bg-gray-800",
+          "border-foreground bg-transparent text-foreground hover:-translate-x-px hover:-translate-y-px hover:shadow-hard-sm active:translate-x-0.5 active:translate-y-0.5 active:shadow-none",
         secondary:
-          "bg-gray-200 dark:bg-gray-800 text-gray-900 dark:text-gray-50 hover:bg-gray-300 dark:hover:bg-gray-700",
-        ghost: "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-900 dark:text-gray-50",
-        link: "text-blue-600 dark:text-blue-400 underline-offset-4 hover:underline",
+          "border-foreground bg-secondary text-secondary-foreground shadow-hard-sm hover:-translate-x-px hover:-translate-y-px hover:shadow-hard active:translate-x-0.5 active:translate-y-0.5 active:shadow-hard-press",
+        ghost:
+          "border-transparent text-foreground hover:border-foreground hover:bg-accent active:translate-x-px active:translate-y-px",
+        link: "border-transparent text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
+        sm: "h-9 px-3",
+        lg: "h-11 px-8",
         icon: "h-10 w-10",
       },
     },

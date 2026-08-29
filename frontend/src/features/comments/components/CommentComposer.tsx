@@ -145,7 +145,7 @@ export function CommentComposer({ projectId, ticketId }: CommentComposerProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-start gap-2 border-t border-border pt-3">
+    <form onSubmit={handleSubmit} className="flex items-start gap-2 border-t-2 border-border pt-3">
       {currentUser ? <MemberAvatar user={currentUser} size="sm" /> : null}
 
       <div className="relative flex flex-1 flex-col gap-2">
@@ -158,14 +158,14 @@ export function CommentComposer({ projectId, ticketId }: CommentComposerProps) {
           rows={1}
           placeholder="Escribí un comentario… (Enter para enviar)"
           aria-label="Escribir comentario"
-          className="min-h-[36px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-[36px] w-full resize-none rounded border-2 border-border bg-card px-3 py-2 text-sm leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         />
 
         {isMentionOpen ? (
           <div
             role="listbox"
             aria-label="Mencionar a un miembro"
-            className="absolute bottom-full left-0 z-20 mb-1 w-64 rounded-md border border-border bg-popover shadow-md"
+            className="absolute bottom-full left-0 z-20 mb-1 w-64 rounded border-2 border-border bg-popover shadow-hard dark:shadow-hard-float"
           >
             <Command shouldFilter={false}>
               <CommandList>

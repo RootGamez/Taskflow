@@ -47,6 +47,16 @@ const COVERED_PATHS = [
   // el directorio).
   "src/store/commandPaletteStore.ts",
   "src/store/commandActionsStore.ts",
+  // Rediseño "Brutalismo Corporativo" (docs/BRUTALIST_REDESIGN_PLAN.md):
+  // R1 — pizarra de metas semanales.
+  "src/features/goals/**",
+  // R0 — primitivas base con el nuevo lenguaje de tokens/bordes/sombra dura.
+  "src/components/ui/shadcn/button.tsx",
+  "src/components/ui/shadcn/badge.tsx",
+  "src/components/ui/shadcn/card.tsx",
+  "src/components/ui/shadcn/input.tsx",
+  "src/components/ui/shadcn/textarea.tsx",
+  "src/components/ui/shadcn/label.tsx",
 ];
 
 export default defineConfig({

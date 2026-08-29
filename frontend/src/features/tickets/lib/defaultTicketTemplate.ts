@@ -1,5 +1,11 @@
 // Plantilla por defecto del cuerpo de un ticket nuevo.
 //
+// Título placeholder de la creación instantánea (RD-5 de
+// docs/BRUTALIST_REDESIGN_PLAN.md §9): el ticket nunca se crea sin título
+// (el backend lo exige), así que se crea con este y el usuario escribe
+// encima en el detalle, con el texto ya seleccionado.
+export const DEFAULT_TICKET_TITLE = "Ticket sin título";
+
 // Movida literalmente (byte a byte) desde `CreateTicketModal.tsx:105-149`
 // (docs/PHASE_4_PLAN.md, R0A-2/D24): antes de este movimiento el modal
 // tenia esta constante hardcodeada como `DEFAULT_DESCRIPTION`. Se extrae

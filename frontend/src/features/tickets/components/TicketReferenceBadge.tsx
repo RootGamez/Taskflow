@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui/shadcn/badge";
+
 interface TicketReferenceBadgeProps {
   reference?: string | null;
   className?: string;
@@ -10,6 +12,9 @@ interface TicketReferenceBadgeProps {
  * tiene `number`, ambos estados validos y permanentes). Devuelve `null` en
  * ambos casos, `reference: null` y `reference: undefined` (el tipo es
  * opcional).
+ *
+ * Brutalismo Corporativo: se renderiza vía la primitiva `Badge` con `mono`
+ * (borde sólido tipo "sello" + cifras tabulares) — nunca texto suelto.
  */
 export function TicketReferenceBadge({ reference, className = "" }: TicketReferenceBadgeProps) {
   if (!reference) {
@@ -17,6 +22,8 @@ export function TicketReferenceBadge({ reference, className = "" }: TicketRefere
   }
 
   return (
-    <span className={`font-mono text-xs text-muted-foreground ${className}`}>{reference}</span>
+    <Badge variant="secondary" mono className={className}>
+      {reference}
+    </Badge>
   );
 }

@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Button, Input } from "@heroui/react";
+import { Button } from "@heroui/react";
 import toast from "react-hot-toast";
 import { Link, useNavigate } from "react-router-dom";
 
+import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { getApiErrorMessage } from "@/lib/errors";
 
@@ -138,36 +140,47 @@ export function RegisterForm() {
     <form className="space-y-4" onSubmit={onSubmit} noValidate>
       {step === "request-code" ? (
         <>
-          <Input
-            label="Nombre completo"
-            value={state.full_name}
-            onValueChange={(full_name) => setState((prev) => ({ ...prev, full_name }))}
-          />
-          <Input
-            label="Email"
-            type="email"
-            value={state.email}
-            onValueChange={(email) => setState((prev) => ({ ...prev, email }))}
-          />
-          <Button color="primary" type="submit" className="w-full" isLoading={isSubmitting}>
+          <div className="space-y-1.5">
+            <Label htmlFor="register-full-name">Nombre completo</Label>
+            <Input
+              id="register-full-name"
+              value={state.full_name}
+              onChange={(event) => setState((prev) => ({ ...prev, full_name: event.target.value }))}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="register-email">Email</Label>
+            <Input
+              id="register-email"
+              type="email"
+              value={state.email}
+              onChange={(event) => setState((prev) => ({ ...prev, email: event.target.value }))}
+            />
+          </div>
+          <Button color="primary" type="submit" className="w-full rounded-none" isLoading={isSubmitting}>
             Enviar codigo
           </Button>
         </>
       ) : step === "validate-code" ? (
         <>
-          <Input
-            label="Codigo de verificacion"
-            value={state.code}
-            onValueChange={(code) => setState((prev) => ({ ...prev, code }))}
-            description={`Te enviamos un codigo a ${state.email}`}
-          />
-          <Button color="primary" type="submit" className="w-full" isLoading={isSubmitting}>
+          <div className="space-y-1.5">
+            <Label htmlFor="register-code">Codigo de verificacion</Label>
+            <Input
+              id="register-code"
+              value={state.code}
+              onChange={(event) => setState((prev) => ({ ...prev, code: event.target.value }))}
+            />
+            <p className="font-mono text-xs text-muted-foreground">
+              Te enviamos un codigo a {state.email}
+            </p>
+          </div>
+          <Button color="primary" type="submit" className="w-full rounded-none" isLoading={isSubmitting}>
             Validar codigo
           </Button>
           <Button
             variant="light"
             type="button"
-            className="w-full"
+            className="w-full rounded-none"
             onPress={onResendCode}
             isLoading={registerRequestCodeMutation.isPending}
           >
@@ -176,27 +189,38 @@ export function RegisterForm() {
         </>
       ) : (
         <>
-          <Input
-            label="Crea tu contraseña"
-            type="password"
-            value={state.password}
-            onValueChange={(password) => setState((prev) => ({ ...prev, password }))}
-            description="Tu codigo ya fue validado correctamente"
-          />
-          <Input
-            label="Confirma tu contraseña"
-            type="password"
-            value={state.confirmPassword}
-            onValueChange={(confirmPassword) => setState((prev) => ({ ...prev, confirmPassword }))}
-          />
-          <Button color="primary" type="submit" className="w-full" isLoading={isSubmitting}>
+          <div className="space-y-1.5">
+            <Label htmlFor="register-password">Crea tu contraseña</Label>
+            <Input
+              id="register-password"
+              type="password"
+              value={state.password}
+              onChange={(event) => setState((prev) => ({ ...prev, password: event.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">Tu codigo ya fue validado correctamente</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="register-confirm-password">Confirma tu contraseña</Label>
+            <Input
+              id="register-confirm-password"
+              type="password"
+              value={state.confirmPassword}
+              onChange={(event) =>
+                setState((prev) => ({ ...prev, confirmPassword: event.target.value }))
+              }
+            />
+          </div>
+          <Button color="primary" type="submit" className="w-full rounded-none" isLoading={isSubmitting}>
             Crear cuenta
           </Button>
         </>
       )}
 
-      <p className="text-sm text-zinc-500">
-        ¿Ya tienes cuenta? <Link to="/login" className="text-brand-600">Inicia sesión</Link>
+      <p className="text-sm text-muted-foreground">
+        ¿Ya tienes cuenta?{" "}
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          Inicia sesión
+        </Link>
       </p>
     </form>
   );

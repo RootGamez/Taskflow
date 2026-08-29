@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/shadcn/button";
+import { Input } from "@/components/ui/shadcn/input";
 import { TemplateChecklistEditor } from "@/features/ticket-templates/components/TemplateChecklistEditor";
 import type {
   TicketTemplate,
@@ -66,37 +68,35 @@ export function TemplateEditorForm({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <label htmlFor="template-name" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <label htmlFor="template-name" className="text-xs font-medium text-muted-foreground">
           Nombre
         </label>
-        <input
+        <Input
           id="template-name"
           type="text"
           value={name}
           disabled={isSubmitting}
           onChange={(event) => setName(event.target.value)}
           placeholder="Ej. Bug report"
-          className="rounded border border-zinc-200 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="template-title-prefix" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <label htmlFor="template-title-prefix" className="text-xs font-medium text-muted-foreground">
           Prefijo del titulo
         </label>
-        <input
+        <Input
           id="template-title-prefix"
           type="text"
           value={titleTemplate}
           disabled={isSubmitting}
           onChange={(event) => setTitleTemplate(event.target.value)}
           placeholder="Ej. [BUG] "
-          className="rounded border border-zinc-200 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
         />
       </div>
 
       <div className="flex flex-col gap-1">
-        <label htmlFor="template-priority" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+        <label htmlFor="template-priority" className="text-xs font-medium text-muted-foreground">
           Prioridad
         </label>
         <select
@@ -104,7 +104,7 @@ export function TemplateEditorForm({
           value={priority}
           disabled={isSubmitting}
           onChange={(event) => setPriority(event.target.value as Priority)}
-          className="rounded border border-zinc-200 bg-transparent px-2 py-1.5 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
+          className="h-10 rounded border-2 border-border bg-card px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-primary disabled:opacity-50"
         >
           {PRIORITY_OPTIONS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -115,24 +115,19 @@ export function TemplateEditorForm({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Checklist</span>
+        <span className="text-xs font-medium text-muted-foreground">Checklist</span>
         <TemplateChecklistEditor items={items} onChange={setItems} disabled={isSubmitting} />
       </div>
 
       {errorMessage ? (
-        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+        <p className="rounded border-2 border-destructive bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {errorMessage}
         </p>
       ) : null}
 
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={!canSubmit}
-        className="self-end rounded bg-violet-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-      >
+      <Button type="button" className="self-end" onClick={handleSubmit} disabled={!canSubmit}>
         {isSubmitting ? "Guardando..." : initialTemplate ? "Guardar cambios" : "Crear plantilla"}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -18,7 +18,7 @@ interface TicketDiscussionProps {
  */
 export function TicketDiscussion({ ticketId, projectId, canComment }: TicketDiscussionProps) {
   return (
-    <div className="flex-1 border-t border-zinc-100 pt-4 dark:border-zinc-800/50">
+    <div className="flex-1 border-t-2 border-border pt-4">
       <Tabs aria-label="Discusión del ticket" size="sm" variant="underlined">
         <Tab key="comments" title="Comentarios">
           <CommentThread ticketId={ticketId} projectId={projectId} canComment={canComment} />

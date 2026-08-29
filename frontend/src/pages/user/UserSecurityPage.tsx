@@ -1,8 +1,11 @@
-import { Button, Card, Input } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { Trash2, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 
+import { Badge } from "@/components/ui/shadcn/badge";
+import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import { apiClient } from "@/lib/axios";
 
 interface Session {
@@ -95,70 +98,86 @@ export function UserSecurityPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold dark:text-zinc-50">
-          <Shield className="h-6 w-6" />
+      <div className="border-b-2 border-border pb-4">
+        <p className="eyebrow mb-1">Cuenta</p>
+        <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-foreground">
+          <span className="boxed-icon h-8 w-8">
+            <Shield className="h-4 w-4" />
+          </span>
           Seguridad
         </h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Gestiona tu contraseña y sesiones activas</p>
+        <p className="mt-1 text-sm text-muted-foreground">Gestiona tu contraseña y sesiones activas</p>
       </div>
 
       {/* Cambio de contraseña */}
-      <Card className="p-6 dark:bg-zinc-800">
-        <h2 className="mb-4 text-lg font-semibold dark:text-zinc-50">Cambiar contraseña</h2>
-        <div className="space-y-4">
+      <section className="space-y-4">
+        <p className="eyebrow text-foreground">Cambiar contraseña</p>
+        <div className="space-y-1.5">
+          <Label htmlFor="security-current-password">Contraseña actual</Label>
           <Input
+            id="security-current-password"
             type="password"
-            label="Contraseña actual"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
             placeholder="Tu contraseña actual"
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="security-new-password">Nueva contraseña</Label>
           <Input
+            id="security-new-password"
             type="password"
-            label="Nueva contraseña"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             placeholder="Nueva contraseña (mín. 8 caracteres)"
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="security-confirm-password">Confirmar contraseña</Label>
           <Input
+            id="security-confirm-password"
             type="password"
-            label="Confirmar contraseña"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             placeholder="Confirma tu nueva contraseña"
           />
-          <Button color="primary" onPress={handleChangePassword} isLoading={isChanging}>
-            Actualizar contraseña
-          </Button>
         </div>
-      </Card>
+        <Button color="primary" className="rounded-none" onPress={handleChangePassword} isLoading={isChanging}>
+          Actualizar contraseña
+        </Button>
+      </section>
 
       {/* Sesiones activas */}
-      <Card className="p-6 dark:bg-zinc-800">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold dark:text-zinc-50">Sesiones activas</h2>
+      <section className="space-y-4 border-t-2 border-border pt-6">
+        <div className="flex items-center justify-between">
+          <p className="eyebrow text-foreground">Sesiones activas</p>
           {sessions.length > 1 && (
-            <Button size="sm" variant="flat" onPress={handleRevokeAllOtherSessions}>
+            <Button size="sm" variant="flat" className="rounded-none" onPress={handleRevokeAllOtherSessions}>
               Revocar otras sesiones
             </Button>
           )}
         </div>
 
         {isLoadingSessions ? (
-          <p className="text-sm text-zinc-500">Cargando sesiones...</p>
+          <p className="text-sm text-muted-foreground">Cargando sesiones...</p>
         ) : sessions.length === 0 ? (
-          <p className="text-sm text-zinc-500">No hay sesiones activas</p>
+          <p className="text-sm text-muted-foreground">No hay sesiones activas</p>
         ) : (
-          <div className="space-y-3">
+          <ul className="divide-y-2 divide-border border-2 border-border">
             {sessions.map((session) => (
-              <div key={session.id} className="flex items-center justify-between rounded-lg bg-zinc-100 p-3 dark:bg-zinc-700">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                    {session.user_agent} {session.is_current && <span className="text-xs text-blue-500">(Esta sesión)</span>}
+              <li key={session.id} className="flex items-center justify-between gap-3 bg-card p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="truncate">{session.user_agent}</span>
+                    {session.is_current && (
+                      <Badge variant="primary" mono>
+                        Esta sesión
+                      </Badge>
+                    )}
                   </p>
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                    IP: {session.ip_address} • Última actividad: {new Date(session.last_activity).toLocaleString()}
+                  <p className="font-mono text-xs text-muted-foreground">
+                    IP: {session.ip_address} • Última actividad:{" "}
+                    {new Date(session.last_activity).toLocaleString()}
                   </p>
                 </div>
                 {!session.is_current && (
@@ -167,16 +186,18 @@ export function UserSecurityPage() {
                     size="sm"
                     variant="light"
                     color="danger"
+                    className="rounded-none"
+                    aria-label="Revocar sesión"
                     onPress={() => handleRevokeSession(session.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
-              </div>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
-      </Card>
+      </section>
     </div>
   );
 }

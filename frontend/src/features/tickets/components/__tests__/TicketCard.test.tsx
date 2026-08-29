@@ -56,6 +56,27 @@ describe("TicketCard", () => {
     expect(screen.getByText("Urgente")).toBeInTheDocument();
   });
 
+  it("sin accentColor la tarjeta usa bg-card y no lleva franja de color", () => {
+    render(<TicketCard ticket={buildTicket()} onOpen={vi.fn()} />);
+
+    const card = screen.getByRole("button");
+    expect(card.className).toContain("bg-card");
+    expect(card.style.backgroundColor).toBe("");
+    expect(card.style.borderLeftColor).toBe("");
+  });
+
+  it("con accentColor tinta el fondo con el color del estado y agrega una franja izquierda", () => {
+    render(<TicketCard ticket={buildTicket()} onOpen={vi.fn()} accentColor="#2E6E4E" />);
+
+    const card = screen.getByRole("button");
+    // color-mix del color del estado sobre --card (nunca el color crudo a full)
+    expect(card.style.backgroundColor).toContain("color-mix");
+    expect(card.style.backgroundColor).toContain("#2E6E4E");
+    expect(card.style.borderLeftColor).not.toBe("");
+    expect(card.style.borderLeftWidth).toBe("5px");
+    expect(card.className).not.toContain("bg-card");
+  });
+
   it.each([
     ["high", "Alta"],
     ["medium", "Media"],

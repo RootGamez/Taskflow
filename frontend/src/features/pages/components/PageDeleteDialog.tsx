@@ -53,9 +53,9 @@ export function PageDeleteDialog({
         </DialogHeader>
 
         <div className="space-y-3">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="text-sm text-muted-foreground">
             Para confirmar, escribe el título exacto:{" "}
-            <span className="font-semibold text-zinc-800 dark:text-zinc-100">
+            <span className="font-semibold text-foreground">
               {trimmedTitle || "(sin título)"}
             </span>
           </p>

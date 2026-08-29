@@ -46,13 +46,13 @@ export function CommandPaletteTickets({ results, isLoading, onSelect }: CommandP
         >
           <div className="flex min-w-0 items-center gap-2">
             {result.reference ? (
-              <span data-testid="search-result-reference" className="shrink-0 font-mono text-xs text-zinc-400">
+              <span data-testid="search-result-reference" className="shrink-0 font-mono text-xs text-muted-foreground">
                 {result.reference}
               </span>
             ) : null}
             <span className="truncate">{result.title}</span>
           </div>
-          <span className="shrink-0 truncate text-xs text-zinc-400">{result.project.name}</span>
+          <span className="shrink-0 truncate text-xs text-muted-foreground">{result.project.name}</span>
         </CommandItem>
       ))}
     </CommandGroup>

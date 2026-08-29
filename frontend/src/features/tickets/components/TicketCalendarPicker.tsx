@@ -32,14 +32,18 @@ export function TicketCalendarPicker({ value, onChange, disabled }: TicketCalend
           className={cn(
             "h-8 justify-start px-2 py-1 text-xs font-normal",
             !value && "opacity-60",
-            "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+            "text-muted-foreground hover:bg-accent hover:text-foreground"
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4" />
-          {value ? format(dateValue!, "PPP", { locale: es }) : <span>Sin fecha límite</span>}
+          {value ? (
+            <span className="font-mono tabular-nums">{format(dateValue!, "PPP", { locale: es })}</span>
+          ) : (
+            <span>Sin fecha límite</span>
+          )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="flex w-fit flex-col p-0 shadow-xl border-zinc-200 dark:border-zinc-800" align="start">
+      <PopoverContent className="flex w-fit flex-col p-0" align="start">
         <div className="flex justify-center pt-1 pb-0 px-0">
           <Calendar
             mode="single"
@@ -56,7 +60,7 @@ export function TicketCalendarPicker({ value, onChange, disabled }: TicketCalend
             className="p-0"
           />
         </div>
-        <div className="flex flex-wrap justify-center gap-1.5 border-t border-zinc-100 p-2 dark:border-zinc-800/50">
+        <div className="flex flex-wrap justify-center gap-1.5 border-t-2 border-border p-2">
           {[
             { label: "Hoy", value: 0 },
             { label: "Mañana", value: 1 },
@@ -65,9 +69,9 @@ export function TicketCalendarPicker({ value, onChange, disabled }: TicketCalend
           ].map((preset) => (
             <Button
               key={preset.value}
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-7 w-[calc(50%-0.2rem)] bg-zinc-50 px-2 text-[10px] font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 border border-zinc-200/50 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 dark:border-zinc-800/50 rounded-md transition-all"
+              className="h-7 w-[calc(50%-0.2rem)] rounded-none px-2 text-[10px] font-medium transition-colors"
               disabled={disabled}
               onClick={(e) => {
                 e.preventDefault();

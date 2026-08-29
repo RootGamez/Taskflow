@@ -36,7 +36,7 @@ function Initials({ label }: { label: string }) {
     .join("")
     .toUpperCase();
   return (
-    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-semibold text-zinc-600 dark:bg-zinc-700 dark:text-zinc-200">
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
       {text}
     </span>
   );
@@ -114,10 +114,10 @@ export function MentionList({ state, keyDownHandlerRef, container, onDismiss }: 
             role="option"
             aria-selected={idx === activeIndex}
             className={cn(
-              "flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition-colors",
+              "flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm transition-colors",
               idx === activeIndex
-                ? "bg-zinc-100 dark:bg-zinc-800"
-                : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                ? "bg-secondary text-foreground"
+                : "hover:bg-accent",
             )}
             onMouseEnter={() => setActiveIndex(idx)}
             onPointerDown={tap.onPointerDown}
@@ -134,7 +134,7 @@ export function MentionList({ state, keyDownHandlerRef, container, onDismiss }: 
             ) : (
               <Initials label={item.label} />
             )}
-            <span className="truncate text-zinc-800 dark:text-zinc-100">{item.label}</span>
+            <span className="truncate text-foreground">{item.label}</span>
           </button>
         );
       })}

@@ -14,6 +14,14 @@ import { useWorkspaceStore } from "@/store/workspaceStore";
 // item "Crear ticket" del command palette realmente tienen algo que
 // invocar cuando se monta esta pagina -- y de que dejan de tenerlo al
 // desmontarla (RD5).
+//
+// docs/BRUTALIST_REDESIGN_PLAN.md §9: la accion ya NO abre un modal, dispara
+// la creacion instantanea (`useCreateTicketInstant`, mockeado aca).
+const { createTicketInstant } = vi.hoisted(() => ({ createTicketInstant: vi.fn() }));
+
+vi.mock("@/features/tickets/hooks/useCreateTicketInstant", () => ({
+  useCreateTicketInstant: () => ({ createTicketInstant, isCreating: false }),
+}));
 const PROJECT: Project = {
   id: "project-1",
   workspace_id: "workspace-1",
@@ -33,7 +41,6 @@ vi.mock("@/features/projects/hooks/useProjects", () => ({
 
 vi.mock("@/features/tickets/hooks/useTickets", () => ({
   useTicketsSuspense: () => ({ data: [] }),
-  useCreateTicket: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateTicket: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteTicket: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
@@ -59,10 +66,6 @@ vi.mock("@/features/tickets/components/TicketDateFilter", () => ({
   TicketDateFilter: () => null,
 }));
 
-vi.mock("@/features/tickets/components/CreateTicketModal", () => ({
-  CreateTicketModal: ({ isOpen }: { isOpen: boolean }) => (isOpen ? <div>create-modal-open</div> : null),
-}));
-
 function renderKanbanPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -77,6 +80,7 @@ function renderKanbanPage() {
 describe("KanbanPage -- registro de 'create-ticket' (D8/D53)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    createTicketInstant.mockResolvedValue({ id: "new-ticket" });
     useCommandActionsStore.setState({ actions: {} });
     useWorkspaceStore.setState({
       activeWorkspace: {
@@ -134,13 +138,13 @@ describe("KanbanPage -- registro de 'create-ticket' (D8/D53)", () => {
     expect(useCommandActionsStore.getState().actions["create-ticket"]).toBeUndefined();
   });
 
-  it("invoking the registered handler opens the create-ticket modal", async () => {
+  it("invoking the registered handler fires instant ticket creation (no modal)", async () => {
     renderKanbanPage();
     await screen.findByText("kanban-board");
 
     const handler = useCommandActionsStore.getState().actions["create-ticket"];
     handler?.();
 
-    expect(await screen.findByText("create-modal-open")).toBeInTheDocument();
+    expect(createTicketInstant).toHaveBeenCalledWith({ columnId: "column-1", sprintIds: undefined });
   });
 });

@@ -678,7 +678,7 @@ export function TicketDetail({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex items-center justify-between border-b border-zinc-100 px-8 py-4 dark:border-zinc-800/50">
+          <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800/50 sm:px-8 sm:py-4">
             <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
               {ticket?.reference ? (
                 <TicketReferenceBadge reference={ticket.reference} className="uppercase tracking-wider" />
@@ -712,7 +712,7 @@ export function TicketDetail({
             </div>
           </div>
 
-          <div className="flex min-h-[calc(100dvh-53px)] flex-col px-8 py-6">
+          <div className="flex min-h-[calc(100dvh-53px)] flex-col px-4 py-5 sm:px-8 sm:py-6">
             <div className="mb-8 space-y-4">
             <div className="mb-2">
               <textarea
@@ -751,8 +751,8 @@ export function TicketDetail({
 
             <div className="flex flex-col gap-3 py-4 text-sm">
               {/* Asignados */}
-              <div className="flex items-center gap-4">
-                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Responsables</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Responsables</span>
                 <div className="flex-1">
                   <TicketAssigneeSelect
                     assigneeIds={assignees}
@@ -767,8 +767,8 @@ export function TicketDetail({
               </div>
 
               {/* Estado */}
-              <div className="flex items-center gap-4">
-                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Estado</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Estado</span>
                 <div className="flex-1">
                   <Select
                     aria-label="Estado"
@@ -785,7 +785,7 @@ export function TicketDetail({
                     }}
                     onFocus={columnField.onFocus}
                     onBlur={columnField.onBlur}
-                    className="w-48"
+                    className="w-full sm:w-48"
                     classNames={{
                       trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
                       value: "text-xs font-medium"
@@ -800,8 +800,8 @@ export function TicketDetail({
               </div>
 
               {/* Prioridad */}
-              <div className="flex items-center gap-4">
-                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Prioridad</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Prioridad</span>
                 <div className="flex-1">
                   <Select
                     aria-label="Prioridad"
@@ -816,7 +816,7 @@ export function TicketDetail({
                     }}
                     onFocus={priorityField.onFocus}
                     onBlur={priorityField.onBlur}
-                    className="w-48"
+                    className="w-full sm:w-48"
                     classNames={{
                       trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
                       value: "text-xs font-medium"
@@ -831,8 +831,8 @@ export function TicketDetail({
               </div>
 
               {/* Fecha Limite */}
-              <div className="flex items-center gap-4">
-                <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Fecha límite</span>
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Fecha límite</span>
                 <div className="flex-1">
                   <TicketCalendarPicker
                     value={due_date ? new Date(`${due_date}T00:00:00Z`).toISOString() : null}

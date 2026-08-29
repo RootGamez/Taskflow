@@ -192,16 +192,16 @@ function BlockMenuPopup({ options, onSelect, onClose, anchorRect }: BlockMenuPro
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={handleInputKeyDown}
           placeholder="Buscar bloques..."
-          className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+          className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
         />
       }
     >
       {groups.length === 0 ? (
-        <p className="px-3 py-2 text-sm text-zinc-400">Sin resultados</p>
+        <p className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</p>
       ) : (
         groups.map((group) => (
           <div key={group.label} className="mb-1">
-            <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               {group.label}
             </p>
             {group.items.map((option) => {
@@ -216,11 +216,11 @@ function BlockMenuPopup({ options, onSelect, onClose, anchorRect }: BlockMenuPro
                   aria-selected={idx === activeIndex}
                   data-bm-idx={idx}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                    "flex w-full items-center gap-3 rounded px-2 text-left transition-colors",
                     isMobile ? "py-2.5" : "py-1.5",
                     idx === activeIndex
-                      ? "bg-zinc-100 dark:bg-zinc-800"
-                      : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                      ? "bg-secondary text-foreground"
+                      : "hover:bg-accent",
                   )}
                   onMouseEnter={() => setActiveIndex(idx)}
                   onPointerDown={(e) => {
@@ -230,14 +230,14 @@ function BlockMenuPopup({ options, onSelect, onClose, anchorRect }: BlockMenuPro
                   onPointerUp={tap.onPointerUp}
                   onPointerCancel={tap.onPointerCancel}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border-2 border-border bg-card text-muted-foreground">
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                    <span className="block text-sm font-medium text-foreground">
                       {option.label}
                     </span>
-                    <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
+                    <span className="block truncate text-xs text-muted-foreground">
                       {option.description}
                     </span>
                   </span>
@@ -285,7 +285,7 @@ function BlockActionsMenuPopup({
         type="button"
         role="option"
         aria-selected={false}
-        className={cn(item, "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800")}
+        className={cn(item, "text-foreground hover:bg-accent")}
         onClick={() => {
           onMoveUp();
           onClose();
@@ -297,7 +297,7 @@ function BlockActionsMenuPopup({
         type="button"
         role="option"
         aria-selected={false}
-        className={cn(item, "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800")}
+        className={cn(item, "text-foreground hover:bg-accent")}
         onClick={() => {
           onMoveDown();
           onClose();
@@ -305,14 +305,14 @@ function BlockActionsMenuPopup({
       >
         <ArrowDown className="h-4 w-4" /> Mover abajo
       </button>
-      <div className="mx-2 my-1 border-t border-zinc-100 dark:border-zinc-800" />
+      <div className="mx-2 my-1 h-px bg-border" />
       <button
         type="button"
         role="option"
         aria-selected={false}
         className={cn(
           item,
-          "text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300",
+          "text-destructive hover:bg-destructive/10 hover:text-destructive",
         )}
         onClick={() => {
           onDelete();
@@ -529,7 +529,7 @@ export function BlockControls({
         type="button"
         aria-label="Insertar bloque"
         title="Insertar bloque"
-        className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-brand-600 text-white shadow-lg shadow-brand-600/30 ring-2 ring-white transition hover:bg-brand-700 active:scale-95 dark:ring-zinc-900"
+        className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-10 w-10 items-center justify-center rounded border-2 border-border bg-primary text-primary-foreground shadow-hard transition hover:bg-primary/90 active:scale-95 dark:shadow-hard-float"
         onPointerDown={(e) => e.preventDefault()}
         onClick={openBlockMenuFromButton}
       >
@@ -553,7 +553,7 @@ export function BlockControls({
             type="button"
             aria-label="Agregar bloque"
             title="Agregar bloque"
-            className="flex h-6 w-6 items-center justify-center rounded bg-transparent text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="flex h-6 w-6 items-center justify-center rounded bg-transparent text-muted-foreground transition hover:bg-accent hover:text-foreground"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openBlockMenu}
           >
@@ -563,7 +563,7 @@ export function BlockControls({
             type="button"
             aria-label="Opciones de bloque"
             title="Mover o eliminar bloque"
-            className="flex h-6 w-6 cursor-grab items-center justify-center rounded bg-transparent text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            className="flex h-6 w-6 cursor-grab items-center justify-center rounded bg-transparent text-muted-foreground transition hover:bg-accent hover:text-foreground active:cursor-grabbing"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openActionsMenu}
           >

@@ -135,7 +135,7 @@ export function SlashCommandMenu({
     >
       {grouped.map((group) => (
         <div key={group.label} className="mb-1">
-          <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+          <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
             {group.label}
           </p>
           {group.items.map((item) => {
@@ -150,25 +150,25 @@ export function SlashCommandMenu({
                 role="option"
                 aria-selected={idx === activeIndex}
                 className={cn(
-                  "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                  "flex w-full items-center gap-3 rounded px-2 text-left transition-colors",
                   isMobile ? "py-2.5" : "py-1.5",
                   idx === activeIndex
-                    ? "bg-zinc-100 dark:bg-zinc-800"
-                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                    ? "bg-secondary text-foreground"
+                    : "hover:bg-accent",
                 )}
                 onMouseEnter={() => setActiveIndex(idx)}
                 onPointerDown={tap.onPointerDown}
                 onPointerUp={tap.onPointerUp}
                 onPointerCancel={tap.onPointerCancel}
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded border-2 border-border bg-card text-muted-foreground">
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                  <span className="block text-sm font-medium text-foreground">
                     {item.label}
                   </span>
-                  <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
+                  <span className="block truncate text-xs text-muted-foreground">
                     {item.description}
                   </span>
                 </span>

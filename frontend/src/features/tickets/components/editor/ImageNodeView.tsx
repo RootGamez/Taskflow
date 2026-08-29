@@ -198,12 +198,12 @@ export function ImageNodeView({
               if (e.key === "Escape") setShowAltEdit(false);
             }}
             placeholder="Texto alternativo..."
-            className="h-8 w-48 rounded-md border border-zinc-300 bg-white px-2 text-sm text-zinc-900 outline-none focus:ring-2 focus:ring-blue-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            className="h-8 w-48 rounded border-2 border-border bg-card px-2 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-ring"
           />
           <button
             type="button"
             onPointerDown={(e) => { e.preventDefault(); applyAltEdit(); }}
-            className="rounded-md bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+            className="rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
           >
             OK
           </button>
@@ -214,14 +214,14 @@ export function ImageNodeView({
       {selected && !isUploading && (
         <div
           contentEditable={false}
-          className="mb-1.5 flex items-center gap-0.5 rounded-lg border border-zinc-200 bg-white p-0.5 shadow-lg dark:border-zinc-700 dark:bg-zinc-900 w-fit"
+          className="mb-1.5 flex w-fit items-center gap-0.5 rounded border-2 border-border bg-card/95 p-0.5 shadow-hard dark:shadow-hard-float"
         >
           {!src.startsWith("blob:") && (
             <button
               type="button"
               title="Abrir imagen"
               onPointerDown={(e) => { e.preventDefault(); handleOpenUrl(); }}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               Abrir
@@ -231,7 +231,7 @@ export function ImageNodeView({
             type="button"
             title="Copiar URL"
             onPointerDown={(e) => { e.preventDefault(); handleCopyUrl(); }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
           >
             <Copy className="h-3.5 w-3.5" />
             Copiar URL
@@ -240,17 +240,17 @@ export function ImageNodeView({
             type="button"
             title="Editar alt"
             onPointerDown={(e) => { e.preventDefault(); setShowAltEdit((v) => !v); }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-accent hover:text-foreground"
           >
             <Type className="h-3.5 w-3.5" />
             Alt
           </button>
-          <div className="mx-1 h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+          <div className="mx-1 h-4 w-px bg-border" />
           <button
             type="button"
             title="Eliminar imagen"
             onPointerDown={(e) => { e.preventDefault(); handleDeleteNode(); }}
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+            className="flex items-center gap-1.5 rounded px-2 py-1.5 text-xs text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
             Eliminar
@@ -275,11 +275,11 @@ export function ImageNodeView({
         {/* Loading shimmer */}
         {isUploading ? (
           <div
-            className="flex w-full items-center justify-center gap-2 rounded-lg text-sm text-zinc-400 dark:text-zinc-500"
+            className="flex w-full items-center justify-center gap-2 rounded text-sm text-muted-foreground"
             style={{
               minHeight: "180px",
               background:
-                "linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%)",
+                "linear-gradient(90deg, hsl(var(--card)) 25%, hsl(var(--muted)) 50%, hsl(var(--card)) 75%)",
               backgroundSize: "200% 100%",
               animation: "tf-shimmer 1.4s infinite",
             }}
@@ -299,10 +299,10 @@ export function ImageNodeView({
               display: "block",
               width: displayWidth ? `${displayWidth}px` : "100%",
               height: displayHeight ? `${displayHeight}px` : "auto",
-              borderRadius: "0.5rem",
+              borderRadius: "var(--radius)",
               boxShadow: selected
-                ? "0 0 0 2px #3b82f6, 0 0 0 5px #bfdbfe55"
-                : "0 1px 6px rgba(0,0,0,0.10)",
+                ? "0 0 0 2px hsl(var(--ring)), 0 0 0 5px hsl(var(--ring) / 0.25)"
+                : "0 0 0 2px hsl(var(--border))",
               transition: "box-shadow 0.15s",
               cursor: "default",
               objectFit: "contain",
@@ -320,8 +320,8 @@ export function ImageNodeView({
               position: "absolute",
               width: HANDLE_SIZE,
               height: HANDLE_SIZE,
-              background: "#3b82f6",
-              border: "2px solid #fff",
+              background: "hsl(var(--primary))",
+              border: "2px solid hsl(var(--background))",
               borderRadius: "2px",
               zIndex: 10,
               touchAction: "none",

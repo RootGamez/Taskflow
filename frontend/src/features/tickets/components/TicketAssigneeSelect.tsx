@@ -47,14 +47,14 @@ function MemberAvatar({
       <img
         src={member.avatar_url}
         alt={member.full_name}
-        className={`${sizeClass} rounded-full object-cover ring-1 ring-white dark:ring-zinc-900`}
+        className={`${sizeClass} rounded-full object-cover ring-1 ring-card`}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClass} flex items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 font-semibold text-white ring-1 ring-white dark:ring-zinc-900`}
+      className={`${sizeClass} flex items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground ring-1 ring-card`}
     >
       {initials}
     </div>
@@ -106,7 +106,7 @@ export function TicketAssigneeSelect({
       {selectedMembers.map((member) => (
         <div
           key={member.user_id}
-          className="flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 py-0.5 pl-0.5 pr-1.5 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+          className="flex items-center gap-1 rounded-full border-[1.5px] border-border bg-muted py-0.5 pl-0.5 pr-1.5 text-xs text-foreground"
         >
           <MemberAvatar member={member} size="xs" />
           <span className="max-w-[80px] truncate font-medium">
@@ -116,7 +116,7 @@ export function TicketAssigneeSelect({
             <button
               type="button"
               onClick={(e) => removeAssignee(member.user_id, e)}
-              className="ml-0.5 rounded-full p-0.5 text-zinc-400 transition-colors hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+              className="ml-0.5 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               aria-label={`Quitar a ${member.full_name}`}
             >
               <X className="h-2.5 w-2.5" />
@@ -134,7 +134,7 @@ export function TicketAssigneeSelect({
               variant="ghost"
               size="sm"
               disabled={disabled || isLoading}
-              className="h-7 gap-1.5 rounded-full border border-dashed border-zinc-300 px-2.5 py-0 text-xs text-zinc-500 hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+              className="h-7 gap-1.5 rounded-full border-[1.5px] border-dashed border-border px-2.5 py-0 text-xs text-muted-foreground hover:border-foreground hover:bg-accent hover:text-foreground"
             >
               {selectedMembers.length === 0 ? (
                 <>
@@ -162,7 +162,7 @@ export function TicketAssigneeSelect({
                 className="h-9 text-xs"
               />
               <CommandList>
-                <CommandEmpty className="py-4 text-center text-xs text-zinc-500">
+                <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
                   No se encontraron miembros.
                 </CommandEmpty>
                 <CommandGroup className="pb-1">
@@ -181,21 +181,19 @@ export function TicketAssigneeSelect({
                       >
                         <MemberAvatar member={member} size="sm" />
                         <div className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate font-medium text-zinc-800 dark:text-zinc-200">
+                          <span className="truncate font-medium text-foreground">
                             {member.full_name}
                           </span>
-                          <span className="truncate text-[10px] text-zinc-400">
+                          <span className="truncate text-[10px] text-muted-foreground">
                             {member.email}
                           </span>
                         </div>
                         <div
-                          className={`flex h-4 w-4 items-center justify-center rounded border transition-colors ${
-                            isSelected
-                              ? "border-violet-600 bg-violet-600"
-                              : "border-zinc-300 dark:border-zinc-600"
+                          className={`flex h-4 w-4 items-center justify-center rounded border-[1.5px] transition-colors ${
+                            isSelected ? "border-primary bg-primary" : "border-border"
                           }`}
                         >
-                          {isSelected && <Check className="h-2.5 w-2.5 text-white" />}
+                          {isSelected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                         </div>
                       </CommandItem>
                     );
@@ -203,11 +201,11 @@ export function TicketAssigneeSelect({
                 </CommandGroup>
 
                 {selectedMembers.length > 0 && (
-                  <div className="border-t border-zinc-100 px-2.5 py-2 dark:border-zinc-800">
+                  <div className="border-t-2 border-border px-2.5 py-2">
                     <button
                       type="button"
                       onClick={() => onChange([])}
-                      className="w-full rounded px-2 py-1 text-left text-[11px] text-zinc-400 transition-colors hover:bg-zinc-50 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+                      className="w-full rounded px-2 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       Quitar todos los responsables
                     </button>
@@ -221,7 +219,7 @@ export function TicketAssigneeSelect({
 
       {/* Read-only state when disabled and no assignees */}
       {disabled && selectedMembers.length === 0 && (
-        <span className="text-xs text-zinc-400 dark:text-zinc-500">Sin asignar</span>
+        <span className="text-xs text-muted-foreground">Sin asignar</span>
       )}
     </div>
   );

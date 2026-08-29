@@ -3,6 +3,7 @@ import { Select, SelectItem } from "@heroui/react";
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
+import { Badge } from "@/components/ui/shadcn/badge";
 import { Button } from "@/components/ui/shadcn/button";
 import {
   Dialog,
@@ -16,7 +17,6 @@ import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
 import { TicketSprintsRow } from "@/features/sprints/components/TicketSprintsRow";
 import { TicketRelationsSection } from "@/features/relations/components/TicketRelationsSection";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
-import { TicketReferenceBadge } from "@/features/tickets/components/TicketReferenceBadge";
 import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
 import type { MentionItem } from "@/features/tickets/components/editor/MentionList";
 import { TicketSubtasksSection } from "@/features/subtasks/components/TicketSubtasksSection";
@@ -666,7 +666,7 @@ export function TicketDetail({
         <DialogContent
           ref={dialogContentRef}
           showCloseButton={false}
-          className="flex h-[100dvh] max-h-[100dvh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 shadow-2xl dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:w-full max-sm:max-w-none max-sm:rounded-none"
+          className="flex h-[100dvh] max-h-[100dvh] w-[94vw] max-w-6xl flex-col gap-0 overflow-hidden rounded border-2 border-border bg-card p-0 shadow-hard-lg dark:shadow-hard-float max-sm:w-full max-sm:max-w-none max-sm:rounded-none"
           onInteractOutside={(event) => {
             if (shouldKeepDialogOpen(event.target)) {
               event.preventDefault();
@@ -685,23 +685,31 @@ export function TicketDetail({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800/50 sm:px-10 sm:py-4">
-            <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex shrink-0 items-center justify-between border-b-2 border-border px-4 py-3 sm:px-10 sm:py-4">
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {ticket?.reference ? (
-                <TicketReferenceBadge reference={ticket.reference} className="uppercase tracking-wider" />
+                <Badge variant="outline" mono className="uppercase tracking-wider">
+                  {ticket.reference}
+                </Badge>
               ) : (
-                <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
+                <Badge variant="outline" mono className="uppercase tracking-wider">
+                  #{ticket?.id?.slice(0, 8) ?? "---"}
+                </Badge>
               )}
               {ticket?.project ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ticket.project.color }} />
+                  <span
+                    className="boxed-icon h-3 w-3 shrink-0"
+                    style={{ backgroundColor: ticket.project.color }}
+                    aria-hidden
+                  />
                   {ticket.project.name}
                 </span>
               ) : null}
               {titleField.isLockedByOther && (
-                <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+                <Badge variant="mustard" className="text-[10px]">
                   {fieldLocks.title?.userName} editando...
-                </span>
+                </Badge>
               )}
             </div>
             <div className="flex items-center gap-3">
@@ -710,7 +718,7 @@ export function TicketDetail({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-950/30 dark:hover:text-red-300"
+                  className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   onClick={openDeleteDialog}
                   disabled={isLoading || isDeleting}
                 >
@@ -718,13 +726,13 @@ export function TicketDetail({
                   Eliminar
                 </Button>
               ) : null}
-              <div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
+              <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
                 <Check className="h-4 w-4" />
                 <span>Guardado automático</span>
               </div>
               <DialogClose
                 aria-label="Cerrar"
-                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+                className="flex h-8 w-8 items-center justify-center rounded border-2 border-transparent text-muted-foreground transition-[color,border-color,background-color] hover:border-border hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <X className="h-5 w-5" />
               </DialogClose>
@@ -757,21 +765,21 @@ export function TicketDetail({
                 disabled={isLoading || !canEdit || titleField.isLockedByOther}
                 className={
                   "w-full resize-none overflow-hidden bg-transparent outline-none " +
-                  "text-[1.55rem] font-bold leading-tight tracking-tight " +
-                  "text-zinc-900 dark:text-zinc-50 " +
-                  "placeholder:text-zinc-300 placeholder:font-bold placeholder:tracking-tight dark:placeholder:text-zinc-600 " +
+                  "font-display text-[1.55rem] font-bold leading-tight tracking-tight " +
+                  "text-foreground " +
+                  "placeholder:font-bold placeholder:tracking-tight placeholder:text-muted-foreground/50 " +
                   "transition-colors duration-150 " +
                   (isLoading || !canEdit || titleField.isLockedByOther ? "opacity-50 cursor-not-allowed" : "")
                 }
                 style={{ height: "auto" }}
               />
-              <div className="mt-2 h-[2px] rounded-full bg-gradient-to-r from-violet-400 via-indigo-300 to-transparent opacity-60 dark:from-violet-600 dark:via-indigo-500 dark:to-transparent" />
+              <div className="mt-3 border-b-2 border-border" />
             </div>
 
             <div className="flex flex-col gap-3 py-4 text-sm">
               {/* Asignados */}
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Responsables</span>
+                <span className="eyebrow sm:w-28">Responsables</span>
                 <div className="flex-1">
                   <TicketAssigneeSelect
                     assigneeIds={assignees}
@@ -787,7 +795,7 @@ export function TicketDetail({
 
               {/* Estado */}
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Estado</span>
+                <span className="eyebrow sm:w-28">Estado</span>
                 <div className="flex-1">
                   <Select
                     aria-label="Estado"
@@ -810,7 +818,7 @@ export function TicketDetail({
                     onBlur={columnField.onBlur}
                     className="w-full sm:w-48"
                     classNames={{
-                      trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
+                      trigger: "bg-card shadow-none border-2 border-border hover:bg-accent h-8 min-h-8 rounded-none text-xs data-[focus=true]:border-primary",
                       value: "text-xs font-medium"
                     }}
                     isDisabled={isLoading || !canEdit || columnField.isLockedByOther || columns.length === 0}
@@ -824,7 +832,7 @@ export function TicketDetail({
 
               {/* Prioridad */}
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Prioridad</span>
+                <span className="eyebrow sm:w-28">Prioridad</span>
                 <div className="flex-1">
                   <Select
                     aria-label="Prioridad"
@@ -841,7 +849,7 @@ export function TicketDetail({
                     onBlur={priorityField.onBlur}
                     className="w-full sm:w-48"
                     classNames={{
-                      trigger: "bg-transparent shadow-none border hover:bg-zinc-100 dark:border-zinc-800 dark:hover:bg-zinc-800 h-8 min-h-8 rounded-md text-xs",
+                      trigger: "bg-card shadow-none border-2 border-border hover:bg-accent h-8 min-h-8 rounded-none text-xs data-[focus=true]:border-primary",
                       value: "text-xs font-medium"
                     }}
                     isDisabled={isLoading || !canEdit || priorityField.isLockedByOther}
@@ -855,7 +863,7 @@ export function TicketDetail({
 
               {/* Fecha Limite */}
               <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
-                <span className="text-sm text-zinc-500 dark:text-zinc-500 sm:w-28">Fecha límite</span>
+                <span className="eyebrow sm:w-28">Fecha límite</span>
                 <div className="flex-1">
                   <TicketCalendarPicker
                     value={due_date ? new Date(`${due_date}T00:00:00Z`).toISOString() : null}
@@ -911,7 +919,7 @@ export function TicketDetail({
               />
             ) : null}
 
-            <div className="flex-1 space-y-5 border-t border-zinc-100 pt-6 dark:border-zinc-800/50">
+            <div className="flex-1 space-y-5 border-t-2 border-border pt-6">
               <TicketRichEditor
                 value={parseRichTextJson(description)}
                 placeholder="Describe el contexto, avances y decisiones del ticket..."

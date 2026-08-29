@@ -42,7 +42,7 @@ function CommentAuthorAvatar({ author }: { author: Comment["author"] }) {
       .toUpperCase() || "?";
 
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-border bg-muted text-xs font-semibold text-muted-foreground">
       {initials}
     </div>
   );

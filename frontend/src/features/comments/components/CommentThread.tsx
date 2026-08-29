@@ -61,7 +61,9 @@ export function CommentThread({ ticketId, projectId, canComment }: CommentThread
           <p className="py-6 text-center text-sm text-muted-foreground">Cargando comentarios…</p>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <MessageSquare className="h-8 w-8 text-muted-foreground" />
+            <span className="boxed-icon h-10 w-10 text-muted-foreground">
+              <MessageSquare className="h-5 w-5" />
+            </span>
             <p className="text-sm text-muted-foreground">Sin comentarios todavía</p>
           </div>
         ) : (

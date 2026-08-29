@@ -20,13 +20,11 @@ export function ActivityItem({ activity }: ActivityItemProps) {
 
   return (
     <div className="relative z-10 flex items-center gap-2">
-      <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background ${iconClassName}`}
-      >
+      <span className={`boxed-icon h-6 w-6 shrink-0 bg-background ${iconClassName}`}>
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{text}</span>
-      <span className="shrink-0 text-xs text-muted-foreground">{timestamp}</span>
+      <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{timestamp}</span>
     </div>
   );
 }

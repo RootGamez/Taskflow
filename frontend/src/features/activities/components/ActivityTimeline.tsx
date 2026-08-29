@@ -26,7 +26,9 @@ export function ActivityTimeline({ ticketId, projectId }: ActivityTimelineProps)
 
   return (
     <div className="relative flex flex-col gap-3">
-      <div aria-hidden="true" className="absolute bottom-1 left-3 top-1 w-px bg-border" />
+      {/* Riel vertical sólido (§11): la línea fina pasa a barra de 2px en tinta,
+          los íconos boxed se apoyan sobre ella. */}
+      <div aria-hidden="true" className="absolute bottom-1 left-[11px] top-1 w-0.5 bg-border" />
       {activities.map((activity) => (
         <ActivityItem key={activity.id} activity={activity} />
       ))}

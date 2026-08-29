@@ -34,27 +34,27 @@ function Calendar({
         nav: "flex items-center pointer-events-none",
         button_previous: cn(
           buttonVariants({ variant: "outline" }),
-          "absolute left-0 top-1/2 -translate-x-[115%] -translate-y-1/2 h-7 w-7 bg-background p-0 opacity-70 hover:opacity-100 pointer-events-auto dark:border-zinc-800"
+          "absolute left-0 top-1/2 -translate-x-[115%] -translate-y-1/2 h-7 w-7 bg-background p-0 opacity-70 hover:opacity-100 pointer-events-auto"
         ),
         button_next: cn(
           buttonVariants({ variant: "outline" }),
-          "absolute right-0 top-1/2 translate-x-[115%] -translate-y-1/2 h-7 w-7 bg-background p-0 opacity-70 hover:opacity-100 pointer-events-auto dark:border-zinc-800"
+          "absolute right-0 top-1/2 translate-x-[115%] -translate-y-1/2 h-7 w-7 bg-background p-0 opacity-70 hover:opacity-100 pointer-events-auto"
         ),
         month_grid: "border-collapse mx-auto tabular-nums",
         weekdays: "flex",
-        weekday: "text-zinc-500 rounded-md w-8 font-normal text-[0.75rem] dark:text-zinc-400 text-center",
+        weekday: "text-muted-foreground rounded-md w-8 font-normal text-[0.75rem] text-center",
         week: "flex w-full mt-1",
         day: "h-8 w-8 text-center text-sm p-0 flex justify-center items-center",
-        day_button: "h-full w-full p-0 font-normal aria-selected:opacity-100 m-0 text-center inline-flex items-center justify-center hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 transition-colors rounded-md",
+        day_button: "h-full w-full p-0 font-normal aria-selected:opacity-100 m-0 text-center inline-flex items-center justify-center hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent dark:hover:text-accent-foreground transition-colors rounded-md",
         range_end: "day-range-end",
         selected:
-          "bg-zinc-900 text-zinc-50 hover:bg-zinc-900 hover:text-zinc-50 focus:bg-zinc-900 focus:text-zinc-50 dark:bg-zinc-50 dark:text-zinc-900 dark:hover:bg-zinc-50 dark:hover:text-zinc-900 rounded-md",
-        today: "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50 rounded-md",
+          "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary dark:hover:text-primary-foreground rounded-md",
+        today: "bg-accent text-accent-foreground dark:bg-accent dark:text-accent-foreground rounded-md",
         outside:
-          "day-outside text-zinc-500 aria-selected:bg-zinc-100/50 aria-selected:text-zinc-500 aria-selected:opacity-30 dark:text-zinc-400 dark:aria-selected:bg-zinc-800/50 dark:aria-selected:text-zinc-400",
-        disabled: "text-zinc-500 opacity-50 dark:text-zinc-400",
+          "day-outside text-muted-foreground aria-selected:bg-muted aria-selected:text-muted-foreground aria-selected:opacity-30 dark:text-muted-foreground dark:aria-selected:bg-muted dark:aria-selected:text-muted-foreground",
+        disabled: "text-muted-foreground opacity-50",
         range_middle:
-          "aria-selected:bg-zinc-100 aria-selected:text-zinc-900 dark:aria-selected:bg-zinc-800 dark:aria-selected:text-zinc-50",
+          "aria-selected:bg-accent aria-selected:text-accent-foreground dark:aria-selected:bg-accent dark:aria-selected:text-accent-foreground",
         hidden: "invisible",
         ...classNames,
       }}

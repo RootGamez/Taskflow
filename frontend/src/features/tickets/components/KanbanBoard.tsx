@@ -73,10 +73,12 @@ function SortableTicketCard({
   ticket,
   laneId,
   onOpen,
+  accentColor,
 }: {
   ticket: Ticket;
   laneId: string;
   onOpen: (ticket: Ticket) => void;
+  accentColor?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: getTicketDragId(ticket.id, laneId),
@@ -105,7 +107,7 @@ function SortableTicketCard({
     >
       {/* Sin sombra en reposo — el borde grueso da el peso. La sombra dura
           solo aparece en el DragOverlay mientras se arrastra. */}
-      <TicketCard ticket={ticket} onOpen={onOpen} />
+      <TicketCard ticket={ticket} onOpen={onOpen} accentColor={accentColor} />
     </div>
   );
 }
@@ -158,6 +160,7 @@ function TicketCell({
               ticket={ticket}
               laneId={laneId}
               onOpen={onOpenTicket}
+              accentColor={column.color}
             />
           ))}
           {isFilteredEmpty ? (
@@ -503,6 +506,7 @@ export function KanbanBoard({
             <TicketCard
               ticket={activeTicket}
               onOpen={onOpenTicket}
+              accentColor={orderedColumns.find((c) => c.id === activeTicket.column_id)?.color}
               className="shadow-hard dark:shadow-hard-float"
             />
           </div>

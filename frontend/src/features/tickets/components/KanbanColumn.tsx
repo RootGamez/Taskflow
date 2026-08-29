@@ -49,7 +49,11 @@ export function KanbanColumn({
       <div className="space-y-3 border-l-2 border-border pl-3">
         {tickets.map((ticket) => (
           <div key={ticket.id}>
-            {renderTicket ? renderTicket(ticket) : <TicketCard ticket={ticket} onOpen={onOpenTicket} />}
+            {renderTicket ? (
+              renderTicket(ticket)
+            ) : (
+              <TicketCard ticket={ticket} onOpen={onOpenTicket} accentColor={color} />
+            )}
           </div>
         ))}
       </div>

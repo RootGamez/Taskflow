@@ -44,10 +44,12 @@ function SortableMobileCard({
   ticket,
   onOpen,
   onRequestMove,
+  accentColor,
 }: {
   ticket: Ticket;
   onOpen: (ticket: Ticket) => void;
   onRequestMove: (ticket: Ticket) => void;
+  accentColor?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: ticket.id,
@@ -66,7 +68,7 @@ function SortableMobileCard({
           delay), pero dejamos el tap para abrir el ticket. Sin sombra en
           reposo — solo el DragOverlay lleva `shadow-hard`. */}
       <div {...attributes} {...listeners} className="touch-pan-y">
-        <TicketCard ticket={ticket} onOpen={onOpen} className="pr-12" />
+        <TicketCard ticket={ticket} onOpen={onOpen} accentColor={accentColor} className="pr-12" />
       </div>
       <button
         type="button"
@@ -283,6 +285,7 @@ export function KanbanBoardMobile({
                 ticket={ticket}
                 onOpen={onOpenTicket}
                 onRequestMove={setMoveTarget}
+                accentColor={activeColumn?.color}
               />
             ))}
 
@@ -301,6 +304,9 @@ export function KanbanBoardMobile({
             <TicketCard
               ticket={draggedTicket}
               onOpen={onOpenTicket}
+              accentColor={
+                orderedColumns.find((c) => c.id === draggedTicket.column_id)?.color
+              }
               className="shadow-hard dark:shadow-hard-float"
             />
           ) : null}

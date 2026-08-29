@@ -23,9 +23,22 @@ interface TicketCardProps {
   /** Muestra a qué proyecto pertenece el ticket. Se usa en el tablero de
    * sprint, que cruza proyectos. Si se omite, usa `ticket.project`. */
   showProject?: boolean;
+  /**
+   * Color (hex) del estado/columna del ticket. Si se pasa, la tarjeta lleva
+   * un fondo tintado con ese color + una franja izquierda sólida — la vista
+   * "respira" el color del estado. El texto sigue en tokens del tema (nunca
+   * sobre el color crudo a full — DESIGN_SYSTEM §3).
+   */
+  accentColor?: string;
 }
 
-export function TicketCard({ ticket, onOpen, className = "", showProject = false }: TicketCardProps) {
+export function TicketCard({
+  ticket,
+  onOpen,
+  className = "",
+  showProject = false,
+  accentColor,
+}: TicketCardProps) {
   const dueDateLabel = formatDueDateDayMonth(ticket.due_date);
   const isOverdue = isDueDateOverdue(ticket.due_date);
   const priorityStyle = PRIORITY_STYLES[ticket.priority];
@@ -37,12 +50,26 @@ export function TicketCard({ ticket, onOpen, className = "", showProject = false
         ? ticket.assignees[0].full_name
         : `${ticket.assignees[0].full_name} +${ticket.assignees.length - 1}`;
 
+  const tinted = Boolean(accentColor);
+
   return (
     <button
       type="button"
       onClick={() => onOpen(ticket)}
+      style={
+        tinted
+          ? {
+              backgroundColor: `color-mix(in srgb, ${accentColor} 16%, hsl(var(--card)))`,
+              borderLeftColor: accentColor,
+              borderLeftWidth: "5px",
+            }
+          : undefined
+      }
       className={cn(
-        "w-full border-2 border-border bg-card p-3 text-left transition-colors duration-150 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "w-full border-2 border-border p-3 text-left transition-[filter,background-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        tinted
+          ? "hover:brightness-[0.97] dark:hover:brightness-[1.07]"
+          : "bg-card hover:bg-accent",
         className,
       )}
     >

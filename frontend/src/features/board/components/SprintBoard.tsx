@@ -30,10 +30,12 @@ function DraggableCard({
   ticket,
   canMutate,
   onOpen,
+  accentColor,
 }: {
   ticket: Ticket;
   canMutate: boolean;
   onOpen: (ticket: Ticket) => void;
+  accentColor?: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: ticket.id,
@@ -48,7 +50,7 @@ function DraggableCard({
       {...listeners}
       className={`select-none ${canMutate ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-30" : ""}`}
     >
-      <TicketCard ticket={ticket} onOpen={onOpen} showProject />
+      <TicketCard ticket={ticket} onOpen={onOpen} showProject accentColor={accentColor} />
     </div>
   );
 }
@@ -137,6 +139,7 @@ function StatusColumn({
                   ticket={ticket}
                   canMutate={canMutate}
                   onOpen={onOpenTicket}
+                  accentColor={status.color}
                 />
               ))}
             </div>
@@ -218,7 +221,14 @@ export function SprintBoard({
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
           <div className="w-[300px] rotate-1 cursor-grabbing shadow-hard-lg dark:shadow-hard-float">
-            <TicketCard ticket={activeTicket} onOpen={onOpenTicket} showProject />
+            <TicketCard
+              ticket={activeTicket}
+              onOpen={onOpenTicket}
+              showProject
+              accentColor={
+                orderedStatuses.find((s) => s.id === activeTicket.workspace_status_id)?.color
+              }
+            />
           </div>
         ) : null}
       </DragOverlay>

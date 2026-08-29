@@ -804,13 +804,18 @@ export function TicketRichEditor({
         <EditorContent editor={editor} />
       </div>
 
-      {/* ── Slash command menu (portal to document.body) ──────────────────── */}
+      {/* ── Slash command menu ────────────────────────────────────────────── */}
       <SlashCommandMenu
         items={slashMenuState.items}
         command={slashMenuState.command}
         clientRect={slashMenuState.clientRect}
         isVisible={slashMenuState.isVisible}
         keyDownHandlerRef={slashKeyDownRef}
+        container={
+          (editor?.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null) ??
+          (typeof document !== "undefined" ? document.body : null)
+        }
+        onDismiss={() => setSlashMenuState((prev) => ({ ...prev, isVisible: false }))}
       />
 
       {/* ── Link BubbleMenu ───────────────────────────────────────────────── */}

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import { createTapSelectHandlers } from "./tapSelect";
+import { EditorMenuSurface } from "./EditorMenuSurface";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,10 @@ interface SlashCommandMenuProps {
   isVisible: boolean;
   /** Ref that the suggestion renderer uses to call our keyboard handler */
   keyDownHandlerRef: React.MutableRefObject<((e: KeyboardEvent) => boolean) | null>;
+  /** Portal container (el `[data-slot='dialog-content']` si aplica). */
+  container?: HTMLElement | null;
+  /** Se llama cuando Radix pide cerrar (Esc / clic fuera). */
+  onDismiss?: () => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -34,10 +38,11 @@ export function SlashCommandMenu({
   clientRect,
   isVisible,
   keyDownHandlerRef,
+  container,
+  onDismiss,
 }: SlashCommandMenuProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [anchorRect, setAnchorRect] = useState<{ top: number; left: number } | null>(null);
   const isMobile = useIsMobile();
   const pressRef = useRef<{ index: number; x: number; y: number; time: number } | null>(null);
 
@@ -62,24 +67,13 @@ export function SlashCommandMenu({
     setActiveIndex(0);
   }, [items]);
 
-  // Update position from DOMRect (provided by @tiptap/suggestion)
+  // El ancla es el rect del cursor que entrega @tiptap/suggestion. Radix
+  // Popper se encarga del flip/colisión — ya no hay menuHeight mágico.
   useEffect(() => {
     if (!clientRect) return;
     const rect = clientRect();
     if (!rect) return;
-
-    const menuHeight = containerRef.current?.offsetHeight ?? 300;
-    const menuWidth = containerRef.current?.offsetWidth ?? 288;
-    const vp = { w: window.innerWidth, h: window.innerHeight };
-
-    let top = rect.bottom + 6;
-    let left = rect.left;
-
-    if (top + menuHeight > vp.h - 16) top = rect.top - menuHeight - 6;
-    if (left + menuWidth > vp.w - 8) left = vp.w - menuWidth - 8;
-    left = Math.max(8, left);
-
-    setPosition({ top, left });
+    setAnchorRect({ top: rect.bottom, left: rect.left });
   }, [clientRect, items]);
 
   // Keyboard handler — exposed via ref so the suggestion renderer can call it
@@ -117,8 +111,8 @@ export function SlashCommandMenu({
 
   // Auto-scroll active item into view
   useEffect(() => {
-    const el = containerRef.current?.querySelector(
-      `[data-slash-index="${activeIndex}"]`
+    const el = document.querySelector(
+      `[data-slash-index="${activeIndex}"]`,
     ) as HTMLElement | null;
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
@@ -127,89 +121,63 @@ export function SlashCommandMenu({
 
   let globalIndex = 0;
 
-  const outerStyle: React.CSSProperties = isMobile
-    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999 }
-    : { position: "fixed", top: position.top, left: position.left, zIndex: 9999 };
-
-  const panelClass = isMobile
-    ? "w-full rounded-t-2xl border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
-    : "w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900";
-
-  const scrollClass = isMobile
-    ? "tf-scroll-contain max-h-[60dvh] overflow-y-auto p-1.5"
-    : "tf-scroll-contain max-h-72 overflow-y-auto p-1";
-
-  return createPortal(
-    // `data-ticket-editor-floating` evita que el Dialog del panel de ticket
-    // (Radix) se cierre al tocar este menú, que está portaleado a <body>.
-    <div style={outerStyle} ref={containerRef} data-ticket-editor-floating="true">
-      <div className={panelClass}>
-        {isMobile ? (
-          <div className="mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-        ) : null}
-        <div
-          className={scrollClass}
-          style={{ touchAction: "pan-y" }}
-          onWheel={(e) => {
-            if (isMobile) return;
-            const el = e.currentTarget;
-            const max = el.scrollHeight - el.clientHeight;
-            if ((e.deltaY > 0 && el.scrollTop < max) || (e.deltaY < 0 && el.scrollTop > 0)) {
-              e.preventDefault();
-              el.scrollTop += e.deltaY;
-            }
-          }}
-        >
-          {grouped.map((group) => (
-            <div key={group.label} className="mb-1">
-              <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                {group.label}
-              </p>
-              {group.items.map((item) => {
-                const idx = globalIndex++;
-                const Icon = item.icon;
-                const tap = createTapSelectHandlers(
-                  idx,
-                  () => command(flatItems[idx]),
-                  pressRef,
-                );
-                return (
-                  <button
-                    key={item.id}
-                    data-slash-index={idx}
-                    type="button"
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
-                      isMobile ? "py-2.5" : "py-1.5",
-                      idx === activeIndex
-                        ? "bg-zinc-100 dark:bg-zinc-800"
-                        : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                    )}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onPointerDown={tap.onPointerDown}
-                    onPointerUp={tap.onPointerUp}
-                    onPointerCancel={tap.onPointerCancel}
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
-                        {item.label}
-                      </span>
-                      <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
-                        {item.description}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+  return (
+    <EditorMenuSurface
+      open
+      onOpenChange={(next) => {
+        if (!next) onDismiss?.();
+      }}
+      anchorRect={anchorRect}
+      container={container}
+      autoFocus={false}
+      ariaLabel="Insertar bloque"
+      desktopMaxHeightClass="max-h-72"
+    >
+      {grouped.map((group) => (
+        <div key={group.label} className="mb-1">
+          <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            {group.label}
+          </p>
+          {group.items.map((item) => {
+            const idx = globalIndex++;
+            const Icon = item.icon;
+            const tap = createTapSelectHandlers(idx, () => command(flatItems[idx]), pressRef);
+            return (
+              <button
+                key={item.id}
+                data-slash-index={idx}
+                type="button"
+                role="option"
+                aria-selected={idx === activeIndex}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                  isMobile ? "py-2.5" : "py-1.5",
+                  idx === activeIndex
+                    ? "bg-zinc-100 dark:bg-zinc-800"
+                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                )}
+                onMouseEnter={() => setActiveIndex(idx)}
+                onPointerDown={tap.onPointerDown}
+                onPointerUp={tap.onPointerUp}
+                onPointerCancel={tap.onPointerCancel}
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                    {item.label}
+                  </span>
+                  <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
+                    {item.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </div>,
-    document.body
+      ))}
+    </EditorMenuSurface>
   );
 }
 

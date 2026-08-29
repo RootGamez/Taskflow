@@ -3,31 +3,22 @@
 /**
  * BlockControls.tsx
  *
- * Floating "+" and "⠿" (grip) buttons that appear on block hover.
- *
- * Key fix vs the old implementation:
- *   - Uses `position: absolute` relative to the `.tf-editor-wrapper` (position: relative).
- *   - `top` is (coordsAtPos().top - wrapper.getBoundingClientRect().top + scrollTop)
- *     so it stays correct during scroll, dialog animations and viewport resize.
- *   - Handles atom nodes (image, hr) correctly when inserting after them.
+ * Botones flotantes "+" y "⠿" (grip) que aparecen al pasar por un bloque, y
+ * los menús que abren. Los menús se renderizan con `EditorMenuSurface`
+ * (Radix Popover en escritorio, Sheet en móvil) — ver ese archivo para el
+ * porqué de los bugs históricos de scroll / foco del buscador.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
-import { Plus, GripVertical } from "lucide-react";
+import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
 import { createTapSelectHandlers } from "./tapSelect";
+import { EditorMenuSurface } from "./EditorMenuSurface";
 
 // ── ProseMirror helpers ───────────────────────────────────────────────────────
 
@@ -78,9 +69,7 @@ function moveBlock(editor: Editor, hoveredIndex: number, direction: "up" | "down
   tr.replaceWith(rangeFrom, rangeTo, nodes);
 
   const newPos =
-    direction === "up"
-      ? rangeFrom + 1
-      : rangeFrom + swap.node.nodeSize + 1;
+    direction === "up" ? rangeFrom + 1 : rangeFrom + swap.node.nodeSize + 1;
 
   const resolved = tr.doc.resolve(Math.min(newPos, tr.doc.content.size - 1));
   tr.setSelection(TextSelection.near(resolved));
@@ -103,195 +92,176 @@ function prepareInsertAfter(editor: Editor, index: number) {
   const { node } = range;
 
   if (node.isAtom || !node.isTextblock) {
-    // For atoms, insert a new paragraph right after and move the cursor there
-    editor
-      .chain()
-      .focus()
-      .insertContentAt(range.to, { type: "paragraph" })
-      .run();
+    editor.chain().focus().insertContentAt(range.to, { type: "paragraph" }).run();
     setCursorNear(editor, range.to + 1);
   } else {
     setCursorNear(editor, range.to + 1);
   }
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Grouping helper (shared by both menus) ────────────────────────────────────
+
+interface OptionGroup {
+  label: string;
+  items: SlashCommandItem[];
+}
+
+function groupOptions(options: SlashCommandItem[], query: string): OptionGroup[] {
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? options.filter(
+        (o) =>
+          o.label.toLowerCase().includes(q) ||
+          o.keywords.some((k) => k.includes(q)),
+      )
+    : options;
+
+  const groups: OptionGroup[] = [];
+  const byGroup = (g: SlashCommandItem["group"]) => filtered.filter((o) => o.group === g);
+  const basic = byGroup("basic");
+  const lists = byGroup("lists");
+  const advanced = byGroup("advanced");
+  const media = byGroup("media");
+  if (basic.length) groups.push({ label: "Básico", items: basic });
+  if (lists.length) groups.push({ label: "Listas", items: lists });
+  if (advanced.length) groups.push({ label: "Avanzado", items: advanced });
+  if (media.length) groups.push({ label: "Media", items: media });
+  return groups;
+}
+
+type AnchorRect = { top: number; left: number } | null;
+
+// ── "+" menu (block type picker) ─────────────────────────────────────────────
 
 interface BlockMenuProps {
   options: SlashCommandItem[];
   onSelect: (option: SlashCommandItem) => void;
   onClose: () => void;
-  x: number;
-  y: number;
+  anchorRect: AnchorRect;
+  container: HTMLElement | null;
 }
 
-function BlockMenuPopup({ options, onSelect, onClose, x, y }: BlockMenuProps) {
+function BlockMenuPopup({ options, onSelect, onClose, anchorRect, container }: BlockMenuProps) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
   const pressRef = useRef<{ index: number; x: number; y: number; time: number } | null>(null);
 
-  useEffect(() => {
-    // En móvil no autoenfocamos: abriría el teclado virtual encima de la
-    // hoja de bloques. El usuario puede tocar el campo para buscar.
-    if (isMobile) return;
-    const t = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(t);
-  }, [isMobile]);
+  const groups = useMemo(() => groupOptions(options, search), [options, search]);
+  const flat = useMemo(() => groups.flatMap((g) => g.items), [groups]);
 
-  const grouped = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filtered = q
-      ? options.filter(
-          (o) =>
-            o.label.toLowerCase().includes(q) ||
-            o.keywords.some((k) => k.includes(q))
-        )
-      : options;
-
-    const basic = filtered.filter((o) => o.group === "basic");
-    const lists = filtered.filter((o) => o.group === "lists");
-    const advanced = filtered.filter((o) => o.group === "advanced");
-    const media = filtered.filter((o) => o.group === "media");
-    const groups: { label: string; items: SlashCommandItem[] }[] = [];
-    if (basic.length) groups.push({ label: "Básico", items: basic });
-    if (lists.length) groups.push({ label: "Listas", items: lists });
-    if (advanced.length) groups.push({ label: "Avanzado", items: advanced });
-    if (media.length) groups.push({ label: "Media", items: media });
-    return groups;
-  }, [options, search]);
-
-  const flatFiltered = useMemo(() => grouped.flatMap((g) => g.items), [grouped]);
-
-  useEffect(() => setActiveIndex(0), [flatFiltered.length]);
+  useEffect(() => setActiveIndex(0), [flat.length]);
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { e.preventDefault(); onClose(); }
-      else if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, flatFiltered.length - 1)); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
-      else if (e.key === "Enter") { e.preventDefault(); const sel = flatFiltered[activeIndex]; if (sel) onSelect(sel); }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [activeIndex, flatFiltered, onClose, onSelect]);
-
-  useEffect(() => {
-    const handleClick = (e: PointerEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) onClose();
-    };
-    window.addEventListener("pointerdown", handleClick);
-    return () => window.removeEventListener("pointerdown", handleClick);
-  }, [onClose]);
-
-  useEffect(() => {
-    const el = containerRef.current?.querySelector(`[data-bm-idx="${activeIndex}"]`) as HTMLElement | null;
+    const el = document.querySelector(
+      `[data-bm-idx="${activeIndex}"]`,
+    ) as HTMLElement | null;
     el?.scrollIntoView({ block: "nearest" });
   }, [activeIndex]);
 
-  // Flip up if near bottom
-  const menuHeight = 320;
-  const top = y + menuHeight > window.innerHeight - 16 ? y - menuHeight : y + 4;
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, flat.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const sel = flat[activeIndex];
+      if (sel) onSelect(sel);
+    }
+    // Escape lo maneja Radix (cierra el Popover, no el Dialog).
+  };
 
   let globalIndex = 0;
 
-  const outerStyle: React.CSSProperties = isMobile
-    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999, pointerEvents: "auto" }
-    : { position: "fixed", top, left: x, zIndex: 9999, pointerEvents: "auto" };
-
-  const panelClass = isMobile
-    ? "w-full rounded-t-2xl border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900"
-    : "w-72 overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-zinc-900";
-
   return (
-    // `data-ticket-editor-floating` -> el Dialog del panel de ticket no se
-    // cierra al tocar esta hoja (portaleada fuera del contenido del Dialog).
-    <div style={outerStyle} ref={containerRef} data-ticket-editor-floating="true">
-      <div className={panelClass}>
-        {isMobile ? (
-          <div className="mx-auto mt-2 mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-        ) : null}
-        <div className="border-b border-zinc-100 px-3 py-2 dark:border-zinc-800">
-          <input
-            ref={inputRef}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar bloques..."
-            className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
-          />
-        </div>
-        <div
-          className="tf-scroll-contain max-h-[58dvh] overflow-y-auto p-1 sm:max-h-72"
-          style={{ touchAction: "pan-y" }}
-        >
-          {grouped.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-zinc-400">Sin resultados</p>
-          ) : (
-            grouped.map((group) => (
-              <div key={group.label} className="mb-1">
-                <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-                  {group.label}
-                </p>
-                {group.items.map((option) => {
-                  const idx = globalIndex++;
-                  const Icon = option.icon;
-                  const tap = createTapSelectHandlers(
-                    idx,
-                    () => onSelect(flatFiltered[idx]),
-                    pressRef,
-                  );
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      data-bm-idx={idx}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
-                        isMobile ? "py-2.5" : "py-1.5",
-                        idx === activeIndex
-                          ? "bg-zinc-100 dark:bg-zinc-800"
-                          : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
-                      )}
-                      onMouseEnter={() => setActiveIndex(idx)}
-                      onPointerDown={(e) => {
-                        e.stopPropagation();
-                        tap.onPointerDown(e);
-                      }}
-                      onPointerUp={tap.onPointerUp}
-                      onPointerCancel={tap.onPointerCancel}
-                    >
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                        <Icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
-                          {option.label}
-                        </span>
-                        <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
-                          {option.description}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </div>
+    <EditorMenuSurface
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      anchorRect={anchorRect}
+      container={container}
+      autoFocus={!isMobile}
+      ariaLabel="Insertar bloque"
+      desktopMaxHeightClass="max-h-80"
+      header={
+        <input
+          autoFocus={!isMobile}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={handleInputKeyDown}
+          placeholder="Buscar bloques..."
+          className="w-full bg-transparent text-sm text-zinc-800 outline-none placeholder:text-zinc-400 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+        />
+      }
+    >
+      {groups.length === 0 ? (
+        <p className="px-3 py-2 text-sm text-zinc-400">Sin resultados</p>
+      ) : (
+        groups.map((group) => (
+          <div key={group.label} className="mb-1">
+            <p className="px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+              {group.label}
+            </p>
+            {group.items.map((option) => {
+              const idx = globalIndex++;
+              const Icon = option.icon;
+              const tap = createTapSelectHandlers(idx, () => onSelect(flat[idx]), pressRef);
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="option"
+                  aria-selected={idx === activeIndex}
+                  data-bm-idx={idx}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-2 text-left transition-colors",
+                    isMobile ? "py-2.5" : "py-1.5",
+                    idx === activeIndex
+                      ? "bg-zinc-100 dark:bg-zinc-800"
+                      : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50",
+                  )}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    tap.onPointerDown(e);
+                  }}
+                  onPointerUp={tap.onPointerUp}
+                  onPointerCancel={tap.onPointerCancel}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-zinc-200 bg-white text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                      {option.label}
+                    </span>
+                    <span className="block truncate text-xs text-zinc-400 dark:text-zinc-500">
+                      {option.description}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        ))
+      )}
+    </EditorMenuSurface>
   );
 }
+
+// ── Block actions menu (move / delete) ───────────────────────────────────────
 
 interface BlockActionsMenuProps {
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
   onClose: () => void;
-  x: number;
-  y: number;
+  anchorRect: AnchorRect;
+  container: HTMLElement | null;
 }
 
 function BlockActionsMenuPopup({
@@ -299,61 +269,64 @@ function BlockActionsMenuPopup({
   onMoveDown,
   onDelete,
   onClose,
-  x,
-  y,
+  anchorRect,
+  container,
 }: BlockActionsMenuProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isMobile = useIsMobile();
-
-  useEffect(() => {
-    const handleClick = (e: PointerEvent) => {
-      if (!ref.current?.contains(e.target as Node)) onClose();
-    };
-    window.addEventListener("pointerdown", handleClick);
-    return () => window.removeEventListener("pointerdown", handleClick);
-  }, [onClose]);
-
-  const outerStyle: React.CSSProperties = isMobile
-    ? { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 9999, pointerEvents: "auto" }
-    : { position: "fixed", top: y, left: x, zIndex: 9999, pointerEvents: "auto" };
-
+  const item =
+    "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition-colors sm:py-2";
   return (
-    <div style={outerStyle} ref={ref} data-ticket-editor-floating="true">
-      <div
-        className={cn(
-          "flex flex-col border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900",
-          isMobile
-            ? "w-full rounded-t-2xl border-t py-2 pb-[env(safe-area-inset-bottom)] [&>button]:py-3"
-            : "w-44 overflow-hidden rounded-lg border py-1",
-        )}
+    <EditorMenuSurface
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      anchorRect={anchorRect}
+      container={container}
+      ariaLabel="Acciones del bloque"
+      className="w-52"
+      desktopMaxHeightClass="max-h-none"
+    >
+      <button
+        type="button"
+        role="option"
+        aria-selected={false}
+        className={cn(item, "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800")}
+        onClick={() => {
+          onMoveUp();
+          onClose();
+        }}
       >
-        {isMobile ? (
-          <div className="mx-auto mb-1 h-1.5 w-10 rounded-full bg-zinc-300 dark:bg-zinc-700" />
-        ) : null}
-        <button
-          type="button"
-          className="flex w-full items-start px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onMoveUp(); onClose(); }}
-        >
-          ↑ Mover arriba
-        </button>
-        <button
-          type="button"
-          className="flex w-full items-start px-3 py-1.5 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800 transition-colors"
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onMoveDown(); onClose(); }}
-        >
-          ↓ Mover abajo
-        </button>
-        <div className="mx-2 my-1 border-t border-zinc-100 dark:border-zinc-800" />
-        <button
-          type="button"
-          className="flex w-full items-start px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300 transition-colors"
-          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); onDelete(); onClose(); }}
-        >
-          Eliminar bloque
-        </button>
-      </div>
-    </div>
+        <ArrowUp className="h-4 w-4" /> Mover arriba
+      </button>
+      <button
+        type="button"
+        role="option"
+        aria-selected={false}
+        className={cn(item, "text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-800")}
+        onClick={() => {
+          onMoveDown();
+          onClose();
+        }}
+      >
+        <ArrowDown className="h-4 w-4" /> Mover abajo
+      </button>
+      <div className="mx-2 my-1 border-t border-zinc-100 dark:border-zinc-800" />
+      <button
+        type="button"
+        role="option"
+        aria-selected={false}
+        className={cn(
+          item,
+          "text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300",
+        )}
+        onClick={() => {
+          onDelete();
+          onClose();
+        }}
+      >
+        <Trash2 className="h-4 w-4" /> Eliminar bloque
+      </button>
+    </EditorMenuSurface>
   );
 }
 
@@ -379,18 +352,25 @@ export function BlockControls({
   const [controlsTop, setControlsTop] = useState(0);
   const [isHoveringControls, setIsHoveringControls] = useState(false);
   const hideTimerRef = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
 
-  const [blockMenu, setBlockMenu] = useState({ open: false, x: 0, y: 0 });
-  const [actionsMenu, setActionsMenu] = useState({ open: false, x: 0, y: 0 });
+  const [blockMenu, setBlockMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
+    open: false,
+    anchorRect: null,
+  });
+  const [actionsMenu, setActionsMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
+    open: false,
+    anchorRect: null,
+  });
 
-  /** Portal target: prefer dialog content, fallback to body */
+  /** Portal target: el contenido del diálogo si el editor vive en uno, si no <body>. */
   const portalContainer = useMemo(
     () =>
       (editor.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null) ??
-      document.body,
+      (typeof document !== "undefined" ? document.body : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editor]
+    [editor],
   );
 
   const clearHideTimer = useCallback(() => {
@@ -412,35 +392,38 @@ export function BlockControls({
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
       if (disabled || !editor.view) return;
-      const wrapper = wrapperRef.current;
-      if (!wrapper) return;
+      // N6: throttle a un frame — antes hacía setState en cada mousemove (~60Hz).
+      if (rafRef.current !== null) return;
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null;
+        const wrapper = wrapperRef.current;
+        if (!wrapper) return;
 
-      const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-      let index = -1;
+        const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+        let index = -1;
+        if (pos) {
+          index = getBlockIndexAtPos(editor, pos.pos);
+        } else {
+          const childCount = editor.state.doc.childCount;
+          if (childCount > 0) index = childCount - 1;
+        }
 
-      if (pos) {
-        index = getBlockIndexAtPos(editor, pos.pos);
-      } else {
-        const childCount = editor.state.doc.childCount;
-        if (childCount > 0) index = childCount - 1;
-      }
+        if (index === -1) {
+          setHoveredBlockIndex(null);
+          return;
+        }
+        setHoveredBlockIndex((prev) => (prev === index ? prev : index));
 
-      if (index === -1) {
-        setHoveredBlockIndex(null);
-        return;
-      }
-      setHoveredBlockIndex(index);
-
-      // ── Key fix: absolute positioning relative to wrapper ──────────────
-      const range = getBlockRange(editor, index);
-      if (range) {
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const coordTop = editor.view.coordsAtPos(range.from).top;
-        // scrollTop included for when the wrapper itself scrolls
-        setControlsTop(coordTop - wrapperRect.top + wrapper.scrollTop);
-      }
+        const range = getBlockRange(editor, index);
+        if (range) {
+          const wrapperRect = wrapper.getBoundingClientRect();
+          const coordTop = editor.view.coordsAtPos(range.from).top;
+          const nextTop = coordTop - wrapperRect.top + wrapper.scrollTop;
+          setControlsTop((prev) => (Math.abs(prev - nextTop) < 0.5 ? prev : nextTop));
+        }
+      });
     },
-    [editor, disabled, wrapperRef]
+    [editor, disabled, wrapperRef],
   );
 
   useEffect(() => {
@@ -454,7 +437,13 @@ export function BlockControls({
     };
   }, [editor, handleMouseMove, scheduleHide, isMobile]);
 
-  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+  useEffect(
+    () => () => {
+      clearHideTimer();
+      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
+    },
+    [clearHideTimer],
+  );
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -465,9 +454,9 @@ export function BlockControls({
         prepareInsertAfter(editor, hoveredBlockIndex);
       }
       setActionsMenu((s) => ({ ...s, open: false }));
-      setBlockMenu({ open: true, x: e.clientX + 8, y: e.clientY });
+      setBlockMenu({ open: true, anchorRect: { top: e.clientY, left: e.clientX + 8 } });
     },
-    [editor, hoveredBlockIndex]
+    [editor, hoveredBlockIndex],
   );
 
   const openActionsMenu = useCallback(
@@ -484,9 +473,9 @@ export function BlockControls({
         }
       }
       setBlockMenu((s) => ({ ...s, open: false }));
-      setActionsMenu({ open: true, x: e.clientX + 8, y: e.clientY });
+      setActionsMenu({ open: true, anchorRect: { top: e.clientY, left: e.clientX + 8 } });
     },
-    [editor, hoveredBlockIndex]
+    [editor, hoveredBlockIndex],
   );
 
   const handleSelectBlock = useCallback(
@@ -504,14 +493,13 @@ export function BlockControls({
         option.apply(editor);
       }
 
-      // Trigger image file input if the option needs it
       if (option.id === "image") {
         triggerImageFileInput?.();
       }
 
-      setBlockMenu({ open: false, x: 0, y: 0 });
+      setBlockMenu({ open: false, anchorRect: null });
     },
-    [editor, triggerImageFileInput]
+    [editor, triggerImageFileInput],
   );
 
   const deleteBlock = useCallback(() => {
@@ -528,7 +516,7 @@ export function BlockControls({
   const openBlockMenuMobile = useCallback(() => {
     editor.chain().focus().run();
     setActionsMenu((s) => ({ ...s, open: false }));
-    setBlockMenu({ open: true, x: 0, y: 0 });
+    setBlockMenu({ open: true, anchorRect: null });
   }, [editor]);
 
   if (disabled) return null;
@@ -538,8 +526,7 @@ export function BlockControls({
 
   return (
     <>
-      {/* Móvil: no hay hover, así que un botón "+" persistente abre la hoja
-          de bloques en la posición actual del cursor. */}
+      {/* Móvil: sin hover, un botón "+" persistente abre la hoja de bloques. */}
       {isMobile && (
         <button
           type="button"
@@ -552,17 +539,14 @@ export function BlockControls({
         </button>
       )}
 
-      {/* Absolute-positioned controls (relative to wrapper) */}
       {showControls && (
         <div
           className="pointer-events-auto absolute flex items-center gap-0.5"
-          style={{
-            top: controlsTop,
-            left: 4,
-            transform: "translateY(-1px)",
-            zIndex: 40,
+          style={{ top: controlsTop, left: 4, transform: "translateY(-1px)", zIndex: 40 }}
+          onMouseEnter={() => {
+            clearHideTimer();
+            setIsHoveringControls(true);
           }}
-          onMouseEnter={() => { clearHideTimer(); setIsHoveringControls(true); }}
           onMouseLeave={() => {
             setIsHoveringControls(false);
             if (!blockMenu.open && !actionsMenu.open) scheduleHide();
@@ -572,7 +556,7 @@ export function BlockControls({
             type="button"
             aria-label="Agregar bloque"
             title="Agregar bloque"
-            className="flex h-6 w-6 items-center justify-center rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 bg-transparent"
+            className="flex h-6 w-6 items-center justify-center rounded bg-transparent text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openBlockMenu}
           >
@@ -582,7 +566,7 @@ export function BlockControls({
             type="button"
             aria-label="Opciones de bloque"
             title="Mover o eliminar bloque"
-            className="flex h-6 w-6 cursor-grab items-center justify-center rounded text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200 bg-transparent"
+            className="flex h-6 w-6 cursor-grab items-center justify-center rounded bg-transparent text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 active:cursor-grabbing dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
             onMouseDown={(e) => e.preventDefault()}
             onClick={openActionsMenu}
           >
@@ -591,32 +575,26 @@ export function BlockControls({
         </div>
       )}
 
-      {/* Block type picker portal */}
-      {blockMenu.open &&
-        createPortal(
-          <BlockMenuPopup
-            options={blockOptions}
-            onSelect={handleSelectBlock}
-            onClose={() => setBlockMenu({ open: false, x: 0, y: 0 })}
-            x={blockMenu.x}
-            y={blockMenu.y}
-          />,
-          portalContainer
-        )}
+      {blockMenu.open ? (
+        <BlockMenuPopup
+          options={blockOptions}
+          onSelect={handleSelectBlock}
+          onClose={() => setBlockMenu({ open: false, anchorRect: null })}
+          anchorRect={blockMenu.anchorRect}
+          container={portalContainer}
+        />
+      ) : null}
 
-      {/* Block actions portal */}
-      {actionsMenu.open &&
-        createPortal(
-          <BlockActionsMenuPopup
-            onMoveUp={() => moveBlock(editor, hoveredBlockIndex ?? 0, "up")}
-            onMoveDown={() => moveBlock(editor, hoveredBlockIndex ?? 0, "down")}
-            onDelete={deleteBlock}
-            onClose={() => setActionsMenu({ open: false, x: 0, y: 0 })}
-            x={actionsMenu.x}
-            y={actionsMenu.y}
-          />,
-          portalContainer
-        )}
+      {actionsMenu.open ? (
+        <BlockActionsMenuPopup
+          onMoveUp={() => moveBlock(editor, hoveredBlockIndex ?? 0, "up")}
+          onMoveDown={() => moveBlock(editor, hoveredBlockIndex ?? 0, "down")}
+          onDelete={deleteBlock}
+          onClose={() => setActionsMenu({ open: false, anchorRect: null })}
+          anchorRect={actionsMenu.anchorRect}
+          container={portalContainer}
+        />
+      ) : null}
     </>
   );
 }

@@ -812,6 +812,11 @@ export function CreateTicketModal({
                 clientRect={slashMenuState.clientRect}
                 isVisible={slashMenuState.isVisible}
                 keyDownHandlerRef={slashKeyDownRef}
+                container={
+                  (editor?.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null) ??
+                  (typeof document !== "undefined" ? document.body : null)
+                }
+                onDismiss={() => setSlashMenuState((prev) => ({ ...prev, isVisible: false }))}
               />
             </div>
           </div>

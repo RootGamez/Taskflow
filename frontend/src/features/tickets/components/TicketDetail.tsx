@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Select, SelectItem } from "@heroui/react";
-import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Minus, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 
 import { Button } from "@/components/ui/shadcn/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -663,7 +664,8 @@ export function TicketDetail({
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent
           ref={dialogContentRef}
-          className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:top-0 max-sm:bottom-auto max-sm:rounded-none max-sm:pb-0"
+          showCloseButton={false}
+          className="flex max-h-[90dvh] w-[95vw] max-w-5xl flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-0 shadow-2xl dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:left-0 max-sm:top-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none"
           onInteractOutside={(event) => {
             if (shouldKeepDialogOpen(event.target)) {
               event.preventDefault();
@@ -678,11 +680,11 @@ export function TicketDetail({
           <DialogHeader className="sr-only">
             <DialogTitle>Detalle del ticket</DialogTitle>
             <DialogDescription>
-              Panel lateral para editar el ticket, sus responsables, prioridad y descripción.
+              Ventana para editar el ticket, sus responsables, prioridad, sprints y descripción.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800/50 sm:px-8 sm:py-4">
+          <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 px-4 py-3 dark:border-zinc-800/50 sm:px-10 sm:py-4">
             <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
               {ticket?.reference ? (
                 <TicketReferenceBadge reference={ticket.reference} className="uppercase tracking-wider" />
@@ -709,14 +711,20 @@ export function TicketDetail({
                   Eliminar
                 </Button>
               ) : null}
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <div className="hidden items-center gap-2 text-xs text-zinc-400 sm:flex">
                 <Check className="h-4 w-4" />
                 <span>Guardado automático</span>
               </div>
+              <DialogClose
+                aria-label="Cerrar"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              >
+                <X className="h-5 w-5" />
+              </DialogClose>
             </div>
           </div>
 
-          <div className="flex min-h-[calc(100dvh-53px)] flex-col px-4 py-5 sm:px-8 sm:py-6">
+          <div className="flex flex-1 flex-col overflow-y-auto px-4 py-5 sm:px-10 sm:py-7 lg:px-14">
             <div className="mb-8 space-y-4">
             <div className="mb-2">
               <textarea

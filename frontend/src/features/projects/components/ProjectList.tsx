@@ -43,9 +43,9 @@ export function ProjectList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-950/40 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-3 border-2 border-border bg-secondary p-3 md:flex-row md:items-center md:justify-between">
         <div className="relative w-full md:max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
@@ -56,6 +56,7 @@ export function ProjectList({
         <Button
           size="sm"
           variant="light"
+          className="rounded-none"
           onPress={toggleShowArchived}
           startContent={showArchived ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
         >
@@ -78,7 +79,7 @@ export function ProjectList({
           ))}
         </div>
       ) : (
-        <div className="rounded-2xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+        <div className="border-2 border-dashed border-border p-6 text-sm text-muted-foreground">
           No hay proyectos que coincidan con el filtro actual.
         </div>
       )}

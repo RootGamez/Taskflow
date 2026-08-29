@@ -1,21 +1,25 @@
-import { Button, Card, CardBody, Chip } from "@heroui/react";
-import { ArrowRight, FolderOpen, Plus, Sparkles, Ticket as TicketIcon, Users } from "lucide-react";
+import { Button } from "@heroui/react";
+import { AlertTriangle, FolderOpen, Ticket as TicketIcon, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 
+import { Card } from "@/components/ui/shadcn/card";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
-import { ProjectDeleteDialog } from "@/features/projects/components/ProjectDeleteDialog";
-import { ProjectList } from "@/features/projects/components/ProjectList";
+import { useWorkspaceStatuses } from "@/features/board/hooks/useWorkspaceStatuses";
+import { DashboardProjectsPanel } from "@/features/dashboard/components/DashboardProjectsPanel";
+import { DashboardStatBlock } from "@/features/dashboard/components/DashboardStatBlock";
+import { QuickAccessPanel } from "@/features/dashboard/components/QuickAccessPanel";
+import { UrgentTicketsPanel } from "@/features/dashboard/components/UrgentTicketsPanel";
 import {
-  useCreateProject,
-  useDeleteProject,
-  useProjects,
-  useToggleProjectArchive,
-  useUpdateProject,
-} from "@/features/projects/hooks/useProjects";
+  countOpenTickets,
+  countOverdueTickets,
+  getDoneStatusIds,
+} from "@/features/dashboard/lib/dashboardMetrics";
+import { WeeklyBoardWidget } from "@/features/goals/components/WeeklyBoardWidget";
+import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
+import { useCreateProject, useProjects } from "@/features/projects/hooks/useProjects";
 import type { Project } from "@/features/projects/types/project.types";
 import { getTicketsByProject } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -25,23 +29,6 @@ import { useCreateWorkspace, useWorkspaces } from "@/features/workspaces/hooks/u
 import type { Workspace } from "@/features/workspaces/types/workspace.types";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useWorkspaceStore } from "@/store/workspaceStore";
-
-interface RecentTicketEntry {
-  ticket: Ticket;
-  projectName: string;
-}
-
-function formatRelativeDate(isoDate: string): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) {
-    return "Fecha desconocida";
-  }
-
-  return new Intl.DateTimeFormat("es", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -57,10 +44,9 @@ export default function DashboardPage() {
   const createWorkspaceMutation = useCreateWorkspace();
   const [isCreateWorkspaceOpen, setIsCreateWorkspaceOpen] = useState(false);
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
-  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
-  const currentWorkspace = activeWorkspace ?? workspaces.find((workspace) => workspace.is_active) ?? workspaces[0] ?? null;
+  const currentWorkspace =
+    activeWorkspace ?? workspaces.find((workspace) => workspace.is_active) ?? workspaces[0] ?? null;
   const workspaceSlug = currentWorkspace?.slug ?? "";
   const canMutate = canMutateWorkspace(currentWorkspace?.role);
 
@@ -70,22 +56,9 @@ export default function DashboardPage() {
     }
   }, [activeWorkspace?.id, currentWorkspace, setActiveWorkspace]);
 
-  useEffect(() => {
-    const isDark = document.documentElement.classList.contains("dark");
-    console.info("[Dashboard] theme/workspace", {
-      theme: isDark ? "dark" : "light",
-      workspaceSlug,
-      workspaces: workspaces.length,
-      currentWorkspace: currentWorkspace?.name ?? null,
-    });
-  }, [workspaceSlug, workspaces.length, currentWorkspace?.name]);
-
   const projectsQuery = useProjects(workspaceSlug);
   const projects = (projectsQuery.data ?? []) as Project[];
   const createProjectMutation = useCreateProject();
-  const updateProjectMutation = useUpdateProject();
-  const deleteProjectMutation = useDeleteProject();
-  const toggleProjectArchiveMutation = useToggleProjectArchive();
 
   const ticketQueries = useQueries({
     queries: projects.map((project) => ({
@@ -96,50 +69,43 @@ export default function DashboardPage() {
     })),
   }) as Array<{ data?: Ticket[] }>;
 
+  const statusesQuery = useWorkspaceStatuses(workspaceSlug);
+  const doneStatusIds = useMemo(
+    () => getDoneStatusIds(statusesQuery.data),
+    [statusesQuery.data],
+  );
+
+  const ticketsByProjectId = useMemo<Record<string, Ticket[]>>(() => {
+    const map: Record<string, Ticket[]> = {};
+    ticketQueries.forEach((query, index) => {
+      const project = projects[index];
+      if (project && query.data) {
+        map[project.id] = query.data;
+      }
+    });
+    return map;
+  }, [projects, ticketQueries]);
+
+  const allTickets = useMemo(
+    () => Object.values(ticketsByProjectId).flat(),
+    [ticketsByProjectId],
+  );
+
+  const openTicketCount = useMemo(
+    () => countOpenTickets(allTickets, doneStatusIds),
+    [allTickets, doneStatusIds],
+  );
+  const overdueTicketCount = useMemo(
+    () => countOverdueTickets(allTickets, doneStatusIds),
+    [allTickets, doneStatusIds],
+  );
+
   const recentWorkspaces = useMemo(() => {
     const prioritized = currentWorkspace
       ? [currentWorkspace, ...workspaces.filter((workspace) => workspace.id !== currentWorkspace.id)]
       : workspaces;
     return prioritized.slice(0, 4);
   }, [currentWorkspace, workspaces]);
-
-  const recentTickets = useMemo<RecentTicketEntry[]>(() => {
-    return ticketQueries
-      .flatMap((query, index) => {
-        const project = projects[index];
-        if (!project || !query.data) {
-          return [];
-        }
-
-        return query.data.map((ticket) => ({
-          ticket,
-          projectName: project.name,
-        }));
-      })
-      .sort((left, right) => new Date(right.ticket.updated_at).getTime() - new Date(left.ticket.updated_at).getTime())
-      .slice(0, 8);
-  }, [projects, ticketQueries]);
-
-  const workspaceStats = [
-    {
-      label: "Espacios",
-      value: workspaces.length,
-      icon: Users,
-      helper: currentWorkspace ? `Activo: ${currentWorkspace.name}` : "Sin espacio activo",
-    },
-    {
-      label: "Proyectos",
-      value: projects.length,
-      icon: FolderOpen,
-      helper: workspaceSlug ? `En ${currentWorkspace?.name ?? "tu espacio"}` : "Crea o selecciona un espacio de trabajo",
-    },
-    {
-      label: "Tickets recientes",
-      value: recentTickets.length,
-      icon: TicketIcon,
-      helper: recentTickets.length > 0 ? "Actividad reciente" : "Todavía no hay actividad",
-    },
-  ];
 
   const handleCreateWorkspace = async (name: string) => {
     try {
@@ -181,250 +147,131 @@ export default function DashboardPage() {
     }
   };
 
-  const handleUpdateProject = async (input: {
-    name: string;
-    description?: string;
-    color?: string;
-  }) => {
-    if (!workspaceSlug || !projectToEdit) {
-      return;
-    }
-
-    try {
-      await updateProjectMutation.mutateAsync({
-        workspaceSlug,
-        projectId: projectToEdit.id,
-        ...input,
-      });
-      setProjectToEdit(null);
-      toast.success("Proyecto actualizado");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo actualizar el proyecto"));
-    }
-  };
-
-  const handleToggleArchiveProject = async (project: Project) => {
-    if (!workspaceSlug) {
-      return;
-    }
-
-    try {
-      await toggleProjectArchiveMutation.mutateAsync({
-        workspaceSlug,
-        projectId: project.id,
-        isArchived: !project.is_archived,
-      });
-      toast.success(project.is_archived ? "Proyecto desarchivado" : "Proyecto archivado");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo actualizar el estado del proyecto"));
-    }
-  };
-
-  const handleDeleteProject = async (projectId: string) => {
-    if (!workspaceSlug) {
-      return;
-    }
-
-    try {
-      await deleteProjectMutation.mutateAsync({ workspaceSlug, projectId });
-      setProjectToDelete(null);
-      toast.success("Proyecto eliminado");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "No se pudo eliminar el proyecto"));
-    }
-  };
-
   return (
     <div className="space-y-6">
+      {workspaceSlug ? <WeeklyBoardWidget workspaceSlug={workspaceSlug} /> : null}
+
       <PageHeader
+        eyebrow="Panel general"
         title="Dashboard"
-        subtitle={currentWorkspace ? `Espacio actual: ${currentWorkspace.name}` : "Empieza creando tu primer espacio o acepta una invitación"}
+        subtitle={
+          currentWorkspace
+            ? `Espacio actual: ${currentWorkspace.name}`
+            : "Empieza creando tu primer espacio o acepta una invitación"
+        }
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button variant="light" onPress={() => setIsCreateWorkspaceOpen(true)}>
+            <Button variant="light" className="rounded-none" onPress={() => setIsCreateWorkspaceOpen(true)}>
               Crear espacio
             </Button>
-            <Button color="primary" onPress={() => setIsCreateProjectOpen(true)} isDisabled={!workspaceSlug || !canMutate}>
+            <Button
+              color="primary"
+              className="rounded-none"
+              onPress={() => setIsCreateProjectOpen(true)}
+              isDisabled={!workspaceSlug || !canMutate}
+            >
               Nuevo proyecto
             </Button>
           </div>
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {workspaceStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <Card key={stat.label} className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-              <CardBody className="space-y-2 p-4">
-                <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400">
-                  <span className="text-sm font-medium">{stat.label}</span>
-                  <Icon className="h-4 w-4" />
-                </div>
-                <p className="text-3xl font-semibold text-zinc-900 dark:text-zinc-50">{stat.value}</p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{stat.helper}</p>
-              </CardBody>
-            </Card>
-          );
-        })}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <DashboardStatBlock
+          label="Espacios"
+          value={workspaces.length}
+          icon={Users}
+          helper={currentWorkspace ? `Activo: ${currentWorkspace.name}` : "Sin espacio activo"}
+        />
+        <DashboardStatBlock
+          label="Proyectos"
+          value={projects.length}
+          icon={FolderOpen}
+          helper={
+            workspaceSlug
+              ? `En ${currentWorkspace?.name ?? "tu espacio"}`
+              : "Crea o selecciona un espacio"
+          }
+        />
+        <DashboardStatBlock
+          label="Abiertos"
+          value={openTicketCount}
+          icon={TicketIcon}
+          helper="Tickets sin completar"
+        />
+        <DashboardStatBlock
+          label="Vencidos"
+          value={overdueTicketCount}
+          icon={AlertTriangle}
+          helper="Tickets abiertos fuera de fecha"
+          emphasis={overdueTicketCount > 0 ? "destructive" : "default"}
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <CardBody className="space-y-4 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Proyectos recientes</h2>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Tus tableros del workspace actual.</p>
-              </div>
-              {currentWorkspace ? (
-                <Chip color={canMutate ? "primary" : "default"} variant="flat" className="capitalize">
-                  {currentWorkspace.role}
-                </Chip>
-              ) : null}
-            </div>
+        <DashboardProjectsPanel
+          workspaceSlug={workspaceSlug}
+          projects={projects}
+          ticketsByProjectId={ticketsByProjectId}
+          doneStatusIds={doneStatusIds}
+          isLoading={isLoadingWorkspaces || projectsQuery.isLoading}
+          hasWorkspace={Boolean(currentWorkspace)}
+        />
 
-            {workspaceSlug && projects.length > 0 ? (
-              <ProjectList
-                projects={projects}
-                workspaceSlug={workspaceSlug}
-                onEdit={setProjectToEdit}
-                onToggleArchive={handleToggleArchiveProject}
-                onDelete={setProjectToDelete}
-                isActionLoading={updateProjectMutation.isPending || deleteProjectMutation.isPending || toggleProjectArchiveMutation.isPending}
-              />
-            ) : isLoadingWorkspaces ? (
-              <p className="text-sm text-zinc-500">Cargando workspaces...</p>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                {currentWorkspace
-                  ? "No hay proyectos todavía. Crea el primero para empezar a organizar tickets."
-                  : "No tienes espacios todavía. Crea uno para empezar o acepta una invitación pendiente."}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <CardBody className="space-y-4 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Espacios recientes</h2>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Acceso rápido y vista completa en una página dedicada.</p>
-              </div>
-              <Button size="sm" variant="light" onPress={() => navigate("/workspaces")}>Ver todos</Button>
-            </div>
-
+        {/* TODO(plan §10): panel de actividad del equipo requiere endpoint workspace-level.
+            Hoy `features/activities` solo expone actividad por ticket
+            (`GET /projects/<id>/tickets/<id>/activities/`), no un feed agregado
+            a nivel espacio — se omite el panel hasta que exista ese endpoint. */}
+        <Card className="flex flex-col">
+          <header className="flex items-center justify-between gap-3 border-b-2 border-border px-4 py-3">
+            <p className="eyebrow">Espacios recientes</p>
+            <Button
+              size="sm"
+              variant="light"
+              className="rounded-none"
+              onPress={() => navigate("/workspaces")}
+            >
+              Ver todos
+            </Button>
+          </header>
+          <div className="p-2">
             {recentWorkspaces.length > 0 ? (
-              <div className="space-y-2">
+              <ul className="divide-y divide-border">
                 {recentWorkspaces.map((workspace) => (
-                  <Link
-                    key={workspace.id}
-                    to={`/workspaces/${workspace.slug}`}
-                    className="flex items-center justify-between rounded-xl border border-zinc-200 px-3 py-2 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-50">{workspace.name}</p>
-                      <p className="text-xs capitalize text-zinc-500 dark:text-zinc-400">{workspace.role}</p>
-                    </div>
-                    {workspaceSlug === workspace.slug ? (
-                      <span className="text-xs font-medium text-brand-600">Actual</span>
-                    ) : null}
-                  </Link>
+                  <li key={workspace.id}>
+                    <Link
+                      to={`/workspaces/${workspace.slug}`}
+                      className="flex items-center justify-between gap-3 rounded px-2 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-foreground">
+                          {workspace.name}
+                        </span>
+                        <span className="block font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                          {workspace.role}
+                        </span>
+                      </span>
+                      {workspaceSlug === workspace.slug ? (
+                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                          Actual
+                        </span>
+                      ) : null}
+                    </Link>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-300 p-5 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+              <p className="px-2 py-6 text-sm text-muted-foreground">
                 No tienes espacios de trabajo aún.
-              </div>
+              </p>
             )}
-          </CardBody>
+          </div>
         </Card>
-
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-        <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <CardBody className="space-y-4 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Últimos tickets vistos</h2>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Actividad reciente en tus proyectos.</p>
-              </div>
-              <Sparkles className="h-4 w-4 text-zinc-400" />
-            </div>
-
-            {recentTickets.length > 0 ? (
-              <div className="space-y-2">
-                {recentTickets.map(({ ticket, projectName }) => (
-                  <Link
-                    key={ticket.id}
-                    to={`/tickets/${ticket.id}`}
-                    className="flex items-center justify-between rounded-2xl border border-zinc-200 px-4 py-3 transition-colors hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800/60"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-zinc-900 dark:text-zinc-50">{ticket.title}</p>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{projectName}</p>
-                    </div>
-                    <div className="flex items-center gap-3 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                      <span className="uppercase tracking-wider">{ticket.priority}</span>
-                      <span>{formatRelativeDate(ticket.updated_at)}</span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-zinc-300 p-6 text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                Aún no hay tickets recientes. Cuando abras o edites uno aparecerá aquí.
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <CardBody className="space-y-4 p-5">
-            <div>
-              <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-50">Guía para nuevos usuarios</h2>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">Si todavía no tienes nada cargado, sigue este flujo.</p>
-            </div>
-
-            <div className="space-y-3">
-              {[
-                {
-                  title: "1. Crea tu primer espacio",
-                  description: "Usa el botón de crear espacio para abrir un entorno propio del equipo.",
-                },
-                {
-                  title: "2. Crea un proyecto",
-                  description: "Dentro del espacio agrega un proyecto para empezar a organizar tickets y columnas.",
-                },
-                {
-                  title: "3. Invita o acepta invitaciones",
-                  description: "Si ya te invitaron, abre la campana de notificaciones y acepta la invitación. Si no, invita a tu equipo desde Miembros.",
-                },
-              ].map((step) => (
-                <div key={step.title} className="rounded-2xl border border-zinc-200 p-4 dark:border-zinc-800">
-                  <p className="font-medium text-zinc-900 dark:text-zinc-50">{step.title}</p>
-                  <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{step.description}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button color="primary" startContent={<Plus className="h-4 w-4" />} onPress={() => setIsCreateWorkspaceOpen(true)}>
-                Crear espacio
-              </Button>
-              <Button
-                variant="light"
-                startContent={<ArrowRight className="h-4 w-4" />}
-                onPress={() => workspaceSlug ? navigate(`/workspaces/${workspaceSlug}`) : undefined}
-                isDisabled={!workspaceSlug}
-              >
-                Ir al espacio actual
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+      <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <UrgentTicketsPanel />
+        <QuickAccessPanel workspaceSlug={workspaceSlug || undefined} />
       </div>
 
       <CreateWorkspaceModal
@@ -439,29 +286,6 @@ export default function DashboardPage() {
         onClose={() => setIsCreateProjectOpen(false)}
         onSubmit={handleCreateProject}
         isLoading={createProjectMutation.isPending}
-      />
-
-      <CreateProjectModal
-        isOpen={Boolean(projectToEdit) && canMutate && Boolean(workspaceSlug)}
-        onClose={() => setProjectToEdit(null)}
-        onSubmit={handleUpdateProject}
-        isLoading={updateProjectMutation.isPending}
-        title="Editar proyecto"
-        description="Actualiza el nombre, la descripcion y el color del proyecto."
-        submitLabel="Guardar cambios"
-        initialValues={projectToEdit ? {
-          name: projectToEdit.name,
-          description: projectToEdit.description ?? "",
-          color: projectToEdit.color,
-        } : undefined}
-      />
-
-      <ProjectDeleteDialog
-        project={projectToDelete}
-        isOpen={Boolean(projectToDelete) && canMutate && Boolean(workspaceSlug)}
-        onClose={() => setProjectToDelete(null)}
-        onDelete={handleDeleteProject}
-        isLoading={deleteProjectMutation.isPending}
       />
     </div>
   );

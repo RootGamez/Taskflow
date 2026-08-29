@@ -7,6 +7,7 @@ import { useParams } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { WeeklyBoardWidget } from "@/features/goals/components/WeeklyBoardWidget";
 import { CreateProjectModal } from "@/features/projects/components/CreateProjectModal";
 import { ProjectDeleteDialog } from "@/features/projects/components/ProjectDeleteDialog";
 import { ProjectList } from "@/features/projects/components/ProjectList";
@@ -113,11 +114,20 @@ export default function WorkspaceDashboardPage() {
   };
 
   return (
-    <div>
+    <div className="space-y-6">
+      {workspaceSlug ? <WeeklyBoardWidget workspaceSlug={workspaceSlug} /> : null}
+
       <PageHeader
+        eyebrow="Espacio"
         title="Panel del espacio"
         subtitle={`Espacio: ${workspaceSlug}`}
-        actions={canMutate ? <Button color="primary" onPress={() => setCreateModalOpen(true)}>Nuevo proyecto</Button> : undefined}
+        actions={
+          canMutate ? (
+            <Button color="primary" className="rounded-none" onPress={() => setCreateModalOpen(true)}>
+              Nuevo proyecto
+            </Button>
+          ) : undefined
+        }
       />
       {projects.length === 0 ? (
         <EmptyState

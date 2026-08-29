@@ -45,6 +45,8 @@ import { TicketTemplatePicker, type AppliedTicketTemplate } from "@/features/tic
 import { BUILT_IN_TEMPLATE_ID } from "@/features/ticket-templates/lib/builtInTemplate";
 import type { Priority } from "@/features/tickets/types/ticket.types";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
+import { normalizeUrl } from "./editor/url";
+import { useUrlPrompt, type RequestUrlFn } from "./editor/useUrlPrompt";
 import {
   SlashCommandMenu,
   createSlashMenuRenderer,
@@ -269,6 +271,7 @@ function useBlockOptions(
   editor: Editor | null,
   triggerImage: () => void,
   triggerVideo: () => void,
+  requestUrl?: RequestUrlFn,
 ): SlashCommandItem[] {
   return useMemo<SlashCommandItem[]>(() => {
     if (!editor) return [];
@@ -362,8 +365,10 @@ function useBlockOptions(
         keywords: ["link", "enlace", "url", "href"],
         icon: LinkIcon,
         apply: (e) => {
-          const url = window.prompt("URL del enlace:");
-          if (url) e.chain().focus().setLink({ href: url, target: "_blank" }).run();
+          void requestUrl?.("URL del enlace").then((url) => {
+            const safe = normalizeUrl(url);
+            if (safe) e.chain().focus().setLink({ href: safe, target: "_blank" }).run();
+          });
         },
       },
       {
@@ -385,7 +390,7 @@ function useBlockOptions(
         apply: () => { triggerVideo(); },
       },
     ];
-  }, [editor, triggerImage, triggerVideo]);
+  }, [editor, triggerImage, triggerVideo, requestUrl]);
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -514,7 +519,8 @@ export function CreateTicketModal({
   );
 
   // ── Block options (uses base64 uploads) ───────────────────────────────────
-  const blockOptions = useBlockOptions(null, triggerImage, triggerVideo);
+  const { requestUrl, urlPromptDialog } = useUrlPrompt();
+  const blockOptions = useBlockOptions(null, triggerImage, triggerVideo, requestUrl);
 
   // ── Tiptap editor ──────────────────────────────────────────────────────────
   const editor = useEditor({
@@ -613,7 +619,7 @@ export function CreateTicketModal({
   });
 
   // ── Live block options (with live editor ref) ──────────────────────────────
-  const liveBlockOptions = useBlockOptions(editor, triggerImage, triggerVideo);
+  const liveBlockOptions = useBlockOptions(editor, triggerImage, triggerVideo, requestUrl);
 
   // ── Reset on open/close ────────────────────────────────────────────────────
   useEffect(() => {
@@ -679,6 +685,7 @@ export function CreateTicketModal({
   const activePriority = PRIORITY_OPTIONS.find((o) => o.value === priority)!;
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         showCloseButton={false}
@@ -925,5 +932,9 @@ export function CreateTicketModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Diálogo para pedir URL (reemplaza window.prompt) */}
+    {urlPromptDialog}
+    </>
   );
 }

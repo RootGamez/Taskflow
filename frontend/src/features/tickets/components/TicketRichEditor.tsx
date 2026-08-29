@@ -45,6 +45,8 @@ import { Button } from "@/components/ui/shadcn/button";
 import { Input } from "@/components/ui/shadcn/input";
 
 import { BookmarkExtension } from "./BookmarkExtension";
+import { normalizeUrl } from "./editor/url";
+import { useUrlPrompt, type RequestUrlFn } from "./editor/useUrlPrompt";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import { VideoExtension } from "./extensions/VideoExtension";
 import { SlashCommandMenu, createSlashMenuRenderer, type SlashMenuReactState } from "./editor/SlashCommandMenu";
@@ -331,6 +333,7 @@ function useBlockOptions(
   onUploadVideo?: ImageUploadFn,
   triggerImage?: (() => void) | null,
   triggerVideo?: (() => void) | null,
+  requestUrl?: RequestUrlFn,
 ): SlashCommandItem[] {
   return useMemo<SlashCommandItem[]>(() => {
     if (!editor) return [];
@@ -424,10 +427,12 @@ function useBlockOptions(
         keywords: ["bookmark", "enlace", "link", "tarjeta", "card", "ogp"],
         icon: LinkIcon,
         apply: (e) => {
-          const url = window.prompt("Introduce la URL para previsualizar:");
-          if (url) {
-            e.chain().focus().insertContent({ type: "bookmark", attrs: { url } }).run();
-          }
+          void requestUrl?.("URL para previsualizar").then((url) => {
+            const safe = normalizeUrl(url);
+            if (safe) {
+              e.chain().focus().insertContent({ type: "bookmark", attrs: { url: safe } }).run();
+            }
+          });
         },
       },
       ...(onUploadImage
@@ -453,7 +458,7 @@ function useBlockOptions(
           ]
         : []),
     ];
-  }, [editor, onUploadImage, onUploadVideo, triggerImage, triggerVideo]);
+  }, [editor, onUploadImage, onUploadVideo, triggerImage, triggerVideo, requestUrl]);
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -471,6 +476,7 @@ export function TicketRichEditor({
   onUploadVideo,
 }: TicketRichEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const { requestUrl, urlPromptDialog } = useUrlPrompt();
   const onChangeRef = useRef(onChange);
   const onUploadImageRef = useRef(onUploadImage);
   const onUploadVideoRef = useRef(onUploadVideo);
@@ -505,7 +511,7 @@ export function TicketRichEditor({
 
   // ── Build extensions ───────────────────────────────────────────────────────
 
-  const blockOptions = useBlockOptions(null, onUploadImage, onUploadVideo, triggerImageFileInput, triggerVideoFileInput);
+  const blockOptions = useBlockOptions(null, onUploadImage, onUploadVideo, triggerImageFileInput, triggerVideoFileInput, requestUrl);
 
   // Stable renderer factory — passes both setState and the keyDown ref
   const slashRenderer = useMemo(
@@ -677,7 +683,7 @@ export function TicketRichEditor({
   }, [editor, disabled, isLocked]);
 
   // ── Block options (needs live editor) ─────────────────────────────────────
-  const liveBlockOptions = useBlockOptions(editor, onUploadImage, onUploadVideo, triggerImageFileInput, triggerVideoFileInput);
+  const liveBlockOptions = useBlockOptions(editor, onUploadImage, onUploadVideo, triggerImageFileInput, triggerVideoFileInput, requestUrl);
 
   // ── Link BubbleMenu ───────────────────────────────────────────────────────
   const [editingLink, setEditingLink] = useState(false);
@@ -817,6 +823,9 @@ export function TicketRichEditor({
         }
         onDismiss={() => setSlashMenuState((prev) => ({ ...prev, isVisible: false }))}
       />
+
+      {/* Diálogo para pedir URL (reemplaza window.prompt) */}
+      {urlPromptDialog}
 
       {/* ── Link BubbleMenu ───────────────────────────────────────────────── */}
       {editor && (

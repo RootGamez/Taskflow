@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import { heroui } from "@heroui/react";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 // Escala azul de marca (== Tailwind `blue`, #3B82F6 es exactamente blue-500).
 // Vive ademas como `theme.extend.colors.brand` (hex planos, no depende del
@@ -30,6 +31,18 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+      },
+      // Tipografía fluida para títulos de página/panel: escala sola entre
+      // móvil y desktop sin necesidad de `text-lg md:text-2xl` repartido por
+      // cada header (font-scale / readable-font-size).
+      fontSize: {
+        "fluid-lg": ["clamp(1.0625rem, 0.95rem + 0.55vw, 1.25rem)", { lineHeight: "1.4" }],
+        "fluid-xl": ["clamp(1.1875rem, 1rem + 0.9vw, 1.625rem)", { lineHeight: "1.3" }],
+        "fluid-2xl": ["clamp(1.375rem, 1.1rem + 1.4vw, 2rem)", { lineHeight: "1.2" }],
+      },
+      spacing: {
+        "safe-top": "env(safe-area-inset-top)",
+        "safe-bottom": "env(safe-area-inset-bottom)",
       },
       colors: {
         brand: {
@@ -95,6 +108,11 @@ const config: Config = {
   },
   darkMode: "class",
   plugins: [
+    // Provee las keyframes de `animate-in`/`slide-in-from-*`/`fade-in-0` que
+    // los componentes shadcn (dialog, popover) y el nuevo `Sheet` ya usaban
+    // en el markup pero que hasta ahora no estaban definidas (los diálogos
+    // aparecían de golpe). Plugin estándar de shadcn, sin runtime.
+    tailwindcssAnimate,
     heroui({
       themes: {
         // Mismo azul en light y dark: hoy (pre-migracion) `primary` era un

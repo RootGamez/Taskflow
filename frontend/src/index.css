@@ -87,8 +87,53 @@
   font-family: Inter, system-ui, sans-serif;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
-  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Reduce el retardo de 300ms al tocar en móviles y evita gestos de zoom
+   accidentales sobre controles (tap-delay). */
+button,
+a,
+[role="button"],
+label,
+summary {
+  touch-action: manipulation;
+}
+
+/* iOS hace zoom automático al enfocar un campo con texto < 16px. Forzamos
+   16px como mínimo solo en viewports de teléfono (readable-font-size). */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  .tf-editor .tiptap {
+    font-size: 16px;
+  }
+}
+
+/* Los contenedores con scroll propio no deben propagar el scroll a la
+   página cuando llegan a su límite (scroll-behavior / nested scroll). */
+.tf-scroll-contain {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* Global override for HeroUI Input focus halo */

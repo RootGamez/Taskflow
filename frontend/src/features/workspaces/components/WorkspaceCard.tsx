@@ -1,7 +1,8 @@
-import { Button, Card, CardBody, Chip } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+import { Badge } from "@/components/ui/shadcn/badge";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import type { WorkspaceMember } from "@/features/members/types/member.types";
 import type { Workspace } from "@/features/workspaces/types/workspace.types";
@@ -33,37 +34,43 @@ export function WorkspaceCard({ workspace, members = [], isCurrent = false }: Wo
   const extraMembers = Math.max(0, members.length - previewMembers.length);
 
   return (
-    <Card className={`border bg-white transition-transform hover:-translate-y-0.5 dark:bg-zinc-900 ${isCurrent ? "border-brand-200 shadow-sm dark:border-brand-900/60" : "border-zinc-200 dark:border-zinc-800"}`}>
-      <CardBody className="space-y-4 p-4">
+    <div
+      className={`border-2 bg-card transition-transform hover:-translate-y-0.5 ${
+        isCurrent ? "border-primary shadow-hard-sm dark:shadow-hard-float" : "border-border"
+      }`}
+    >
+      <div className="space-y-4 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             {workspace.logo_url ? (
               <img
                 src={workspace.logo_url}
                 alt={`Logo de ${workspace.name}`}
-                className="h-11 w-11 shrink-0 rounded-xl border border-zinc-200 object-cover dark:border-zinc-700"
+                className="h-11 w-11 shrink-0 rounded border-2 border-border object-cover"
               />
             ) : (
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-100 text-xs font-semibold uppercase text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded border-2 border-border bg-secondary text-xs font-semibold uppercase text-muted-foreground">
                 {getWorkspaceInitials(workspace.name)}
               </div>
             )}
 
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-[0.16em] text-zinc-500 dark:text-zinc-400">Espacio</p>
-              <h3 className="truncate text-base font-semibold text-zinc-900 dark:text-zinc-50">{workspace.name}</h3>
-              <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">{workspace.slug}</p>
+              <p className="eyebrow">Espacio</p>
+              <h3 className="truncate font-display text-base font-bold tracking-tight text-foreground">
+                {workspace.name}
+              </h3>
+              <p className="truncate font-mono text-sm text-muted-foreground">{workspace.slug}</p>
             </div>
           </div>
-          <Chip color={isCurrent ? "primary" : "default"} variant="flat" className="capitalize">
+          <Badge variant={isCurrent ? "primary" : "outline"} mono className="uppercase">
             {isCurrent ? "Actual" : workspace.role}
-          </Chip>
+          </Badge>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">Integrantes</p>
-            <span className="text-xs text-zinc-400">{members.length}</span>
+            <p className="eyebrow">Integrantes</p>
+            <span className="font-mono text-xs text-muted-foreground">{members.length}</span>
           </div>
 
           {previewMembers.length > 0 ? (
@@ -74,24 +81,25 @@ export function WorkspaceCard({ workspace, members = [], isCurrent = false }: Wo
                 ))}
               </div>
               {extraMembers > 0 ? (
-                <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950/40 dark:text-zinc-400">
+                <span className="rounded border-2 border-border bg-secondary px-2 py-0.5 font-mono text-xs text-muted-foreground">
                   +{extraMembers}
                 </span>
               ) : null}
             </div>
           ) : (
-            <p className="rounded-xl border border-dashed border-zinc-300 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+            <p className="rounded border-2 border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
               Aun no hay integrantes visibles.
             </p>
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Abre el espacio o revisa sus proyectos.</p>
+        <div className="flex items-center justify-between gap-2 border-t-2 border-border pt-3">
+          <p className="text-xs text-muted-foreground">Abre el espacio o revisa sus proyectos.</p>
           <Button
             size="sm"
             color={isCurrent ? "primary" : "default"}
             variant={isCurrent ? "solid" : "flat"}
+            className="rounded-none"
             endContent={<ArrowRight className="h-4 w-4" />}
             onPress={() => {
               setActiveWorkspace(workspace);
@@ -101,7 +109,7 @@ export function WorkspaceCard({ workspace, members = [], isCurrent = false }: Wo
             Abrir
           </Button>
         </div>
-      </CardBody>
-    </Card>
+      </div>
+    </div>
   );
 }

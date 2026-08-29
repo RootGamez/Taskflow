@@ -1,10 +1,12 @@
-import { Button, Card, CardBody, Input, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Input } from "@/components/ui/shadcn/input";
+import { Label } from "@/components/ui/shadcn/label";
 import {
   useDeleteWorkspace,
   useUploadWorkspaceLogo,
@@ -134,114 +136,135 @@ export default function WorkspaceSettingsPage() {
   if (!workspace) {
     return (
       <div>
-        <PageHeader title="Configuracion del espacio" />
-        <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-          <CardBody>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">Espacio no encontrado.</p>
-          </CardBody>
-        </Card>
+        <PageHeader eyebrow="Espacio" title="Configuracion del espacio" />
+        <div className="border-2 border-border bg-card p-6">
+          <p className="text-sm text-muted-foreground">Espacio no encontrado.</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Configuracion del espacio" subtitle="Edita datos generales y administra opciones criticas" />
+      <PageHeader
+        eyebrow="Espacio"
+        title="Configuracion del espacio"
+        subtitle="Edita datos generales y administra opciones criticas"
+      />
 
-      <Card className="border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <CardBody className="space-y-4">
-          <Input
-            label="Nombre"
-            value={name}
-            onValueChange={setName}
-            isDisabled={!canEdit || updateWorkspaceMutation.isPending}
-          />
-          <Input
-            label="Slug"
-            value={slug}
-            onValueChange={setSlug}
-            isDisabled={!canEdit || updateWorkspaceMutation.isPending}
-            description="URL publica del espacio"
-          />
-          <Input
-            label="Logo URL"
-            value={logoUrl}
-            onValueChange={setLogoUrl}
-            isDisabled={!canEdit || updateWorkspaceMutation.isPending}
-            placeholder="https://..."
-          />
+      <div className="border-2 border-border bg-card">
+        <div className="space-y-4 p-6">
+          <p className="eyebrow text-foreground">Datos generales</p>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Logo del espacio</p>
-            <div className="flex items-center gap-3">
-              <img
-                src={logoUrl || undefined}
-                alt="Logo del espacio"
-                className="h-12 w-12 rounded-lg border border-zinc-200 object-cover dark:border-zinc-700"
+          <div className="space-y-1.5">
+            <Label htmlFor="workspace-name">Nombre</Label>
+            <Input
+              id="workspace-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              disabled={!canEdit || updateWorkspaceMutation.isPending}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="workspace-slug">Slug</Label>
+            <Input
+              id="workspace-slug"
+              value={slug}
+              onChange={(event) => setSlug(event.target.value)}
+              disabled={!canEdit || updateWorkspaceMutation.isPending}
+            />
+            <p className="text-xs text-muted-foreground">URL publica del espacio</p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="workspace-logo-url">Logo URL</Label>
+            <Input
+              id="workspace-logo-url"
+              value={logoUrl}
+              onChange={(event) => setLogoUrl(event.target.value)}
+              disabled={!canEdit || updateWorkspaceMutation.isPending}
+              placeholder="https://..."
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3 border-t-2 border-border p-6">
+          <p className="eyebrow text-foreground">Logo del espacio</p>
+          <div className="flex items-center gap-3">
+            <img
+              src={logoUrl || undefined}
+              alt="Logo del espacio"
+              className="h-12 w-12 rounded border-2 border-border object-cover"
+            />
+            <div className="space-y-1">
+              <input
+                ref={logoFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                className="hidden"
+                onChange={handleLogoChange}
               />
-              <div className="space-y-1">
-                <input
-                  ref={logoFileInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="hidden"
-                  onChange={handleLogoChange}
-                />
-                <Button
-                  size="sm"
-                  variant="flat"
-                  onPress={handleSelectLogo}
-                  isDisabled={!canEdit}
-                  isLoading={uploadWorkspaceLogoMutation.isPending}
-                >
-                  Subir logo
-                </Button>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">JPG, PNG, WEBP o GIF. Max 5MB.</p>
-              </div>
+              <Button
+                size="sm"
+                variant="flat"
+                className="rounded-none"
+                onPress={handleSelectLogo}
+                isDisabled={!canEdit}
+                isLoading={uploadWorkspaceLogoMutation.isPending}
+              >
+                Subir logo
+              </Button>
+              <p className="text-xs text-muted-foreground">JPG, PNG, WEBP o GIF. Max 5MB.</p>
             </div>
           </div>
+        </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              color="primary"
-              onPress={handleSave}
-              isLoading={updateWorkspaceMutation.isPending}
-              isDisabled={!canEdit || !name.trim() || !slug.trim()}
-            >
-              Guardar cambios
-            </Button>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-3 border-t-2 border-border p-6">
+          <Button
+            color="primary"
+            className="rounded-none"
+            onPress={handleSave}
+            isLoading={updateWorkspaceMutation.isPending}
+            isDisabled={!canEdit || !name.trim() || !slug.trim()}
+          >
+            Guardar cambios
+          </Button>
           {!canEdit ? (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            <p className="text-xs text-muted-foreground">
               Solo owner o admin pueden editar configuraciones.
             </p>
           ) : null}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
 
-      <Card className="border border-red-200 bg-red-50/40 dark:border-red-900/40 dark:bg-red-950/20">
-        <CardBody className="space-y-3">
-          <p className="text-sm font-semibold text-red-700 dark:text-red-300">Zona de peligro</p>
-          <p className="text-sm text-zinc-700 dark:text-zinc-300">
+      <div className="border-2 border-destructive bg-destructive/5">
+        <div className="space-y-3 p-6">
+          <p className="eyebrow text-destructive">Zona de peligro</p>
+          <p className="text-sm text-foreground">
             Eliminar un espacio borra proyectos, tickets y configuraciones asociadas.
           </p>
           <Button
             color="danger"
             variant="flat"
+            className="rounded-none"
             isDisabled={!canDelete}
             onPress={() => setDeleteDialogOpen(true)}
           >
             Eliminar espacio
           </Button>
           {!canDelete ? (
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">Solo el owner puede eliminar este espacio.</p>
+            <p className="text-xs text-muted-foreground">Solo el owner puede eliminar este espacio.</p>
           ) : null}
-        </CardBody>
-      </Card>
+        </div>
+      </div>
 
       <Modal
         isOpen={isDeleteDialogOpen}
+        classNames={{
+          backdrop: "bg-foreground/60",
+          base: "rounded-none border-2 border-border",
+        }}
         onOpenChange={(open) => {
           if (!open) {
             setDeleteDialogOpen(false);
@@ -250,22 +273,26 @@ export default function WorkspaceSettingsPage() {
         }}
       >
         <ModalContent>
-          <ModalHeader>Eliminar espacio</ModalHeader>
+          <ModalHeader className="font-display tracking-tight">Eliminar espacio</ModalHeader>
           <ModalBody>
-            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            <p className="text-sm text-muted-foreground">
               Esta accion no se puede deshacer. Escribe <strong>{workspace.name}</strong> para confirmar.
             </p>
-            <Input
-              label="Confirmacion"
-              value={deleteConfirmation}
-              onValueChange={setDeleteConfirmation}
-              placeholder={workspace.name}
-              isDisabled={deleteWorkspaceMutation.isPending}
-            />
+            <div className="space-y-1.5">
+              <Label htmlFor="workspace-delete-confirm">Confirmacion</Label>
+              <Input
+                id="workspace-delete-confirm"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                placeholder={workspace.name}
+                disabled={deleteWorkspaceMutation.isPending}
+              />
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button
               variant="light"
+              className="rounded-none"
               onPress={() => {
                 setDeleteDialogOpen(false);
                 setDeleteConfirmation("");
@@ -275,6 +302,7 @@ export default function WorkspaceSettingsPage() {
             </Button>
             <Button
               color="danger"
+              className="rounded-none"
               isLoading={deleteWorkspaceMutation.isPending}
               onPress={() => {
                 if (deleteConfirmation.trim() !== workspace.name) {

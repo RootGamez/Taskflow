@@ -1,4 +1,4 @@
-import { Card, CardBody } from "@heroui/react";
+import { KanbanSquare } from "lucide-react";
 
 import { AuthLayout } from "@/components/layout/AuthLayout";
 import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm";
@@ -6,12 +6,27 @@ import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm"
 export default function ResetPasswordPage() {
   return (
     <AuthLayout>
-      <Card className="w-full max-w-md border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <CardBody className="space-y-4 p-6">
-          <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Crear nueva contraseña</h1>
+      <div className="w-full max-w-md border-2 border-border bg-card shadow-hard-lg dark:shadow-hard-float">
+        <div className="border-b-2 border-border p-6">
+          <div className="flex items-center gap-2.5">
+            <span className="boxed-icon h-8 w-8 bg-primary text-primary-foreground">
+              <KanbanSquare className="h-5 w-5" />
+            </span>
+            <span className="font-display text-lg font-bold tracking-[-0.02em] text-foreground">
+              TASKFLOW
+            </span>
+          </div>
+          <h1 className="mt-4 font-display text-2xl font-bold tracking-tight text-foreground">
+            Crear nueva contraseña
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Elige una contraseña nueva para tu cuenta.
+          </p>
+        </div>
+        <div className="p-6">
           <ResetPasswordForm />
-        </CardBody>
-      </Card>
+        </div>
+      </div>
     </AuthLayout>
   );
 }

@@ -17,49 +17,27 @@ Concentra dos decisiones deliberadas (ver plan tecnico, Seccion 4.3):
 from __future__ import annotations
 
 from django.db import transaction
-from django.db.models import Count, IntegerField, Q, QuerySet, Value
+from django.db.models import Count, Q, QuerySet
 
-from apps.projects.models import Project
 from apps.sprints.models import Sprint
 
 
-def get_done_column_id(project: Project) -> str | None:
-    """Devuelve el id (str) de la ultima columna del proyecto por `order`,
-    o `None` si el proyecto no tiene columnas.
-
-    Riesgo conocido (RA3, severidad MEDIA): en un proyecto con columnas
-    renombradas o reordenadas manualmente, esto puede no ser la columna
-    "real" de Hecho. Aceptado como simplificacion de v1 -- ver docstring del
-    modulo.
-    """
-    last_column = project.columns.order_by("-order").first()
-    return str(last_column.id) if last_column is not None else None
-
-
-def annotate_sprint_progress(queryset: QuerySet[Sprint], done_column_id: str | None) -> QuerySet[Sprint]:
+def annotate_sprint_progress(queryset: QuerySet[Sprint]) -> QuerySet[Sprint]:
     """Anota `ticket_count` y `completed_ticket_count` sobre un queryset de
     `Sprint`, siempre con `annotate` (D12) -- nunca contando en Python, para
-    no introducir un N+1 al listar sprints de un proyecto.
+    no introducir un N+1 al listar sprints.
 
-    `done_column_id is None` (RA4, proyecto sin columnas) usa un `Value(0)`
-    explicito para `completed_ticket_count` en vez de dejar que
-    `Q(tickets__column_id=None)` genere un `IS NULL` que además no tendria
-    sentido semantico (ningun ticket tiene "columna nula").
+    "Completado" = el ticket esta en una columna de proyecto cuyo
+    `WorkspaceStatus` tiene `is_done=True`. Un ticket sin columna mapeada a
+    un estado no cuenta como completado.
     """
-    ticket_count = Count("tickets", distinct=True)
-
-    if done_column_id is None:
-        completed_ticket_count = Value(0, output_field=IntegerField())
-    else:
-        completed_ticket_count = Count(
-            "tickets",
-            filter=Q(tickets__column_id=done_column_id),
-            distinct=True,
-        )
-
     return queryset.annotate(
-        ticket_count=ticket_count,
-        completed_ticket_count=completed_ticket_count,
+        ticket_count=Count("tickets", distinct=True),
+        completed_ticket_count=Count(
+            "tickets",
+            filter=Q(tickets__column__workspace_status__is_done=True),
+            distinct=True,
+        ),
     )
 
 
@@ -71,7 +49,7 @@ def activate_sprint(sprint: Sprint) -> Sprint:
     with transaction.atomic():
         (
             Sprint.objects.select_for_update()
-            .filter(project_id=sprint.project_id, status=Sprint.Status.ACTIVE)
+            .filter(workspace_id=sprint.workspace_id, status=Sprint.Status.ACTIVE)
             .exclude(pk=sprint.pk)
             .update(status=Sprint.Status.COMPLETED)
         )

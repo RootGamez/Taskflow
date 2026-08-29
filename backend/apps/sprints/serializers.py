@@ -12,7 +12,7 @@ class SprintSerializer(serializers.ModelSerializer):
     calculan aca.
     """
 
-    project_id = serializers.UUIDField(read_only=True)
+    workspace_id = serializers.UUIDField(read_only=True)
     ticket_count = serializers.IntegerField(read_only=True, default=0)
     completed_ticket_count = serializers.IntegerField(read_only=True, default=0)
 
@@ -20,7 +20,7 @@ class SprintSerializer(serializers.ModelSerializer):
         model = Sprint
         fields = (
             "id",
-            "project_id",
+            "workspace_id",
             "name",
             "goal",
             "start_date",
@@ -57,9 +57,9 @@ class SprintCreateSerializer(serializers.Serializer):
         return attrs
 
     def create(self, validated_data: dict) -> Sprint:
-        project = self.context["project"]
+        workspace = self.context["workspace"]
         return Sprint.objects.create(
-            project=project,
+            workspace=workspace,
             name=validated_data["name"],
             goal=validated_data.get("goal", ""),
             start_date=validated_data["start_date"],

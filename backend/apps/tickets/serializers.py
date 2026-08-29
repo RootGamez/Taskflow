@@ -58,7 +58,9 @@ def normalize_ticket_positions(ticket: Ticket, target_column: ProjectColumn, req
 
 class TicketSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
+    project = serializers.SerializerMethodField()
     column_id = serializers.UUIDField(source="column.id", read_only=True)
+    workspace_status_id = serializers.SerializerMethodField()
     sprint_ids = serializers.SerializerMethodField()
     created_by = serializers.SerializerMethodField()
     assignees = UserSerializer(many=True, read_only=True)
@@ -73,7 +75,9 @@ class TicketSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "project_id",
+            "project",
             "column_id",
+            "workspace_status_id",
             "sprint_ids",
             "created_by",
             "title",
@@ -94,6 +98,23 @@ class TicketSerializer(serializers.ModelSerializer):
 
     def get_created_by(self, obj: Ticket):
         return str(obj.created_by_id) if obj.created_by_id else None
+
+    def get_project(self, obj: Ticket):
+        # Asume `select_related("project")` desde el call site (todos los
+        # actuales lo tienen). El tablero de sprint cruza proyectos, asi que
+        # cada ticket necesita saber a cual pertenece.
+        project = obj.project
+        return {
+            "id": str(project.id),
+            "name": project.name,
+            "key": project.key,
+            "color": project.color,
+        }
+
+    def get_workspace_status_id(self, obj: Ticket):
+        # Asume `select_related("column")` (o `column__workspace_status`).
+        status_id = getattr(obj.column, "workspace_status_id", None)
+        return str(status_id) if status_id else None
 
     def get_sprint_ids(self, obj: Ticket):
         # Asume `prefetch_related("sprints")` desde el call site.
@@ -174,9 +195,9 @@ class TicketCreateSerializer(serializers.Serializer):
             return value
         project = self.context["project"]
         unique_ids = set(value)
-        valid_count = project.sprints.filter(id__in=unique_ids).count()
+        valid_count = project.workspace.sprints.filter(id__in=unique_ids).count()
         if valid_count != len(unique_ids):
-            raise serializers.ValidationError("Uno o mas sprints no pertenecen al proyecto.")
+            raise serializers.ValidationError("Uno o mas sprints no pertenecen al espacio.")
         return value
 
     def validate_label_ids(self, value):
@@ -283,6 +304,11 @@ class TicketUpdateSerializer(serializers.Serializer):
     priority = serializers.ChoiceField(choices=Ticket.Priority.choices, required=False)
     due_date = serializers.DateTimeField(required=False, allow_null=True)
     column_id = serializers.UUIDField(required=False)
+    # Usado por el tablero de sprint (cruza proyectos): en vez de mandar el
+    # `column_id` concreto (que el cliente del tablero no conoce por
+    # proyecto), manda el estado del espacio destino y el servidor resuelve
+    # la columna del proyecto del ticket mapeada a ese estado.
+    workspace_status_id = serializers.UUIDField(required=False, write_only=True)
     order = serializers.IntegerField(required=False, min_value=1)
     assignee_ids = serializers.ListField(
         child=serializers.UUIDField(),
@@ -308,14 +334,28 @@ class TicketUpdateSerializer(serializers.Serializer):
         self.context["target_column"] = column
         return value
 
+    def validate_workspace_status_id(self, value):
+        project = self.context["project"]
+        column = (
+            project.columns.filter(workspace_status_id=value)
+            .order_by("order", "created_at")
+            .first()
+        )
+        if column is None:
+            raise serializers.ValidationError(
+                f"El proyecto \"{project.name}\" no tiene una columna para este estado."
+            )
+        self.context["target_column"] = column
+        return value
+
     def validate_sprint_ids(self, value):
         if not value:
             return value
         project = self.context["project"]
         unique_ids = set(value)
-        valid_count = project.sprints.filter(id__in=unique_ids).count()
+        valid_count = project.workspace.sprints.filter(id__in=unique_ids).count()
         if valid_count != len(unique_ids):
-            raise serializers.ValidationError("Uno o mas sprints no pertenecen al proyecto.")
+            raise serializers.ValidationError("Uno o mas sprints no pertenecen al espacio.")
         return value
 
     def validate_label_ids(self, value):

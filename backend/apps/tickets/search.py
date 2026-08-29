@@ -159,7 +159,7 @@ class SearchTicketsView(APIView):
 
         results = (
             tickets.filter(match_q)
-            .select_related("project", "project__workspace", "column")
+            .select_related("project", "project__workspace", "column__workspace_status")
             .annotate(rank=rank)
             .order_by("rank", "project__name", "-updated_at")[:limit]
         )

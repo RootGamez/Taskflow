@@ -369,13 +369,13 @@ class TicketSprintLabelReferenceTests(APITestCase):
 		self.project = Project.objects.create(workspace=self.workspace, name="Core Platform", key="KEY")
 		self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
 		self.sprint = Sprint.objects.create(
-			project=self.project,
+			workspace=self.workspace,
 			name="Sprint 1",
 			start_date=date(2026, 1, 1),
 			end_date=date(2026, 1, 14),
 		)
 		self.later_sprint = Sprint.objects.create(
-			project=self.project,
+			workspace=self.workspace,
 			name="Sprint 2",
 			start_date=date(2026, 1, 15),
 			end_date=date(2026, 1, 28),
@@ -392,7 +392,7 @@ class TicketSprintLabelReferenceTests(APITestCase):
 		self.other_project = Project.objects.create(workspace=self.other_workspace, name="Otro proyecto")
 		ProjectColumn.objects.create(project=self.other_project, name="Backlog", order=1)
 		self.other_sprint = Sprint.objects.create(
-			project=self.other_project,
+			workspace=self.other_workspace,
 			name="Sprint ajeno",
 			start_date=date(2026, 1, 1),
 			end_date=date(2026, 1, 14),

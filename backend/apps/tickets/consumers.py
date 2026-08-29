@@ -100,6 +100,59 @@ class ProjectConsumer(BaseJWTConsumer):
         )
 
 
+class WorkspaceBoardConsumer(BaseJWTConsumer):
+    """Realtime del tablero de sprint (cruza proyectos). Escucha el grupo
+    `workspace_{id}`, al que `apps.tickets.views` emite ademas del
+    `project_{id}` de siempre."""
+
+    async def connect(self):
+        self.workspace_id = self.scope["url_route"]["kwargs"]["workspace_id"]
+        self.group_name = f"workspace_{self.workspace_id}"
+
+        user = await self._get_user_from_token()
+        if user is None:
+            await self.close(code=4401)
+            return
+
+        membership = await self._get_workspace_membership(self.workspace_id, user.id)
+        if membership is None:
+            await self.close(code=4403)
+            return
+
+        self.user = user
+        await self.channel_layer.group_add(self.group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "group_name"):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
+
+    async def ticket_created(self, event):
+        await self.send_json({"type": "ticket.created", "ticket": event.get("ticket"), "source": event.get("source")})
+
+    async def ticket_updated(self, event):
+        await self.send_json({"type": "ticket.updated", "ticket": event.get("ticket"), "source": event.get("source")})
+
+    async def ticket_deleted(self, event):
+        await self.send_json(
+            {
+                "type": "ticket.deleted",
+                "ticket_id": event.get("ticket_id"),
+                "project_id": event.get("project_id"),
+                "column_id": event.get("column_id"),
+                "source": event.get("source"),
+            }
+        )
+
+    @database_sync_to_async
+    def _get_workspace_membership(self, workspace_id: str, user_id):
+        return (
+            WorkspaceMember.objects.filter(workspace_id=workspace_id, user_id=user_id)
+            .only("role")
+            .first()
+        )
+
+
 class TicketConsumer(BaseJWTConsumer):
     EDITABLE_FIELDS = {
         "title",
@@ -210,14 +263,18 @@ class TicketConsumer(BaseJWTConsumer):
                 "source": str(self.user.id),
             },
         )
-        await self.channel_layer.group_send(
+        for group in (
             f"project_{result['project_id']}",
-            {
-                "type": "ticket.updated",
-                "ticket": result["ticket"],
-                "source": str(self.user.id),
-            },
-        )
+            f"workspace_{result['workspace_id']}",
+        ):
+            await self.channel_layer.group_send(
+                group,
+                {
+                    "type": "ticket.updated",
+                    "ticket": result["ticket"],
+                    "source": str(self.user.id),
+                },
+            )
 
     async def ticket_updated(self, event):
         await self.send_json(
@@ -365,7 +422,7 @@ class TicketConsumer(BaseJWTConsumer):
     @database_sync_to_async
     def _patch_ticket(self, ticket_id: str, payload: dict):
         ticket = (
-            Ticket.objects.select_related("project", "column", "created_by")
+            Ticket.objects.select_related("project", "column__workspace_status", "created_by")
             .prefetch_related("assignees", "labels", "subtasks", "sprints")
             .filter(id=ticket_id)
             .first()
@@ -392,12 +449,16 @@ class TicketConsumer(BaseJWTConsumer):
 
         # Re-fetch with all relations to ensure assignees are populated correctly
         updated_ticket = (
-            Ticket.objects.select_related("project", "column", "created_by")
+            Ticket.objects.select_related("project", "column__workspace_status", "created_by")
             .prefetch_related("assignees", "labels", "subtasks", "sprints")
             .get(id=ticket_id)
         )
         serialized_ticket = TicketSerializer(updated_ticket).data
-        return {"ticket": serialized_ticket, "project_id": str(serialized_ticket["project_id"])}
+        return {
+            "ticket": serialized_ticket,
+            "project_id": str(serialized_ticket["project_id"]),
+            "workspace_id": str(updated_ticket.project.workspace_id),
+        }
 
     @database_sync_to_async
     def _get_active_lock(self, field: str):

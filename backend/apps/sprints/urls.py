@@ -11,22 +11,22 @@ from apps.sprints.views import (
 
 urlpatterns = [
     path(
-        "projects/<uuid:project_id>/sprints/",
+        "workspaces/<slug:workspace_slug>/sprints/",
         SprintListCreateView.as_view(),
         name="sprint-list-create",
     ),
     path(
-        "projects/<uuid:project_id>/sprints/<uuid:sprint_id>/",
+        "workspaces/<slug:workspace_slug>/sprints/<uuid:sprint_id>/",
         SprintDetailView.as_view(),
         name="sprint-detail",
     ),
     path(
-        "projects/<uuid:project_id>/sprints/<uuid:sprint_id>/activate/",
+        "workspaces/<slug:workspace_slug>/sprints/<uuid:sprint_id>/activate/",
         SprintActivateView.as_view(),
         name="sprint-activate",
     ),
     path(
-        "projects/<uuid:project_id>/sprints/<uuid:sprint_id>/complete/",
+        "workspaces/<slug:workspace_slug>/sprints/<uuid:sprint_id>/complete/",
         SprintCompleteView.as_view(),
         name="sprint-complete",
     ),

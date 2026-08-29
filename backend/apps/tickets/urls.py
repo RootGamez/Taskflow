@@ -2,7 +2,14 @@ from django.urls import path
 
 from apps.tickets.my_tasks import MyTasksView
 from apps.tickets.search import SearchTicketsView
-from apps.tickets.views import TicketDetailView, TicketImageUploadView, TicketVideoUploadView, TicketListCreateView, TicketSingleView
+from apps.tickets.views import (
+    TicketDetailView,
+    TicketImageUploadView,
+    TicketVideoUploadView,
+    TicketListCreateView,
+    TicketSingleView,
+    WorkspaceSprintBoardView,
+)
 
 urlpatterns = [
     path(
@@ -44,6 +51,11 @@ urlpatterns = [
         "search/tickets/",
         SearchTicketsView.as_view(),
         name="ticket-search",
+    ),
+    path(
+        "workspaces/<slug:workspace_slug>/board/",
+        WorkspaceSprintBoardView.as_view(),
+        name="workspace-sprint-board",
     ),
     path(
         "tickets/<uuid:ticket_id>/",

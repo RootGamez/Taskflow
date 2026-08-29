@@ -9,38 +9,11 @@ from django.test.utils import CaptureQueriesContext
 
 from apps.projects.models import Project, ProjectColumn
 from apps.sprints.models import Sprint
-from apps.sprints.services import activate_sprint, annotate_sprint_progress, get_done_column_id
+from apps.sprints.services import activate_sprint, annotate_sprint_progress
 from apps.tickets.models import Ticket
 from apps.workspaces.models import Workspace
 
 User = get_user_model()
-
-
-class GetDoneColumnIdTests(TestCase):
-    def setUp(self) -> None:
-        self.user = User.objects.create_user(
-            email="owner@example.com", full_name="Owner", password="Passw0rd!123"
-        )
-        self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
-        self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
-
-    def test_get_done_column_id_returns_last_column_by_order(self) -> None:
-        ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
-        ProjectColumn.objects.create(project=self.project, name="En progreso", order=2)
-        done = ProjectColumn.objects.create(project=self.project, name="Hecho", order=3)
-
-        self.assertEqual(get_done_column_id(self.project), str(done.id))
-
-    def test_get_done_column_id_returns_none_for_project_without_columns(self) -> None:
-        self.assertIsNone(get_done_column_id(self.project))
-
-    def test_get_done_column_id_respects_reordered_columns(self) -> None:
-        # El heuristico no mira el nombre: la ultima columna por `order` es
-        # "hecho" aunque se llame distinto (RA3).
-        ProjectColumn.objects.create(project=self.project, name="Hecho", order=1)
-        last = ProjectColumn.objects.create(project=self.project, name="Archivado", order=2)
-
-        self.assertEqual(get_done_column_id(self.project), str(last.id))
 
 
 class AnnotateSprintProgressTests(TestCase):
@@ -48,12 +21,20 @@ class AnnotateSprintProgressTests(TestCase):
         self.user = User.objects.create_user(
             email="owner@example.com", full_name="Owner", password="Passw0rd!123"
         )
+        # El post_save de Workspace siembra 3 WorkspaceStatus por defecto
+        # (Backlog / En progreso / Hecho, este ultimo is_done=True).
         self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
+        self.todo_status = self.workspace.statuses.get(order=1)
+        self.done_status = self.workspace.statuses.get(is_done=True)
         self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
-        self.backlog = ProjectColumn.objects.create(project=self.project, name="Backlog", order=1)
-        self.done = ProjectColumn.objects.create(project=self.project, name="Hecho", order=2)
+        self.backlog = ProjectColumn.objects.create(
+            project=self.project, name="Backlog", order=1, workspace_status=self.todo_status
+        )
+        self.done = ProjectColumn.objects.create(
+            project=self.project, name="Hecho", order=2, workspace_status=self.done_status
+        )
         self.sprint = Sprint.objects.create(
-            project=self.project,
+            workspace=self.workspace,
             name="Sprint 1",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 1, 14),
@@ -75,36 +56,47 @@ class AnnotateSprintProgressTests(TestCase):
         self._create_ticket(self.done, sprint=self.sprint)
         self._create_ticket(self.backlog, sprint=None)
 
-        done_column_id = get_done_column_id(self.project)
-        qs = annotate_sprint_progress(Sprint.objects.filter(project=self.project), done_column_id)
+        qs = annotate_sprint_progress(Sprint.objects.filter(workspace=self.workspace))
         sprint = qs.get(pk=self.sprint.pk)
 
         self.assertEqual(sprint.ticket_count, 2)
 
-    def test_annotate_progress_counts_only_done_column_as_completed(self) -> None:
+    def test_annotate_progress_counts_only_done_status_as_completed(self) -> None:
         self._create_ticket(self.backlog, sprint=self.sprint)
         self._create_ticket(self.done, sprint=self.sprint)
         self._create_ticket(self.done, sprint=self.sprint)
 
-        done_column_id = get_done_column_id(self.project)
-        qs = annotate_sprint_progress(Sprint.objects.filter(project=self.project), done_column_id)
+        qs = annotate_sprint_progress(Sprint.objects.filter(workspace=self.workspace))
         sprint = qs.get(pk=self.sprint.pk)
 
         self.assertEqual(sprint.ticket_count, 3)
         self.assertEqual(sprint.completed_ticket_count, 2)
 
-    def test_annotate_progress_returns_zero_for_project_without_columns(self) -> None:
-        empty_project = Project.objects.create(workspace=self.workspace, name="Sin columnas")
+    def test_annotate_progress_counts_tickets_across_projects(self) -> None:
+        other_project = Project.objects.create(workspace=self.workspace, name="Otro")
+        other_done = ProjectColumn.objects.create(
+            project=other_project, name="Hecho", order=1, workspace_status=self.done_status
+        )
+        Ticket.objects.create(
+            project=other_project, column=other_done, created_by=self.user, title="X"
+        ).sprints.add(self.sprint)
+        self._create_ticket(self.done, sprint=self.sprint)
+
+        qs = annotate_sprint_progress(Sprint.objects.filter(workspace=self.workspace))
+        sprint = qs.get(pk=self.sprint.pk)
+
+        self.assertEqual(sprint.ticket_count, 2)
+        self.assertEqual(sprint.completed_ticket_count, 2)
+
+    def test_annotate_progress_returns_zero_for_empty_sprint(self) -> None:
         sprint = Sprint.objects.create(
-            project=empty_project,
+            workspace=self.workspace,
             name="Sprint vacio",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 1, 14),
         )
 
-        done_column_id = get_done_column_id(empty_project)
-        qs = annotate_sprint_progress(Sprint.objects.filter(project=empty_project), done_column_id)
-        result = qs.get(pk=sprint.pk)
+        result = annotate_sprint_progress(Sprint.objects.filter(pk=sprint.pk)).get()
 
         self.assertEqual(result.ticket_count, 0)
         self.assertEqual(result.completed_ticket_count, 0)
@@ -112,27 +104,25 @@ class AnnotateSprintProgressTests(TestCase):
     def test_annotate_progress_does_not_scale_queries_with_sprint_count(self) -> None:
         for i in range(3):
             Sprint.objects.create(
-                project=self.project,
+                workspace=self.workspace,
                 name=f"Sprint {i}",
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 1, 14),
             )
 
-        done_column_id = get_done_column_id(self.project)
-
         with CaptureQueriesContext(connection) as small_batch:
-            list(annotate_sprint_progress(Sprint.objects.filter(project=self.project), done_column_id))
+            list(annotate_sprint_progress(Sprint.objects.filter(workspace=self.workspace)))
 
         for i in range(5):
             Sprint.objects.create(
-                project=self.project,
+                workspace=self.workspace,
                 name=f"Sprint extra {i}",
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 1, 14),
             )
 
         with CaptureQueriesContext(connection) as bigger_batch:
-            list(annotate_sprint_progress(Sprint.objects.filter(project=self.project), done_column_id))
+            list(annotate_sprint_progress(Sprint.objects.filter(workspace=self.workspace)))
 
         self.assertEqual(len(small_batch.captured_queries), len(bigger_batch.captured_queries))
 
@@ -143,11 +133,10 @@ class ActivateSprintTests(TestCase):
             email="owner@example.com", full_name="Owner", password="Passw0rd!123"
         )
         self.workspace = Workspace.objects.create(name="Producto", owner=self.user)
-        self.project = Project.objects.create(workspace=self.workspace, name="Core Platform")
 
     def _sprint(self, name: str, status: str = Sprint.Status.PLANNED) -> Sprint:
         return Sprint.objects.create(
-            project=self.project,
+            workspace=self.workspace,
             name=name,
             start_date=date(2026, 1, 1),
             end_date=date(2026, 1, 14),
@@ -188,7 +177,9 @@ class ActivateSprintTests(TestCase):
         activate_sprint(first)
         activate_sprint(second)
 
-        active_count = Sprint.objects.filter(project=self.project, status=Sprint.Status.ACTIVE).count()
+        active_count = Sprint.objects.filter(
+            workspace=self.workspace, status=Sprint.Status.ACTIVE
+        ).count()
         self.assertEqual(active_count, 1)
         second.refresh_from_db()
         self.assertEqual(second.status, Sprint.Status.ACTIVE)

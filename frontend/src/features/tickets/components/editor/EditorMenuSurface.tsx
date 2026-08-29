@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import * as Popover from "@radix-ui/react-popover";
 import { RemoveScroll } from "react-remove-scroll";
 
@@ -23,13 +24,17 @@ import { cn } from "@/lib/utils";
  *
  * 2. **El buscador robaba/perdía el foco y el menú "desaparecía".** El
  *    `FocusScope` del Dialog devolvía el foco al detectar que salía del
- *    diálogo. Ahora el contenido se portalea DENTRO del `[data-slot=
- *    'dialog-content']` (prop `container`), así que el foco nunca "sale" del
- *    scope, y Radix `Popover` coordina el apilado de capas para que
- *    `Escape` / clic-fuera cierren el menú y no el panel.
+ *    diálogo. Los menús con `<input>` (el "+") se abren con `modal` -> Radix
+ *    monta su propio `FocusScope`, que pausa el del Dialog mientras está
+ *    abierto. Los que no toman el foco (menú "/", menciones) van sin `modal`.
  *
  * 3. **Posición con constante mágica (`menuHeight = 320`).** Radix Popper
  *    mide el ancla real y hace flip/colisión solo.
+ *
+ * NOTA: el ancla y el contenido se portalean a `document.body`, NO dentro del
+ * `DialogContent`. El panel de ticket lleva `translate-x-0` (un `transform`
+ * real), que convierte cualquier `position: fixed` descendiente en relativo
+ * al panel -> el ancla acababa fuera de pantalla y "no se abría nada".
  *
  * En móvil se renderiza como hoja inferior (`components/ui/Sheet.tsx`).
  */
@@ -42,12 +47,18 @@ interface EditorMenuSurfaceProps {
    * `clientRect` de `@tiptap/suggestion`, o el botón "+".
    */
   anchorRect: { top: number; left: number; width?: number; height?: number } | null;
-  /** Elemento contenedor del portal — el `[data-slot='dialog-content']` si el editor vive en un diálogo. */
+  /** Aceptado por compatibilidad; ya no se usa (ver NOTA en el docstring). */
   container?: HTMLElement | null;
   side?: "top" | "bottom";
   align?: "start" | "center" | "end";
   /** true = enfoca el primer foco al abrir (menú "+"); false = deja el foco en el editor (menú "/"). */
   autoFocus?: boolean;
+  /**
+   * `modal` en Radix Popover: monta un `FocusScope` propio que pausa el del
+   * Dialog padre. Necesario para los menús con `<input>` (el "+"), innecesario
+   * para los que no roban el foco.
+   */
+  modal?: boolean;
   ariaLabel: string;
   /** Cabecera fija sobre la zona scrolleable (p. ej. el input de búsqueda). */
   header?: ReactNode;
@@ -63,10 +74,10 @@ export function EditorMenuSurface({
   open,
   onOpenChange,
   anchorRect,
-  container,
   side = "bottom",
   align = "start",
   autoFocus = false,
+  modal = false,
   ariaLabel,
   header,
   children,
@@ -74,6 +85,7 @@ export function EditorMenuSurface({
   desktopMaxHeightClass = "max-h-80",
 }: EditorMenuSurfaceProps) {
   const isMobile = useIsMobile();
+  const bodyEl = typeof document !== "undefined" ? document.body : null;
 
   if (isMobile) {
     return (
@@ -101,22 +113,28 @@ export function EditorMenuSurface({
     );
   }
 
+  const anchor = (
+    <Popover.Anchor asChild>
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          top: anchorRect?.top ?? 0,
+          left: anchorRect?.left ?? 0,
+          width: anchorRect?.width ?? 0,
+          height: anchorRect?.height ?? 0,
+          pointerEvents: "none",
+        }}
+      />
+    </Popover.Anchor>
+  );
+
   return (
-    <Popover.Root open={open} onOpenChange={onOpenChange}>
-      <Popover.Anchor asChild>
-        <div
-          aria-hidden="true"
-          style={{
-            position: "fixed",
-            top: anchorRect?.top ?? 0,
-            left: anchorRect?.left ?? 0,
-            width: anchorRect?.width ?? 0,
-            height: anchorRect?.height ?? 0,
-            pointerEvents: "none",
-          }}
-        />
-      </Popover.Anchor>
-      <Popover.Portal container={container ?? undefined}>
+    <Popover.Root open={open} onOpenChange={onOpenChange} modal={modal}>
+      {/* Ancla portaleada a <body>: fuera del `transform` del panel de ticket,
+          para que su `position: fixed` sea relativo al viewport. */}
+      {bodyEl ? createPortal(anchor, bodyEl) : anchor}
+      <Popover.Portal>
         <Popover.Content
           data-ticket-editor-floating="true"
           side={side}

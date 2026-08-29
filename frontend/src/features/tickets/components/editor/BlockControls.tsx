@@ -138,10 +138,9 @@ interface BlockMenuProps {
   onSelect: (option: SlashCommandItem) => void;
   onClose: () => void;
   anchorRect: AnchorRect;
-  container: HTMLElement | null;
 }
 
-function BlockMenuPopup({ options, onSelect, onClose, anchorRect, container }: BlockMenuProps) {
+function BlockMenuPopup({ options, onSelect, onClose, anchorRect }: BlockMenuProps) {
   const [search, setSearch] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const isMobile = useIsMobile();
@@ -183,8 +182,8 @@ function BlockMenuPopup({ options, onSelect, onClose, anchorRect, container }: B
         if (!next) onClose();
       }}
       anchorRect={anchorRect}
-      container={container}
       autoFocus={!isMobile}
+      modal={!isMobile}
       ariaLabel="Insertar bloque"
       desktopMaxHeightClass="max-h-80"
       header={
@@ -261,7 +260,6 @@ interface BlockActionsMenuProps {
   onDelete: () => void;
   onClose: () => void;
   anchorRect: AnchorRect;
-  container: HTMLElement | null;
 }
 
 function BlockActionsMenuPopup({
@@ -270,7 +268,6 @@ function BlockActionsMenuPopup({
   onDelete,
   onClose,
   anchorRect,
-  container,
 }: BlockActionsMenuProps) {
   const item =
     "flex w-full items-center gap-2.5 px-3 py-2.5 text-sm transition-colors sm:py-2";
@@ -281,7 +278,6 @@ function BlockActionsMenuPopup({
         if (!next) onClose();
       }}
       anchorRect={anchorRect}
-      container={container}
       ariaLabel="Acciones del bloque"
       className="w-52"
       desktopMaxHeightClass="max-h-none"
@@ -363,15 +359,6 @@ export function BlockControls({
     open: false,
     anchorRect: null,
   });
-
-  /** Portal target: el contenido del diálogo si el editor vive en uno, si no <body>. */
-  const portalContainer = useMemo(
-    () =>
-      (editor.view.dom.closest("[data-slot='dialog-content']") as HTMLElement | null) ??
-      (typeof document !== "undefined" ? document.body : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [editor],
-  );
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current !== null) {
@@ -581,7 +568,6 @@ export function BlockControls({
           onSelect={handleSelectBlock}
           onClose={() => setBlockMenu({ open: false, anchorRect: null })}
           anchorRect={blockMenu.anchorRect}
-          container={portalContainer}
         />
       ) : null}
 
@@ -592,7 +578,6 @@ export function BlockControls({
           onDelete={deleteBlock}
           onClose={() => setActionsMenu({ open: false, anchorRect: null })}
           anchorRect={actionsMenu.anchorRect}
-          container={portalContainer}
         />
       ) : null}
     </>

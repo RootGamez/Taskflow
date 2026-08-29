@@ -682,7 +682,7 @@ export function CreateTicketModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
         showCloseButton={false}
-        className="flex max-h-[92vh] w-full max-w-[860px] flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200/80 p-0 shadow-2xl dark:border-zinc-800"
+        className="flex max-h-[92dvh] w-full max-w-[860px] flex-col gap-0 overflow-hidden rounded-2xl border border-zinc-200/80 p-0 shadow-2xl dark:border-zinc-800 max-sm:rounded-b-none"
         onKeyDown={handleKeyDown}
       >
         <DialogHeader className="sr-only">
@@ -747,10 +747,10 @@ export function CreateTicketModal({
         </div>
 
         {/* ── Body ────────────────────────────────────────────────────────── */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden sm:flex-row">
 
           {/* Left: title + rich editor */}
-          <div className="flex flex-1 flex-col overflow-hidden border-r border-zinc-100 dark:border-zinc-800">
+          <div className="flex flex-1 flex-col overflow-hidden border-b border-zinc-100 dark:border-zinc-800 sm:border-b-0 sm:border-r">
 
             {/* Title */}
             <div className="px-6 pt-5 pb-2">
@@ -817,7 +817,7 @@ export function CreateTicketModal({
           </div>
 
           {/* Right: metadata sidebar */}
-          <aside className="flex w-[220px] shrink-0 flex-col gap-5 overflow-y-auto bg-zinc-50/60 px-5 py-5 dark:bg-zinc-900/40">
+          <aside className="flex w-full shrink-0 flex-col gap-5 overflow-y-auto bg-zinc-50/60 px-5 py-5 dark:bg-zinc-900/40 sm:w-[220px]">
 
             <section>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">

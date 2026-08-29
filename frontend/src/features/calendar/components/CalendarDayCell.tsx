@@ -45,7 +45,7 @@ export function CalendarDayCell({
       ref={setNodeRef}
       data-testid={`calendar-day-cell-${dayKey}`}
       className={cn(
-        "flex min-h-[104px] flex-col gap-1 rounded-lg border border-border p-1.5 transition-colors",
+        "flex min-h-[68px] flex-col gap-1 overflow-hidden rounded-lg border border-border p-1 transition-colors sm:min-h-[104px] sm:p-1.5",
         isCurrentMonth ? "bg-card" : "bg-muted/40",
         isOver && "ring-2 ring-ring",
       )}

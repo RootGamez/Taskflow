@@ -21,7 +21,19 @@ import {
   Link as LinkIcon,
   Trash2,
   ExternalLink,
+  Table as TableIcon,
   Video as VideoIcon,
+  Bold as BoldIcon,
+  Italic as ItalicIcon,
+  Underline as UnderlineIcon,
+  Strikethrough as StrikethroughIcon,
+  Code as InlineCodeIcon,
+  Highlighter as HighlighterIcon,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Columns3,
+  Rows3,
 } from "lucide-react";
 import {
   EditorContent,
@@ -46,6 +58,7 @@ import { Input } from "@/components/ui/shadcn/input";
 
 import { BookmarkExtension } from "./BookmarkExtension";
 import { normalizeUrl } from "./editor/url";
+import { createSharedExtensions } from "./editor/sharedExtensions";
 import { useUrlPrompt, type RequestUrlFn } from "./editor/useUrlPrompt";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import { VideoExtension } from "./extensions/VideoExtension";
@@ -413,11 +426,21 @@ function useBlockOptions(
       {
         id: "code",
         label: "Código",
-        description: "Bloque de código",
+        description: "Bloque de código con resaltado",
         group: "advanced",
         keywords: ["code", "codigo", "snippet", "bloque", "pre"],
         icon: Code2,
         apply: (e) => e.chain().focus().toggleCodeBlock().run(),
+      },
+      {
+        id: "table",
+        label: "Tabla",
+        description: "Insertar una tabla 3×3",
+        group: "advanced",
+        keywords: ["tabla", "table", "grid", "filas", "columnas"],
+        icon: TableIcon,
+        apply: (e) =>
+          e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
       },
       {
         id: "bookmark",
@@ -525,7 +548,10 @@ export function TicketRichEditor({
       StarterKit.configure({
         heading: { levels: [2, 3] },
         dropcursor: false,
+        // Reemplazado por CodeBlockLowlight (mismo nombre de nodo).
+        codeBlock: false,
       }),
+      ...createSharedExtensions(),
 
       // Image with React NodeView (resize + toolbar)
       Image.configure({
@@ -690,8 +716,11 @@ export function TicketRichEditor({
   const [linkInputUrl, setLinkInputUrl] = useState("");
 
   const applyLink = useCallback(() => {
-    if (linkInputUrl) {
-      editor?.chain().focus().setLink({ href: linkInputUrl, target: "_blank" }).run();
+    const safe = normalizeUrl(linkInputUrl);
+    if (safe) {
+      editor?.chain().focus().setLink({ href: safe, target: "_blank" }).run();
+    } else if (!linkInputUrl.trim()) {
+      editor?.chain().focus().unsetLink().run();
     }
     setEditingLink(false);
     setLinkInputUrl("");
@@ -827,15 +856,131 @@ export function TicketRichEditor({
       {/* Diálogo para pedir URL (reemplaza window.prompt) */}
       {urlPromptDialog}
 
-      {/* ── Link BubbleMenu ───────────────────────────────────────────────── */}
+      {/* ── BubbleMenu de tabla ──────────────────────────────────────────── */}
       {editor && (
         <BubbleMenu
           editor={editor}
-          tippyOptions={{ duration: 100, placement: "bottom", maxWidth: 420 }}
-          shouldShow={({ editor: e }) => e.isActive("link")}
-          className="flex overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50 p-1"
+          pluginKey="tableBubble"
+          tippyOptions={{ duration: 100, placement: "top" }}
+          shouldShow={({ editor: e }) => e.isActive("table")}
+          className="flex items-center gap-0.5 rounded-xl border border-zinc-200 bg-white p-1 text-xs shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50"
         >
-          {editingLink ? (
+          {[
+            { icon: Columns3, label: "Columna +", run: () => editor.chain().focus().addColumnAfter().run() },
+            { icon: Columns3, label: "Columna −", run: () => editor.chain().focus().deleteColumn().run() },
+            { icon: Rows3, label: "Fila +", run: () => editor.chain().focus().addRowAfter().run() },
+            { icon: Rows3, label: "Fila −", run: () => editor.chain().focus().deleteRow().run() },
+          ].map(({ icon: Icon, label, run }) => (
+            <button
+              key={label}
+              type="button"
+              title={label}
+              aria-label={label}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={run}
+              className="flex items-center gap-1 rounded-md px-2 py-1.5 text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+          <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+          <button
+            type="button"
+            title="Eliminar tabla"
+            aria-label="Eliminar tabla"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </BubbleMenu>
+      )}
+
+      {/* ── BubbleMenu: formato de texto + edición de enlace ──────────────── */}
+      {editor && (
+        <BubbleMenu
+          editor={editor}
+          pluginKey="formatBubble"
+          tippyOptions={{ duration: 100, placement: "top", maxWidth: 480 }}
+          shouldShow={({ editor: e, state, from, to }) => {
+            if (e.isActive("link")) return true;
+            // Selección de texto no vacía y no dentro de un bloque de código.
+            if (from === to) return false;
+            if (e.isActive("codeBlock")) return false;
+            return !state.doc.textBetween(from, to).trim().length ? false : true;
+          }}
+          className="flex items-center gap-0.5 overflow-hidden rounded-xl border border-zinc-200 bg-white p-1 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 z-50"
+        >
+          {!editingLink && !editor.isActive("link") ? (
+            <div className="flex items-center gap-0.5">
+              {[
+                { icon: BoldIcon, label: "Negrita", is: "bold", run: () => editor.chain().focus().toggleBold().run() },
+                { icon: ItalicIcon, label: "Cursiva", is: "italic", run: () => editor.chain().focus().toggleItalic().run() },
+                { icon: UnderlineIcon, label: "Subrayado", is: "underline", run: () => editor.chain().focus().toggleUnderline().run() },
+                { icon: StrikethroughIcon, label: "Tachado", is: "strike", run: () => editor.chain().focus().toggleStrike().run() },
+                { icon: InlineCodeIcon, label: "Código", is: "code", run: () => editor.chain().focus().toggleCode().run() },
+                { icon: HighlighterIcon, label: "Resaltar", is: "highlight", run: () => editor.chain().focus().toggleHighlight().run() },
+              ].map(({ icon: Icon, label, is, run }) => (
+                <button
+                  key={label}
+                  type="button"
+                  aria-label={label}
+                  aria-pressed={editor.isActive(is)}
+                  title={label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={run}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    editor.isActive(is)
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"
+                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+              <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+              {[
+                { icon: AlignLeft, label: "Alinear a la izquierda", value: "left" },
+                { icon: AlignCenter, label: "Centrar", value: "center" },
+                { icon: AlignRight, label: "Alinear a la derecha", value: "right" },
+              ].map(({ icon: Icon, label, value }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-label={label}
+                  aria-pressed={editor.isActive({ textAlign: value })}
+                  title={label}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => editor.chain().focus().setTextAlign(value).run()}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                    editor.isActive({ textAlign: value })
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300"
+                      : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              ))}
+              <div className="mx-0.5 h-5 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <button
+                type="button"
+                aria-label="Añadir enlace"
+                title="Añadir enlace"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setLinkInputUrl("");
+                  setEditingLink(true);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-600 transition-colors hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                <LinkIcon className="h-4 w-4" />
+              </button>
+            </div>
+          ) : editingLink ? (
             <div className="flex items-center gap-2 p-1">
               <Input
                 autoFocus

@@ -17,6 +17,7 @@ import {
   Minus,
   Pilcrow,
   Quote,
+  Table as TableIcon,
   Ticket,
   Video as VideoIcon,
   X,
@@ -46,6 +47,7 @@ import { BUILT_IN_TEMPLATE_ID } from "@/features/ticket-templates/lib/builtInTem
 import type { Priority } from "@/features/tickets/types/ticket.types";
 import { SlashExtension, type SlashCommandItem } from "./extensions/SlashExtension";
 import { normalizeUrl } from "./editor/url";
+import { createSharedExtensions } from "./editor/sharedExtensions";
 import { useUrlPrompt, type RequestUrlFn } from "./editor/useUrlPrompt";
 import {
   SlashCommandMenu,
@@ -358,6 +360,16 @@ function useBlockOptions(
         apply: (e) => e.chain().focus().toggleCodeBlock().run(),
       },
       {
+        id: "table",
+        label: "Tabla",
+        description: "Insertar una tabla 3×3",
+        group: "advanced",
+        keywords: ["tabla", "table", "grid", "filas", "columnas"],
+        icon: TableIcon,
+        apply: (e) =>
+          e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+      },
+      {
         id: "link",
         label: "Enlace",
         description: "Insertar un link",
@@ -525,7 +537,8 @@ export function CreateTicketModal({
   // ── Tiptap editor ──────────────────────────────────────────────────────────
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [2, 3] }, dropcursor: false }),
+      StarterKit.configure({ heading: { levels: [2, 3] }, dropcursor: false, codeBlock: false }),
+      ...createSharedExtensions(),
 
       Image.configure({ inline: false, allowBase64: true }),
 

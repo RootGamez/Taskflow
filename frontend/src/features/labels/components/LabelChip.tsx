@@ -18,7 +18,7 @@ export function LabelChip({ label, className = "" }: LabelChipProps) {
 
   return (
     <span
-      className={`inline-flex max-w-full items-center truncate rounded-full border px-2 py-0.5 text-xs font-medium ${className}`}
+      className={`inline-flex max-w-full items-center truncate rounded-full border-[1.5px] px-2 py-0.5 text-xs font-medium ${className}`}
       style={getLabelChipStyle(label.color)}
     >
       {label.name}

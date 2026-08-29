@@ -40,10 +40,10 @@ export function PageTreeItem({
   return (
     <div
       className={cn(
-        "flex items-center gap-1 rounded-md py-1.5 pr-2 text-sm",
+        "flex items-center gap-1 rounded py-1.5 pr-2 text-sm",
         isActive
           ? "bg-brand-50 font-medium text-brand-700"
-          : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800",
+          : "text-muted-foreground hover:bg-accent",
       )}
       style={{ paddingLeft: `${depth * INDENT_PER_LEVEL_PX + BASE_INDENT_PX}px` }}
     >
@@ -52,7 +52,7 @@ export function PageTreeItem({
           type="button"
           aria-label={isExpanded ? "Colapsar" : "Expandir"}
           onClick={onToggleExpand}
-          className="flex h-4 w-4 shrink-0 items-center justify-center text-zinc-400"
+          className="flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground"
         >
           {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         </button>

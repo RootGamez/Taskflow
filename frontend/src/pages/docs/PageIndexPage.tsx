@@ -34,7 +34,7 @@ export default function PageIndexPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">Páginas</h1>
+        <h1 className="text-xl font-semibold text-foreground">Páginas</h1>
         <Button color="primary" size="sm" onPress={handleCreate} isDisabled={createPage.isPending}>
           <Plus className="h-4 w-4" /> Nueva página
         </Button>
@@ -55,14 +55,14 @@ export default function PageIndexPage() {
           action={{ label: "Crear página", onClick: handleCreate }}
         />
       ) : (
-        <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <ul className="divide-y divide-border">
           {(pages ?? []).map((page) => (
             <li key={page.id}>
               <Link
                 to={`/workspaces/${workspaceSlug}/pages/${page.id}`}
-                className="flex items-center gap-2 py-3 text-sm text-zinc-700 hover:text-brand-700 dark:text-zinc-200"
+                className="flex items-center gap-2 py-3 text-sm text-foreground transition-colors hover:text-primary"
               >
-                {page.icon ? <span>{page.icon}</span> : <FileText className="h-4 w-4 text-zinc-400" />}
+                {page.icon ? <span>{page.icon}</span> : <FileText className="h-4 w-4 text-muted-foreground" />}
                 <span className="font-medium">{page.title}</span>
               </Link>
             </li>

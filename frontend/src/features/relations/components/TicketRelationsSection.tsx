@@ -61,14 +61,14 @@ export function TicketRelationsSection({ ticketId, projectId, canEdit }: TicketR
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Relaciones</span>
+        <span className="text-sm font-medium text-foreground">Relaciones</span>
 
         {canEdit ? (
           <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
+                className="flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:text-primary/80"
               >
                 <Link2 className="h-3.5 w-3.5" />+ Agregar relación
               </button>
@@ -87,7 +87,7 @@ export function TicketRelationsSection({ ticketId, projectId, canEdit }: TicketR
       </div>
 
       {groups.length === 0 ? (
-        <p className="text-xs text-zinc-400 dark:text-zinc-500">Sin relaciones todavia.</p>
+        <p className="text-xs text-muted-foreground">Sin relaciones todavia.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {groups.map((group) => (

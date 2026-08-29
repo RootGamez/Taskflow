@@ -58,7 +58,7 @@ export function LabelPicker({
   return (
     <div className="flex w-60 flex-col gap-1 p-2">
       {labels.length === 0 && !isCreating ? (
-        <p className="px-1 py-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="px-1 py-2 text-center text-xs text-muted-foreground">
           Este proyecto no tiene labels todavia.
         </p>
       ) : (
@@ -66,23 +66,23 @@ export function LabelPicker({
           {labels.map((label) => (
             <li
               key={label.id}
-              className="flex items-center justify-between gap-2 rounded px-1 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              className="flex items-center justify-between gap-2 rounded px-1 py-1 hover:bg-accent"
             >
               {pendingDeleteId === label.id ? (
                 <div className="flex flex-1 items-center justify-between gap-2 text-xs">
-                  <span className="text-zinc-500 dark:text-zinc-400">¿Eliminar "{label.name}"?</span>
+                  <span className="text-muted-foreground">¿Eliminar "{label.name}"?</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => confirmDelete(label.id)}
-                      className="font-medium text-red-500 hover:text-red-600"
+                      className="font-medium text-destructive transition-colors hover:text-destructive/80"
                     >
                       Si
                     </button>
                     <button
                       type="button"
                       onClick={() => setPendingDeleteId(null)}
-                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
                     >
                       No
                     </button>
@@ -104,7 +104,7 @@ export function LabelPicker({
                       type="button"
                       aria-label={`Eliminar label ${label.name}`}
                       onClick={() => requestDelete(label.id)}
-                      className="text-zinc-400 hover:text-red-500 dark:hover:text-red-400"
+                      className="text-muted-foreground transition-colors hover:text-destructive"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -130,7 +130,7 @@ export function LabelPicker({
           <button
             type="button"
             onClick={() => setIsCreating(true)}
-            className="mt-1 rounded px-1 py-1 text-left text-xs font-medium text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+            className="mt-1 rounded px-1 py-1 text-left text-xs font-medium text-primary transition-colors hover:bg-accent"
           >
             + Crear label
           </button>

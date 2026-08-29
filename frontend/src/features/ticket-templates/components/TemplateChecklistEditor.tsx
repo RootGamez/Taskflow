@@ -1,6 +1,8 @@
 import { useState, type KeyboardEvent } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
+import { Button } from "@/components/ui/shadcn/button";
+
 interface TemplateChecklistEditorProps {
   items: string[];
   onChange: (items: string[]) => void;
@@ -58,14 +60,14 @@ export function TemplateChecklistEditor({ items, onChange, disabled = false }: T
             disabled={disabled}
             onChange={(event) => updateItem(index, event.target.value)}
             aria-label={`Item ${index + 1}`}
-            className="flex-1 rounded border border-zinc-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
+            className="flex-1 rounded border-2 border-border bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary disabled:opacity-50"
           />
           <button
             type="button"
             aria-label={`Eliminar item ${index + 1}`}
             disabled={disabled}
             onClick={() => removeItem(index)}
-            className="text-zinc-400 hover:text-red-500 dark:hover:text-red-400"
+            className="text-muted-foreground transition-colors hover:text-destructive"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -81,17 +83,12 @@ export function TemplateChecklistEditor({ items, onChange, disabled = false }: T
           onKeyDown={handleDraftKeyDown}
           placeholder="Agregar item del checklist..."
           aria-label="Agregar item del checklist"
-          className="flex-1 rounded border border-zinc-200 bg-transparent px-2 py-1 text-sm outline-none focus:border-violet-400 dark:border-zinc-700"
+          className="flex-1 rounded border-2 border-border bg-card px-2 py-1 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary disabled:opacity-50"
         />
-        <button
-          type="button"
-          onClick={addDraftItem}
-          disabled={disabled}
-          className="flex items-center gap-1 rounded bg-violet-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="button" size="sm" onClick={addDraftItem} disabled={disabled}>
           <Plus className="h-3.5 w-3.5" />
           Agregar item
-        </button>
+        </Button>
       </div>
     </div>
   );

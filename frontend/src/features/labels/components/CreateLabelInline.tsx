@@ -1,6 +1,8 @@
 import { useState } from "react";
 
+import { Button } from "@/components/ui/shadcn/button";
 import { LABEL_COLORS } from "@/features/labels/lib/labelPalette";
+import { cn } from "@/lib/utils";
 
 interface CreateLabelInlineProps {
   onSubmit: (payload: { name: string; color: string }) => void;
@@ -25,7 +27,7 @@ export function CreateLabelInline({ onSubmit, onCancel, isSubmitting = false }: 
   };
 
   return (
-    <div className="mt-1 flex flex-col gap-2 rounded-md border border-zinc-100 p-2 dark:border-zinc-800">
+    <div className="mt-1 flex flex-col gap-2 rounded border-2 border-border p-2">
       <input
         type="text"
         value={name}
@@ -33,7 +35,7 @@ export function CreateLabelInline({ onSubmit, onCancel, isSubmitting = false }: 
         placeholder="Nombre del label"
         aria-label="Nombre del label"
         disabled={isSubmitting}
-        className="rounded border border-zinc-200 bg-transparent px-2 py-1 text-xs outline-none focus:border-violet-400 dark:border-zinc-700"
+        className="rounded border-2 border-border bg-card px-2 py-1 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-primary disabled:opacity-50"
       />
       <div className="flex flex-wrap gap-1.5">
         {LABEL_COLORS.map((paletteColor) => (
@@ -44,9 +46,10 @@ export function CreateLabelInline({ onSubmit, onCancel, isSubmitting = false }: 
             aria-pressed={color === paletteColor}
             disabled={isSubmitting}
             onClick={() => setColor(paletteColor)}
-            className={`h-5 w-5 rounded-full border-2 transition-colors ${
-              color === paletteColor ? "border-zinc-900 dark:border-white" : "border-transparent"
-            }`}
+            className={cn(
+              "h-5 w-5 rounded-full border-2 transition-colors",
+              color === paletteColor ? "border-foreground" : "border-transparent",
+            )}
             style={{ backgroundColor: paletteColor }}
           />
         ))}
@@ -57,19 +60,14 @@ export function CreateLabelInline({ onSubmit, onCancel, isSubmitting = false }: 
             type="button"
             onClick={onCancel}
             disabled={isSubmitting}
-            className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
             Cancelar
           </button>
         ) : null}
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className="rounded bg-violet-600 px-2 py-1 text-xs font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="button" size="sm" onClick={handleSubmit} disabled={!canSubmit}>
           {isSubmitting ? "Creando..." : "Crear"}
-        </button>
+        </Button>
       </div>
     </div>
   );

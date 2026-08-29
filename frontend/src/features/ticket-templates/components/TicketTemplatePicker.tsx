@@ -106,7 +106,7 @@ export function TicketTemplatePicker({
           <button
             type="button"
             disabled={disabled}
-            className="flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 text-xs font-medium text-zinc-600 transition-colors hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            className="flex items-center gap-1.5 rounded border-2 border-border px-2 py-1 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             <LayoutTemplate className="h-3.5 w-3.5" />
             Usar plantilla
@@ -115,21 +115,21 @@ export function TicketTemplatePicker({
         <PopoverContent align="start" className="w-64 p-1.5">
           {pendingTemplate ? (
             <div className="flex flex-col gap-2 p-2 text-xs">
-              <p className="text-zinc-600 dark:text-zinc-300">
+              <p className="text-muted-foreground">
                 Ya escribiste un titulo. ¿Reemplazar con esta plantilla?
               </p>
               <div className="flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setPendingTemplate(null)}
-                  className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  className="text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={() => applyAndClose(pendingTemplate)}
-                  className="font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                  className="font-medium text-primary transition-colors hover:text-primary/80"
                 >
                   Aplicar igual
                 </button>
@@ -142,15 +142,15 @@ export function TicketTemplatePicker({
                   type="button"
                   data-testid="template-option"
                   onClick={() => requestApply(toApplied(BUILT_IN_TEMPLATE))}
-                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
                 >
-                  <FileText className="h-3.5 w-3.5 text-zinc-400" />
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
                   {BUILT_IN_TEMPLATE.name}
                 </button>
               </li>
 
               {projectTemplates.length > 0 ? (
-                <li role="separator" className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+                <li role="separator" className="my-1 border-t border-border" />
               ) : null}
 
               {projectTemplates.map((template) => (
@@ -159,20 +159,20 @@ export function TicketTemplatePicker({
                     type="button"
                     data-testid="template-option"
                     onClick={() => requestApply(toApplied(template))}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
                   >
-                    <LayoutTemplate className="h-3.5 w-3.5 text-zinc-400" />
+                    <LayoutTemplate className="h-3.5 w-3.5 text-muted-foreground" />
                     {template.name}
                   </button>
                 </li>
               ))}
 
-              <li role="separator" className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+              <li role="separator" className="my-1 border-t border-border" />
               <li>
                 <button
                   type="button"
                   onClick={openManager}
-                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-zinc-500 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-accent"
                 >
                   <Settings2 className="h-3.5 w-3.5" />
                   Administrar plantillas

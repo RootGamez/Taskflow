@@ -43,8 +43,8 @@ export function TicketLabelsRow({ ticketId, projectId, labels, canEdit }: Ticket
   };
 
   return (
-    <div className="flex items-center gap-4">
-      <span className="w-28 text-sm text-zinc-500 dark:text-zinc-500">Labels</span>
+    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-4">
+      <span className="eyebrow sm:w-28">Labels</span>
       <div className="flex flex-1 flex-wrap items-center gap-1.5">
         {labels.map((label) => (
           <LabelChip key={label.id} label={label} />
@@ -56,7 +56,7 @@ export function TicketLabelsRow({ ticketId, projectId, labels, canEdit }: Ticket
               <button
                 type="button"
                 aria-label="Editar labels"
-                className="flex h-6 items-center gap-1 rounded-full border border-dashed border-zinc-300 px-2 text-xs text-zinc-500 transition-colors hover:border-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 dark:border-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                className="flex h-6 items-center gap-1 rounded border border-dashed border-border px-2 text-xs text-muted-foreground transition-colors hover:border-foreground hover:bg-accent hover:text-foreground"
               >
                 <Tag className="h-3 w-3" />
                 {labels.length === 0 ? "Agregar label" : "+"}
@@ -80,7 +80,7 @@ export function TicketLabelsRow({ ticketId, projectId, labels, canEdit }: Ticket
             </PopoverContent>
           </Popover>
         ) : labels.length === 0 ? (
-          <span className="text-xs text-zinc-400 dark:text-zinc-500">Sin labels</span>
+          <span className="text-xs text-muted-foreground">Sin labels</span>
         ) : null}
       </div>
     </div>

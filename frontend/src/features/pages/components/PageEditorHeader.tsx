@@ -27,8 +27,8 @@ export function PageEditorHeader({ icon, title, canEdit, onIconChange, onTitleCh
         onChange={(event) => onIconChange(event.target.value)}
         placeholder="🗒️"
         className={cn(
-          "w-14 rounded-md border border-transparent bg-transparent text-3xl outline-none",
-          "hover:border-zinc-200 dark:hover:border-zinc-700",
+          "w-14 rounded border-2 border-transparent bg-transparent text-3xl outline-none transition-colors",
+          "hover:border-border focus-visible:border-primary",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
       />
@@ -50,9 +50,9 @@ export function PageEditorHeader({ icon, title, canEdit, onIconChange, onTitleCh
         placeholder="Página sin título"
         className={cn(
           "w-full resize-none overflow-hidden bg-transparent outline-none",
-          "text-[1.55rem] font-bold leading-tight tracking-tight",
-          "text-zinc-900 dark:text-zinc-50",
-          "placeholder:text-zinc-300 placeholder:font-bold placeholder:tracking-tight dark:placeholder:text-zinc-600",
+          "font-display text-[1.55rem] font-bold leading-tight tracking-tight",
+          "text-foreground",
+          "placeholder:font-bold placeholder:tracking-tight placeholder:text-muted-foreground/50",
           !canEdit && "cursor-not-allowed opacity-60",
         )}
         style={{ height: "auto" }}

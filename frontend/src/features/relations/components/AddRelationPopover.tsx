@@ -69,10 +69,10 @@ export function AddRelationPopover({
               type="button"
               onClick={() => setRelationType(type)}
               aria-pressed={isSelected}
-              className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+              className={`rounded border-[1.5px] px-2 py-0.5 text-xs transition-colors ${
                 isSelected
-                  ? "border-zinc-900 font-medium text-zinc-900 dark:border-zinc-100 dark:text-zinc-100"
-                  : "border-zinc-200 text-zinc-500 hover:border-zinc-300 dark:border-zinc-700 dark:text-zinc-400"
+                  ? "border-foreground bg-secondary font-medium text-foreground"
+                  : "border-border text-muted-foreground hover:border-foreground"
               }`}
             >
               {style.label}
@@ -81,10 +81,10 @@ export function AddRelationPopover({
         })}
       </div>
 
-      <Command className="rounded-md border border-zinc-200 dark:border-zinc-800">
+      <Command className="rounded border-2 border-border">
         <CommandInput placeholder="Buscar por titulo o referencia..." />
         <CommandList>
-          <CommandEmpty className="py-4 text-center text-xs text-zinc-400 dark:text-zinc-500">
+          <CommandEmpty className="py-4 text-center text-xs text-muted-foreground">
             No se encontraron tickets.
           </CommandEmpty>
           <CommandGroup>

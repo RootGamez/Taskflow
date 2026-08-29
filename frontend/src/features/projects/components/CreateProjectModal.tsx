@@ -93,7 +93,7 @@ export function CreateProjectModal({
       >
         <DialogHeader className="space-y-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+            <div className="boxed-icon h-10 w-10 bg-secondary text-foreground">
               <FolderKanban className="h-5 w-5" />
             </div>
             <DialogTitle>{title}</DialogTitle>
@@ -126,7 +126,7 @@ export function CreateProjectModal({
             </div>
           </div>
 
-          <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/60">
+          <div className="space-y-4 rounded border-2 border-border bg-secondary p-4">
             <div className="space-y-2">
               <Label>Color del proyecto</Label>
               <div className="grid grid-cols-4 gap-2">
@@ -139,10 +139,8 @@ export function CreateProjectModal({
                       type="button"
                       onClick={() => setColor(paletteColor)}
                       aria-label={`Seleccionar color ${paletteColor}`}
-                      className={`h-8 w-8 rounded-full border transition-transform hover:scale-105 ${
-                        isActive
-                          ? "border-zinc-950 ring-2 ring-zinc-300 dark:border-white dark:ring-zinc-700"
-                          : "border-transparent"
+                      className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-105 ${
+                        isActive ? "border-foreground ring-2 ring-ring" : "border-transparent"
                       }`}
                       style={{ backgroundColor: paletteColor }}
                       disabled={isLoading}
@@ -156,7 +154,7 @@ export function CreateProjectModal({
                   type="color"
                   value={color}
                   onChange={(event) => setColor(event.target.value)}
-                  className="h-9 w-12 cursor-pointer rounded border border-zinc-300 bg-transparent p-1 dark:border-zinc-700"
+                  className="h-9 w-12 cursor-pointer rounded border-2 border-border bg-transparent p-1"
                   disabled={isLoading}
                 />
                 <Input
@@ -169,22 +167,22 @@ export function CreateProjectModal({
               </div>
             </div>
 
-            <div className="rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-950">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">Vista previa</p>
+            <div className="rounded border-2 border-border bg-card p-3">
+              <p className="eyebrow mb-2">Vista previa</p>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
-                <p className="truncate text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                <p className="truncate text-sm font-semibold text-foreground">
                   {name.trim() || "Nombre del proyecto"}
                 </p>
               </div>
-              <p className="mt-2 line-clamp-2 text-xs text-zinc-500">
+              <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
                 {projectDescription.trim() || "La descripcion del proyecto aparecera aqui."}
               </p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="border-t border-zinc-200 pt-4 dark:border-zinc-800">
+        <DialogFooter className="border-t-2 border-border pt-4">
           <Button variant="outline" onClick={onClose} disabled={isLoading}>
             Cancelar
           </Button>

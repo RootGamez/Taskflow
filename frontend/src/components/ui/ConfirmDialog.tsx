@@ -1,4 +1,12 @@
-import { Button, Modal, ModalBody, ModalContent, ModalFooter, ModalHeader } from "@heroui/react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/shadcn/dialog";
+import { Button } from "@/components/ui/shadcn/button";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -10,15 +18,21 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ isOpen, title, description, onConfirm, onClose }: ConfirmDialogProps) {
   return (
-    <Modal isOpen={isOpen} onOpenChange={onClose}>
-      <ModalContent>
-        <ModalHeader>{title}</ModalHeader>
-        <ModalBody>{description}</ModalBody>
-        <ModalFooter>
-          <Button variant="light" onPress={onClose}>Cancelar</Button>
-          <Button color="danger" onPress={onConfirm}>Confirmar</Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+    <Dialog open={isOpen} onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="destructive" onClick={onConfirm}>
+            Confirmar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

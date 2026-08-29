@@ -263,6 +263,10 @@ export default function KanbanPage() {
     due_date: string | null;
     description?: Record<string, unknown>;
     assignee_ids?: string[];
+    // D20/I11 de docs/PHASE_4_PLAN.md: `template_id` viaja tal cual hasta
+    // `createTicketMutation` -- sin logica nueva, ya lo resuelve el spread
+    // de abajo (`...payload`).
+    template_id?: string;
   }) => {
     if (!canMutate) {
       toast.error("No tienes permisos para crear tickets en este espacio");

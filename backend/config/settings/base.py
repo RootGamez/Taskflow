@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     "apps.labels",
     "apps.subtasks",
     "apps.relations",
+    "apps.pages",
+    "apps.tickettemplates",
 ]
 
 MIDDLEWARE = [

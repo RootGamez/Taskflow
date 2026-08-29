@@ -18,6 +18,15 @@ DEFAULT_PROJECT_COLUMNS = [
     {"name": "Hecho", "color": "#16A34A", "order": 3},
 ]
 
+# Paso T-4 (opcional, D23 de docs/PHASE_4_PLAN.md): en vez de un modelo
+# `ProjectTemplate` nuevo (segunda superficie CRUD completa para cubrir un
+# caso que se resuelve con un array), `ProjectCreateSerializer` acepta un
+# `columns` opcional. Mismo tope de "cuantas columnas puede tener un
+# proyecto" que ya usa la UI de columnas (`ProjectColumnCreateSerializer` no
+# declara limite propio porque hoy solo se agregan de a una).
+MAX_PROJECT_CREATE_COLUMNS = 12
+DEFAULT_COLUMN_COLOR = "#64748B"
+
 
 class ProjectColumnSerializer(serializers.ModelSerializer):
     project_id = serializers.UUIDField(read_only=True)
@@ -47,6 +56,35 @@ class ProjectSerializer(serializers.ModelSerializer):
         )
 
 
+class ProjectColumnInputSerializer(serializers.Serializer):
+    """Forma de cada entrada de `ProjectCreateSerializer.columns` (T-4,
+    D23). Deliberadamente separado de `ProjectColumnCreateSerializer`
+    (que crea una columna sobre un proyecto YA existente, con `order`
+    reordenable): aca `order` no se acepta -- las columnas de un proyecto
+    nuevo se numeran por su posicion en la lista, igual que
+    `DEFAULT_PROJECT_COLUMNS`.
+    """
+
+    name = serializers.CharField(
+        max_length=120,
+        error_messages={
+            "required": "El nombre de la columna es obligatorio.",
+            "blank": "El nombre de la columna es obligatorio.",
+        },
+    )
+    color = serializers.RegexField(
+        regex=r"^#[0-9A-Fa-f]{6}$",
+        required=False,
+        error_messages={"invalid": "El color debe tener formato hexadecimal #RRGGBB."},
+    )
+
+    def validate_name(self, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise serializers.ValidationError("El nombre de la columna es obligatorio.")
+        return stripped
+
+
 class ProjectCreateSerializer(serializers.Serializer):
     name = serializers.CharField(
         max_length=255,
@@ -66,13 +104,24 @@ class ProjectCreateSerializer(serializers.Serializer):
         required=False,
         error_messages=PROJECT_KEY_ERROR_MESSAGES,
     )
+    # T-4/D23 (opcional): un proyecto puede arrancar con columnas propias en
+    # vez de `DEFAULT_PROJECT_COLUMNS`. RT-11: `required=False` a proposito
+    # -- un POST sin `columns` (el 100% del trafico de hoy) tiene que crear
+    # EXACTAMENTE las mismas 3 columnas que antes de este campo.
+    columns = ProjectColumnInputSerializer(many=True, required=False)
 
     def validate_key(self, value: str) -> str:
         return value.upper()
 
+    def validate_columns(self, value: list[dict]) -> list[dict]:
+        if len(value) > MAX_PROJECT_CREATE_COLUMNS:
+            raise serializers.ValidationError("Un proyecto no puede tener mas de 12 columnas.")
+        return value
+
     def create(self, validated_data: dict) -> Project:
         workspace = self.context["workspace"]
         requested_key = validated_data.get("key")
+        requested_columns = validated_data.get("columns")
 
         with transaction.atomic():
             # Bloqueo implicito de lecturas repetibles dentro de la
@@ -99,15 +148,20 @@ class ProjectCreateSerializer(serializers.Serializer):
                 color=validated_data.get("color", "#2563EB"),
                 key=key,
             )
+            # RT-11: sin `columns` en el body, `requested_columns` es `None`
+            # (el campo ni siquiera entra a `validated_data` -- `required=
+            # False` en un `ListSerializer` anidado) y se usa el default
+            # exacto de siempre, `DEFAULT_PROJECT_COLUMNS`.
+            columns_source = requested_columns if requested_columns else DEFAULT_PROJECT_COLUMNS
             ProjectColumn.objects.bulk_create(
                 [
                     ProjectColumn(
                         project=project,
                         name=column["name"],
-                        color=column["color"],
-                        order=column["order"],
+                        color=column.get("color") or DEFAULT_COLUMN_COLOR,
+                        order=index,
                     )
-                    for column in DEFAULT_PROJECT_COLUMNS
+                    for index, column in enumerate(columns_source, start=1)
                 ]
             )
 

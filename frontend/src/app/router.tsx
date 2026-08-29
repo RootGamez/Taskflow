@@ -18,6 +18,8 @@ import KanbanPage from "@/pages/project/KanbanPage";
 import ListPage from "@/pages/project/ListPage";
 import CalendarPage from "@/pages/project/CalendarPage";
 import MyTasksPage from "@/pages/mytasks/MyTasksPage";
+import PageIndexPage from "@/pages/docs/PageIndexPage";
+import PageDetailPage from "@/pages/docs/PageDetailPage";
 import TicketDetailPage from "@/pages/ticket/TicketDetailPage";
 import { UserProfilePage } from "@/pages/user/UserProfilePage";
 import { UserSecurityPage } from "@/pages/user/UserSecurityPage";
@@ -112,6 +114,26 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingSpinner />}>
             <MyTasksPage />
+          </Suspense>
+        ),
+      },
+      // D8 de docs/PHASE_4_PLAN.md: las unicas 2 rutas nuevas de la
+      // sub-entrega 4A. Ni Plantillas, ni Vista tabla, ni Campos
+      // personalizados, ni Vistas guardadas agregan rutas (sus
+      // superficies de administracion son Dialogs).
+      {
+        path: "/workspaces/:workspaceSlug/pages",
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <PageIndexPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/workspaces/:workspaceSlug/pages/:pageId",
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <PageDetailPage />
           </Suspense>
         ),
       },

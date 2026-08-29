@@ -34,6 +34,12 @@ const COVERED_PATHS = [
   "src/features/subtasks/**",
   "src/features/relations/**",
   "src/features/shortcuts/**",
+  // Fase 4 (sub-entrega 4A, WP-0A -- docs/PHASE_4_PLAN.md I14): agregado
+  // por el orquestador para que WP-P y WP-T hereden el umbral desde su
+  // primer commit, sin tener que tocar este archivo compartido ellos
+  // mismos.
+  "src/features/pages/**",
+  "src/features/ticket-templates/**",
   // Solo los 2 stores nuevos de WP-0 (D7/D8), no "src/store/**" entero:
   // authStore.ts/workspaceStore.ts no tienen tests propios y meterlos
   // aca haria caer el promedio de cobertura por debajo del 80% (mismo

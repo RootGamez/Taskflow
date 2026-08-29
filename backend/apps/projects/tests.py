@@ -41,7 +41,7 @@ class ProjectFlowTests(APITestCase):
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 		self.assertEqual(response.data["name"], "Core Platform")
 		self.assertEqual(len(response.data["columns"]), 3)
-		self.assertEqual([column["name"] for column in response.data["columns"]], ["Backlog", "En progreso", "Hecho"])
+		self.assertEqual([column["name"] for column in response.data["columns"]], ["Backlog", "En progreso", "Completado"])
 
 	def test_cannot_delete_last_column_in_project(self) -> None:
 		create_project = self.client.post(
@@ -120,64 +120,17 @@ class ProjectFlowTests(APITestCase):
 
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-	# --- T-4 (opcional, docs/PHASE_4_PLAN.md D23/RT-11, seccion 5.5 tests
-	# 31-34): `columns` opcional en `ProjectCreateSerializer`. ---
-
-	def test_creating_a_project_without_columns_uses_the_defaults(self) -> None:
-		# RT-11: primer test de este paso -- un POST sin `columns` (el 100%
-		# del trafico de hoy) tiene que seguir creando EXACTAMENTE
-		# `DEFAULT_PROJECT_COLUMNS`.
+	def test_creating_a_project_mirrors_the_workspace_statuses(self) -> None:
+		# Las columnas de un proyecto nuevo son SIEMPRE espejo de los estados
+		# del espacio (una por estado, mismo orden). No hay `columns` custom.
 		response = self.client.post(
 			f"/api/v1/workspaces/{self.workspace.slug}/projects/",
-			{"name": "Sin columnas custom"},
+			{"name": "Nuevo proyecto"},
 			format="json",
 		)
 
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 		self.assertEqual(
 			[(column["name"], column["color"]) for column in response.data["columns"]],
-			[("Backlog", "#64748B"), ("En progreso", "#2563EB"), ("Hecho", "#16A34A")],
+			[("Backlog", "#64748B"), ("En progreso", "#2563EB"), ("Completado", "#16A34A")],
 		)
-
-	def test_creating_a_project_with_custom_columns_uses_them_in_order(self) -> None:
-		response = self.client.post(
-			f"/api/v1/workspaces/{self.workspace.slug}/projects/",
-			{
-				"name": "Con columnas custom",
-				"columns": [
-					{"name": "Por hacer", "color": "#111111"},
-					{"name": "Haciendo"},
-					{"name": "Listo", "color": "#22C55E"},
-				],
-			},
-			format="json",
-		)
-
-		self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-		self.assertEqual(
-			[column["name"] for column in response.data["columns"]],
-			["Por hacer", "Haciendo", "Listo"],
-		)
-		self.assertEqual([column["order"] for column in response.data["columns"]], [1, 2, 3])
-		self.assertEqual(response.data["columns"][0]["color"], "#111111")
-
-	def test_creating_a_project_with_13_columns_returns_400(self) -> None:
-		response = self.client.post(
-			f"/api/v1/workspaces/{self.workspace.slug}/projects/",
-			{
-				"name": "Demasiadas columnas",
-				"columns": [{"name": f"Columna {i}"} for i in range(13)],
-			},
-			format="json",
-		)
-
-		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-	def test_creating_a_project_with_a_blank_column_name_returns_400(self) -> None:
-		response = self.client.post(
-			f"/api/v1/workspaces/{self.workspace.slug}/projects/",
-			{"name": "Columna vacia", "columns": [{"name": "   "}]},
-			format="json",
-		)
-
-		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

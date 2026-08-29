@@ -10,12 +10,14 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-      <Icon className="h-12 w-12 text-zinc-300" />
-      <h3 className="mt-4 text-base font-semibold text-zinc-700 dark:text-zinc-200">{title}</h3>
-      <p className="mt-1 text-sm text-zinc-500">{description}</p>
+    <div className="flex min-h-[320px] flex-col items-center justify-center rounded border-2 border-dashed border-border p-8 text-center">
+      <span className="boxed-icon h-12 w-12 border-dashed text-muted-foreground">
+        <Icon className="h-6 w-6" />
+      </span>
+      <h3 className="mt-4 font-display text-base font-bold tracking-tight text-foreground">{title}</h3>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
       {action ? (
-        <Button className="mt-4" color="primary" onPress={action.onClick}>
+        <Button className="mt-4 rounded-none" color="primary" onPress={action.onClick}>
           {action.label}
         </Button>
       ) : null}

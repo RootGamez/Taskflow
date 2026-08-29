@@ -2,23 +2,25 @@ import type { Config } from "tailwindcss";
 import { heroui } from "@heroui/react";
 import tailwindcssAnimate from "tailwindcss-animate";
 
-// Escala azul de marca (== Tailwind `blue`, #3B82F6 es exactamente blue-500).
-// Vive ademas como `theme.extend.colors.brand` (hex planos, no depende del
-// tema) y se reutiliza aca tal cual para que HeroUI pinte `color="primary"`
-// con el mismo azul que ya usaba la app antes de esta migracion.
+// "Brutalismo Corporativo" — Opción C ("Hueso & Carmesí Corporativo",
+// docs/BRUTALIST_REDESIGN_PLAN.md §3). El acento de marca pasa del azul
+// Tailwind por defecto (#3B82F6) a un carmesí de tinta (#8C1D2B). Vive
+// además como `theme.extend.colors.brand` (hex planos, no depende del tema)
+// y se reutiliza acá tal cual para que HeroUI pinte `color="primary"` con el
+// mismo carmesí en toda la app.
 const brandPrimaryScale = {
-  50: "#EFF6FF",
-  100: "#DBEAFE",
-  200: "#BFDBFE",
-  300: "#93C5FD",
-  400: "#60A5FA",
-  500: "#3B82F6",
-  600: "#2563EB",
-  700: "#1D4ED8",
-  800: "#1E40AF",
-  900: "#1E3A8A",
-  DEFAULT: "#3B82F6",
-  foreground: "#ffffff",
+  50: "#FBEAEC",
+  100: "#F4CDD1",
+  200: "#E59AA2",
+  300: "#D66C77",
+  400: "#B33F4D",
+  500: "#8C1D2B",
+  600: "#7A1926",
+  700: "#5F1420",
+  800: "#4A0F19",
+  900: "#360A12",
+  DEFAULT: "#8C1D2B",
+  foreground: "#F7F4EC",
 };
 
 const config: Config = {
@@ -31,6 +33,10 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+        // Display / headings: geométrica, técnica, con carácter.
+        display: ["'Space Grotesk'", "Inter", "system-ui", "sans-serif"],
+        // Datos, IDs, timestamps: refuerza el look de "reporte impreso".
+        mono: ["'IBM Plex Mono'", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       // Tipografía fluida para títulos de página/panel: escala sola entre
       // móvil y desktop sin necesidad de `text-lg md:text-2xl` repartido por
@@ -46,12 +52,12 @@ const config: Config = {
       },
       colors: {
         brand: {
-          50: "#EFF6FF",
-          100: "#DBEAFE",
-          500: "#3B82F6",
-          600: "#2563EB",
-          700: "#1D4ED8",
-          900: "#1E3A8A",
+          50: "#FBEAEC",
+          100: "#F4CDD1",
+          500: "#8C1D2B",
+          600: "#7A1926",
+          700: "#5F1420",
+          900: "#360A12",
         },
         // shadcn tokens: leidos desde las variables CSS de src/index.css.
         // `<alpha-value>` es obligatorio para que utilidades con opacidad
@@ -81,6 +87,17 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
           foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
         },
+        success: {
+          DEFAULT: "hsl(var(--success) / <alpha-value>)",
+          foreground: "hsl(var(--success-foreground) / <alpha-value>)",
+        },
+        // "Mostaza" de la paleta C: sello / acento decorativo secundario.
+        // Se opta-in explícitamente (bg-mustard, text-mustard), no es una
+        // superficie neutra por defecto.
+        mustard: {
+          DEFAULT: "hsl(var(--mustard) / <alpha-value>)",
+          foreground: "hsl(var(--mustard-foreground) / <alpha-value>)",
+        },
         border: "hsl(var(--border) / <alpha-value>)",
         input: "hsl(var(--input) / <alpha-value>)",
         ring: "hsl(var(--ring) / <alpha-value>)",
@@ -99,26 +116,55 @@ const config: Config = {
           "none-bg": "hsl(var(--priority-none-bg) / <alpha-value>)",
         },
       },
+      // Esquinas casi rectas en todo: `rounded-*` colapsa a `--radius` (2px).
+      // `rounded-full` se conserva para avatares (fotos de personas) y el
+      // toggle de tema — excepción deliberada del plan §2.3.
       borderRadius: {
+        none: "0px",
+        sm: "var(--radius)",
+        DEFAULT: "var(--radius)",
+        md: "var(--radius)",
         lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 2px)",
+        "2xl": "calc(var(--radius) + 4px)",
+        "3xl": "calc(var(--radius) + 6px)",
+        full: "9999px",
+      },
+      borderWidth: {
+        3: "3px",
+      },
+      // Sombra dura con offset sólido y CERO blur. En claro reemplaza toda la
+      // escala difusa de Tailwind; en oscuro las variantes base son `none`
+      // (el borde invertido da el peso — ver src/index.css `.dark`).
+      boxShadow: {
+        sm: "var(--shadow-hard-sm)",
+        DEFAULT: "var(--shadow-hard-sm)",
+        md: "var(--shadow-hard)",
+        lg: "var(--shadow-hard)",
+        xl: "var(--shadow-hard-lg)",
+        "2xl": "var(--shadow-hard-lg)",
+        hard: "var(--shadow-hard)",
+        "hard-sm": "var(--shadow-hard-sm)",
+        "hard-lg": "var(--shadow-hard-lg)",
+        "hard-press": "var(--shadow-hard-press)",
+        "hard-accent": "var(--shadow-hard-accent)",
+        "hard-float": "var(--shadow-hard-float)",
+        inner: "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)",
+        none: "none",
       },
     },
   },
   darkMode: "class",
   plugins: [
     // Provee las keyframes de `animate-in`/`slide-in-from-*`/`fade-in-0` que
-    // los componentes shadcn (dialog, popover) y el nuevo `Sheet` ya usaban
-    // en el markup pero que hasta ahora no estaban definidas (los diálogos
-    // aparecían de golpe). Plugin estándar de shadcn, sin runtime.
+    // los componentes shadcn (dialog, popover) y el `Sheet` ya usaban en el
+    // markup. Plugin estándar de shadcn, sin runtime.
     tailwindcssAnimate,
     heroui({
       themes: {
-        // Mismo azul en light y dark: hoy (pre-migracion) `primary` era un
-        // hex plano estatico que no variaba con el tema, asi que mantener
-        // el mismo scale en ambos modos preserva el aspecto visual actual
-        // de <Button color="primary">, <Tabs>, <Chip>, etc.
+        // Mismo carmesí en light y dark para `color="primary"` de HeroUI
+        // (<Button>, <Tabs>, <Chip>, etc.) — el sistema de tokens del tema
+        // vive en src/index.css; esto solo alinea HeroUI con esa decisión.
         light: { colors: { primary: brandPrimaryScale } },
         dark: { colors: { primary: brandPrimaryScale } },
       },

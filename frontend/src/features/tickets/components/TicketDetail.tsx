@@ -659,7 +659,7 @@ export function TicketDetail({
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent
           ref={dialogContentRef}
-          className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E]"
+          className="left-auto right-0 top-0 h-dvh w-full max-w-3xl translate-x-0 translate-y-0 gap-0 overflow-y-auto rounded-l-2xl border-l border-zinc-200 bg-white p-0 shadow-2xl data-[state=closed]:slide-out-to-right-full data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-full data-[state=open]:fade-in-0 dark:border-zinc-800 dark:bg-[#1C1C1E] max-sm:top-0 max-sm:bottom-auto max-sm:rounded-none max-sm:pb-0"
           onInteractOutside={(event) => {
             if (shouldKeepDialogOpen(event.target)) {
               event.preventDefault();

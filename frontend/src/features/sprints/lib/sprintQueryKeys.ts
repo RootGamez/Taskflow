@@ -1,4 +1,4 @@
 export const sprintQueryKeys = {
   allLists: ["sprints"] as const,
-  list: (projectId: string) => ["sprints", projectId] as const,
+  list: (workspaceSlug: string) => ["sprints", workspaceSlug] as const,
 };

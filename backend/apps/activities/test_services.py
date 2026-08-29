@@ -58,7 +58,7 @@ def in_progress(project):
 @pytest.fixture
 def sprint(project):
     return Sprint.objects.create(
-        project=project,
+        workspace=project.workspace,
         name="Sprint 1",
         start_date=date(2026, 1, 1),
         end_date=date(2026, 1, 14),

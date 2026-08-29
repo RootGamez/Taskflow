@@ -11,7 +11,9 @@ import type { Ticket } from "@/features/tickets/types/ticket.types";
  * `filterTicketsByDate`.
  */
 export function filterTicketsBySprint(tickets: readonly Ticket[], scope: SprintScope): Ticket[] {
-  if (scope.kind === "all") {
+  // "current" se resuelve al sprint activo ANTES de llegar aca (en la
+  // pagina). Si igual llega, se trata como "sin filtro".
+  if (scope.kind === "all" || scope.kind === "current") {
     return tickets as Ticket[];
   }
 

@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.projects.models import Project
+from apps.projects.serializers import WorkspaceStatusSerializer, seed_default_workspace_statuses
 from apps.tickets.consumers import TicketConsumer
 from apps.tickets.filters import apply_ticket_date_filters, parse_ticket_date_filters
 from apps.tickets.models import Ticket, TicketFieldLock, TicketImage, TicketVideo
@@ -29,7 +30,7 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 		project = self.get_project_for_user(request, project_id)
 		date_filters = parse_ticket_date_filters(request.query_params)
 		tickets = (
-			project.tickets.select_related("project", "column", "created_by")
+			project.tickets.select_related("project", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 		)
 		tickets = apply_ticket_date_filters(tickets, date_filters)
@@ -54,7 +55,7 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 
 		ticket = serializer.save()
 		ticket = (
-			project.tickets.select_related("project", "column", "created_by")
+			project.tickets.select_related("project", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.get(id=ticket.id)
 		)
@@ -62,14 +63,15 @@ class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
 
 		channel_layer = get_channel_layer()
 		if channel_layer is not None:
-			async_to_sync(channel_layer.group_send)(
-				f"project_{project_id}",
-				{
-					"type": "ticket.created",
-					"ticket": serialized_ticket,
-					"source": str(request.user.id),
-				},
-			)
+			for group in (f"project_{project_id}", f"workspace_{project.workspace_id}"):
+				async_to_sync(channel_layer.group_send)(
+					group,
+					{
+						"type": "ticket.created",
+						"ticket": serialized_ticket,
+						"source": str(request.user.id),
+					},
+				)
 
 		return Response(serialized_ticket, status=status.HTTP_201_CREATED)
 
@@ -81,7 +83,7 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 		project = self.get_project_for_user(request, project_id)
 		self.assert_project_write_access(request, project)
 		ticket = (
-			project.tickets.select_related("project", "column", "created_by")
+			project.tickets.select_related("project", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.filter(id=ticket_id)
 			.first()
@@ -117,7 +119,7 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 
 		updated_ticket = serializer.save()
 		updated_ticket = (
-			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			Ticket.objects.select_related("project__workspace", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.get(id=updated_ticket.id)
 		)
@@ -125,22 +127,19 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 		channel_layer = get_channel_layer()
 		if channel_layer is not None:
 			serialized_ticket = TicketSerializer(updated_ticket).data
-			async_to_sync(channel_layer.group_send)(
+			for group in (
 				f"ticket_{updated_ticket.id}",
-				{
-					"type": "ticket.updated",
-					"ticket": serialized_ticket,
-					"source": str(request.user.id),
-				},
-			)
-			async_to_sync(channel_layer.group_send)(
 				f"project_{project_id}",
-				{
-					"type": "ticket.updated",
-					"ticket": serialized_ticket,
-					"source": str(request.user.id),
-				},
-			)
+				f"workspace_{project.workspace_id}",
+			):
+				async_to_sync(channel_layer.group_send)(
+					group,
+					{
+						"type": "ticket.updated",
+						"ticket": serialized_ticket,
+						"source": str(request.user.id),
+					},
+				)
 
 		return Response(TicketSerializer(updated_ticket).data, status=status.HTTP_200_OK)
 
@@ -159,18 +158,58 @@ class TicketDetailView(WorkspaceRoleAccessMixin, APIView):
 
 		channel_layer = get_channel_layer()
 		if channel_layer is not None:
-			async_to_sync(channel_layer.group_send)(
-				f"project_{project_id}",
-				{
-					"type": "ticket.deleted",
-					"ticket_id": str(ticket_id),
-					"project_id": str(project_id),
-					"column_id": str(column_id),
-					"source": str(request.user.id),
-				},
-			)
+			for group in (f"project_{project_id}", f"workspace_{project.workspace_id}"):
+				async_to_sync(channel_layer.group_send)(
+					group,
+					{
+						"type": "ticket.deleted",
+						"ticket_id": str(ticket_id),
+						"project_id": str(project_id),
+						"column_id": str(column_id),
+						"source": str(request.user.id),
+					},
+				)
 
 		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class WorkspaceSprintBoardView(WorkspaceRoleAccessMixin, APIView):
+	"""Tablero de sprint del espacio: tickets de TODOS los proyectos del
+	espacio que estan en un sprint dado (o en el backlog), mas los estados
+	del espacio que forman las columnas.
+
+	`GET /api/v1/workspaces/<slug>/board/?sprint=<uuid|backlog>`
+	Sin `sprint` -> devuelve todos los tickets del espacio.
+	"""
+
+	permission_classes = [IsAuthenticated]
+	MAX_TICKETS = 2000
+
+	def get(self, request: Request, workspace_slug: str) -> Response:
+		workspace = self.get_workspace_for_user(request, workspace_slug)
+		statuses = seed_default_workspace_statuses(workspace)
+
+		tickets = (
+			Ticket.objects.filter(project__workspace=workspace)
+			.select_related("project", "column__workspace_status", "created_by")
+			.prefetch_related("assignees", "labels", "subtasks", "sprints")
+		)
+
+		sprint_param = request.query_params.get("sprint")
+		if sprint_param == "backlog":
+			tickets = tickets.filter(sprints__isnull=True)
+		elif sprint_param:
+			tickets = tickets.filter(sprints__id=sprint_param)
+
+		tickets = tickets.order_by("project__name", "column__order", "order", "created_at")[: self.MAX_TICKETS]
+
+		return Response(
+			{
+				"statuses": WorkspaceStatusSerializer(statuses, many=True).data,
+				"tickets": TicketSerializer(tickets, many=True).data,
+			},
+			status=status.HTTP_200_OK,
+		)
 
 
 class TicketSingleView(APIView):
@@ -178,7 +217,7 @@ class TicketSingleView(APIView):
 
 	def get(self, request: Request, ticket_id: str) -> Response:
 		ticket = (
-			Ticket.objects.select_related("project__workspace", "column", "created_by")
+			Ticket.objects.select_related("project__workspace", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
 			.distinct()

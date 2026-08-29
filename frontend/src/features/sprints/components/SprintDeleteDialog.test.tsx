@@ -8,7 +8,7 @@ import type { Sprint } from "@/features/sprints/types/sprint.types";
 function buildSprint(overrides: Partial<Sprint> = {}): Sprint {
   return {
     id: "sprint-1",
-    project_id: "project-1",
+    workspace_id: "project-1",
     name: "Sprint 1",
     goal: "",
     start_date: "2026-09-01",

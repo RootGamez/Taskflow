@@ -2,7 +2,7 @@ export type SprintStatus = "planned" | "active" | "completed";
 
 export interface Sprint {
   id: string;
-  project_id: string;
+  workspace_id: string;
   name: string;
   goal: string;
   start_date: string;
@@ -21,5 +21,21 @@ export interface Sprint {
  */
 export type SprintScope =
   | { kind: "all" }
+  | { kind: "current" }
   | { kind: "backlog" }
   | { kind: "sprint"; sprintId: string };
+
+/** Estado (columna) compartido a nivel espacio. El tablero de sprint agrupa
+ * los tickets de todos los proyectos por estos estados. */
+export interface WorkspaceStatus {
+  id: string;
+  workspace_id: string;
+  name: string;
+  color: string;
+  order: number;
+  is_done: boolean;
+  /** Los 3 por defecto (Backlog / En progreso / Completado): no se pueden
+   * renombrar ni eliminar. */
+  is_system: boolean;
+  created_at: string;
+}

@@ -9,7 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.projects.models import Project, ProjectColumn
+from apps.projects.models import Project, ProjectColumn, WorkspaceStatus
 from apps.projects.serializers import (
 	ProjectColumnCreateSerializer,
 	ProjectColumnSerializer,
@@ -17,9 +17,20 @@ from apps.projects.serializers import (
 	ProjectCreateSerializer,
 	ProjectSerializer,
 	ProjectUpdateSerializer,
+	WorkspaceStatusCreateSerializer,
+	WorkspaceStatusSerializer,
+	WorkspaceStatusUpdateSerializer,
+	seed_default_workspace_statuses,
 )
 from apps.workspaces.access import WorkspaceRoleAccessMixin
 from apps.workspaces.models import Workspace
+
+
+def _first_serializer_error(errors: dict, fallback: str) -> str:
+	first_error = next(iter(errors.values()), None)
+	if isinstance(first_error, list) and first_error:
+		return str(first_error[0])
+	return fallback
 
 
 class ProjectListCreateView(WorkspaceRoleAccessMixin, APIView):
@@ -92,6 +103,74 @@ class ProjectDetailView(WorkspaceRoleAccessMixin, APIView):
 			raise NotFound("Proyecto no encontrado.")
 
 		project.delete()
+		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class WorkspaceStatusListCreateView(WorkspaceRoleAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request: Request, workspace_slug: str) -> Response:
+		workspace = self.get_workspace_for_user(request, workspace_slug)
+		statuses = seed_default_workspace_statuses(workspace)
+		return Response(WorkspaceStatusSerializer(statuses, many=True).data, status=status.HTTP_200_OK)
+
+	def post(self, request: Request, workspace_slug: str) -> Response:
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
+		serializer = WorkspaceStatusCreateSerializer(data=request.data, context={"workspace": workspace})
+		if not serializer.is_valid():
+			raise ValidationError({"detail": _first_serializer_error(serializer.errors, "No se pudo crear el estado.")})
+		created = serializer.save()
+		return Response(WorkspaceStatusSerializer(created).data, status=status.HTTP_201_CREATED)
+
+
+class WorkspaceStatusDetailView(WorkspaceRoleAccessMixin, APIView):
+	permission_classes = [IsAuthenticated]
+
+	def patch(self, request: Request, workspace_slug: str, status_id: str) -> Response:
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
+		instance = workspace.statuses.filter(id=status_id).first()
+		if instance is None:
+			raise NotFound("Estado no encontrado.")
+		if instance.is_system:
+			raise ValidationError({"detail": "Los estados por defecto no se pueden modificar."})
+
+		serializer = WorkspaceStatusUpdateSerializer(instance, data=request.data, partial=True)
+		if not serializer.is_valid():
+			raise ValidationError({"detail": _first_serializer_error(serializer.errors, "No se pudo actualizar el estado.")})
+		serializer.save()
+		return Response(WorkspaceStatusSerializer(instance).data, status=status.HTTP_200_OK)
+
+	def delete(self, request: Request, workspace_slug: str, status_id: str) -> Response:
+		workspace = self.assert_workspace_write_access(request, workspace_slug)
+		instance = workspace.statuses.filter(id=status_id).first()
+		if instance is None:
+			raise NotFound("Estado no encontrado.")
+		if instance.is_system:
+			raise ValidationError({"detail": "Los estados por defecto no se pueden eliminar."})
+
+		# Al borrar un estado extra, sus columnas espejo en cada proyecto se
+		# van con el (los tickets que hubiera ahi se mueven al Backlog del
+		# proyecto para no perderlos).
+		backlog_status = workspace.statuses.filter(is_system=True).order_by("order").first()
+		with transaction.atomic():
+			for column in ProjectColumn.objects.filter(workspace_status=instance).select_related("project"):
+				fallback = (
+					column.project.columns.filter(workspace_status=backlog_status)
+					.exclude(id=column.id)
+					.first()
+				)
+				if fallback is not None:
+					next_order = fallback.ticket_set.aggregate(m=Max("order"))["m"] or 0
+					for i, ticket in enumerate(column.ticket_set.order_by("order", "created_at"), start=1):
+						ticket.column = fallback
+						ticket.order = next_order + i
+						ticket.save(update_fields=["column", "order", "updated_at"])
+				column.delete()
+
+			deleted_order = instance.order
+			instance.delete()
+			workspace.statuses.filter(order__gt=deleted_order).update(order=F("order") - 1)
+
 		return Response(status=status.HTTP_204_NO_CONTENT)
 
 

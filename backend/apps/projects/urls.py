@@ -5,6 +5,8 @@ from apps.projects.views import (
     ProjectColumnListCreateView,
     ProjectDetailView,
     ProjectListCreateView,
+    WorkspaceStatusDetailView,
+    WorkspaceStatusListCreateView,
 )
 
 urlpatterns = [
@@ -12,6 +14,16 @@ urlpatterns = [
         "workspaces/<slug:workspace_slug>/projects/",
         ProjectListCreateView.as_view(),
         name="project-list-create",
+    ),
+    path(
+        "workspaces/<slug:workspace_slug>/statuses/",
+        WorkspaceStatusListCreateView.as_view(),
+        name="workspace-status-list-create",
+    ),
+    path(
+        "workspaces/<slug:workspace_slug>/statuses/<uuid:status_id>/",
+        WorkspaceStatusDetailView.as_view(),
+        name="workspace-status-detail",
     ),
     path(
         "workspaces/<slug:workspace_slug>/projects/<uuid:project_id>/",

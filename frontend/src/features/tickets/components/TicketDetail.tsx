@@ -692,6 +692,12 @@ export function TicketDetail({
               ) : (
                 <span className="font-mono uppercase tracking-wider">#{ticket?.id?.slice(0, 8) ?? "---"}</span>
               )}
+              {ticket?.project ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ticket.project.color }} />
+                  {ticket.project.name}
+                </span>
+              ) : null}
               {titleField.isLockedByOther && (
                 <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
                   {fieldLocks.title?.userName} editando...
@@ -786,7 +792,11 @@ export function TicketDetail({
                   <Select
                     aria-label="Estado"
                     selectionMode="single"
-                    selectedKeys={column_id ? new Set([column_id]) : new Set()}
+                    selectedKeys={
+                      column_id && columns.some((column) => column.id === column_id)
+                        ? new Set([column_id])
+                        : new Set()
+                    }
                     popoverProps={{ portalContainer: dialogContentRef.current ?? undefined }}
                     placeholder={columns.length === 0 ? "Sin columnas" : "Selecciona estado"}
                     onChange={(event) => {

@@ -58,6 +58,8 @@ class WorkspaceCreateSerializer(serializers.Serializer):
 
         with transaction.atomic():
             WorkspaceMember.objects.filter(user=request_user, is_active=True).update(is_active=False)
+            # Los `WorkspaceStatus` por defecto los siembra el `post_save` de
+            # `Workspace` (apps/projects/signals.py).
             workspace = Workspace.objects.create(
                 name=validated_data["name"],
                 slug=validated_data.get("slug", ""),

@@ -14,8 +14,8 @@ class Sprint(models.Model):
         COMPLETED = "completed", "Completed"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    project = models.ForeignKey(
-        "projects.Project",
+    workspace = models.ForeignKey(
+        "workspaces.Workspace",
         on_delete=models.CASCADE,
         related_name="sprints",
     )
@@ -31,11 +31,11 @@ class Sprint(models.Model):
         ordering = ["-start_date", "-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["project"],
+                fields=["workspace"],
                 condition=Q(status="active"),
-                name="unique_active_sprint_per_project",
+                name="unique_active_sprint_per_workspace",
             ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.project_id}:{self.name}"
+        return f"{self.workspace_id}:{self.name}"

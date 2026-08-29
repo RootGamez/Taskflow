@@ -8,11 +8,12 @@ interface SprintScopeStore {
   clear: () => void;
 }
 
-const INITIAL_SCOPE: SprintScope = { kind: "all" };
+// Por defecto "current" = el sprint activo del espacio (lo resuelve la
+// pagina que consume el store contra la lista de sprints).
+const INITIAL_SCOPE: SprintScope = { kind: "current" };
 
 // Store dedicado al scope de sprint (dominio distinto de useTicketFilterStore,
-// que es de fecha). Sin persistencia: se resetea por projectId (D6), igual
-// que useTicketFilterStore.
+// que es de fecha). Sin persistencia: se resetea al navegar entre vistas.
 export const useSprintScopeStore = create<SprintScopeStore>((set) => ({
   scope: INITIAL_SCOPE,
   setScope: (scope) => set({ scope }),

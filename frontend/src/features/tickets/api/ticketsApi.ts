@@ -25,6 +25,9 @@ interface UpdateTicketPayload {
   priority?: Ticket["priority"];
   due_date?: string | null;
   column_id?: string;
+  // Tablero de sprint (cruza proyectos): el servidor resuelve la columna
+  // del proyecto del ticket mapeada a este estado del espacio.
+  workspace_status_id?: string;
   order?: number;
   assignee_ids?: string[];
   sprint_ids?: string[];

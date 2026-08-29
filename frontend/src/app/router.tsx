@@ -14,6 +14,9 @@ import WorkspacesPage from "@/pages/workspace/WorkspacesPage";
 import WorkspaceDashboardPage from "@/pages/workspace/WorkspaceDashboardPage";
 import WorkspaceMembersPage from "@/pages/workspace/WorkspaceMembersPage";
 import WorkspaceSettingsPage from "@/pages/workspace/WorkspaceSettingsPage";
+import SprintBoardPage from "@/pages/workspace/SprintBoardPage";
+import SprintsAdminPage from "@/pages/workspace/SprintsAdminPage";
+import StatusesAdminPage from "@/pages/workspace/StatusesAdminPage";
 import KanbanPage from "@/pages/project/KanbanPage";
 import ListPage from "@/pages/project/ListPage";
 import CalendarPage from "@/pages/project/CalendarPage";
@@ -75,7 +78,23 @@ export const router = createBrowserRouter([
       },
       {
         path: "/workspaces/:workspaceSlug",
+        element: (
+          <Suspense fallback={<LoadingSpinner />}>
+            <SprintBoardPage />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/workspaces/:workspaceSlug/projects",
         element: <WorkspaceDashboardPage />,
+      },
+      {
+        path: "/workspaces/:workspaceSlug/sprints",
+        element: <SprintsAdminPage />,
+      },
+      {
+        path: "/workspaces/:workspaceSlug/statuses",
+        element: <StatusesAdminPage />,
       },
       {
         path: "/workspaces/:workspaceSlug/settings",

@@ -5,7 +5,7 @@ import {
   completeSprint,
   createSprint,
   deleteSprint,
-  getSprintsByProject,
+  getSprintsByWorkspace,
   updateSprint,
 } from "@/features/sprints/api/sprintsApi";
 import { apiClient } from "@/lib/axios";
@@ -19,13 +19,13 @@ describe("sprintsApi", () => {
     vi.clearAllMocks();
   });
 
-  it("getSprintsByProject hace GET al endpoint de sprints del proyecto", async () => {
+  it("getSprintsByWorkspace hace GET al endpoint de sprints del proyecto", async () => {
     const sprints = [{ id: "sprint-1" }];
     vi.mocked(apiClient.get).mockResolvedValue({ data: sprints });
 
-    const result = await getSprintsByProject("project-1");
+    const result = await getSprintsByWorkspace("project-1");
 
-    expect(apiClient.get).toHaveBeenCalledWith("/projects/project-1/sprints/");
+    expect(apiClient.get).toHaveBeenCalledWith("/workspaces/project-1/sprints/");
     expect(result).toBe(sprints);
   });
 
@@ -36,7 +36,7 @@ describe("sprintsApi", () => {
 
     const result = await createSprint("project-1", payload);
 
-    expect(apiClient.post).toHaveBeenCalledWith("/projects/project-1/sprints/", payload);
+    expect(apiClient.post).toHaveBeenCalledWith("/workspaces/project-1/sprints/", payload);
     expect(result).toBe(sprint);
   });
 
@@ -46,7 +46,7 @@ describe("sprintsApi", () => {
 
     const result = await updateSprint("project-1", "sprint-1", { name: "Renombrado" });
 
-    expect(apiClient.patch).toHaveBeenCalledWith("/projects/project-1/sprints/sprint-1/", {
+    expect(apiClient.patch).toHaveBeenCalledWith("/workspaces/project-1/sprints/sprint-1/", {
       name: "Renombrado",
     });
     expect(result).toBe(sprint);
@@ -57,7 +57,7 @@ describe("sprintsApi", () => {
 
     await deleteSprint("project-1", "sprint-1");
 
-    expect(apiClient.delete).toHaveBeenCalledWith("/projects/project-1/sprints/sprint-1/");
+    expect(apiClient.delete).toHaveBeenCalledWith("/workspaces/project-1/sprints/sprint-1/");
   });
 
   it("activateSprint hace POST al endpoint de activate", async () => {
@@ -66,7 +66,7 @@ describe("sprintsApi", () => {
 
     const result = await activateSprint("project-1", "sprint-1");
 
-    expect(apiClient.post).toHaveBeenCalledWith("/projects/project-1/sprints/sprint-1/activate/");
+    expect(apiClient.post).toHaveBeenCalledWith("/workspaces/project-1/sprints/sprint-1/activate/");
     expect(result).toBe(sprint);
   });
 
@@ -76,7 +76,7 @@ describe("sprintsApi", () => {
 
     const result = await completeSprint("project-1", "sprint-1");
 
-    expect(apiClient.post).toHaveBeenCalledWith("/projects/project-1/sprints/sprint-1/complete/");
+    expect(apiClient.post).toHaveBeenCalledWith("/workspaces/project-1/sprints/sprint-1/complete/");
     expect(result).toBe(sprint);
   });
 });

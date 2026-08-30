@@ -42,14 +42,11 @@ import {
   ReactNodeViewRenderer,
   Extension,
 } from "@tiptap/react";
-import { BubbleMenu } from "@tiptap/react";
+import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
-import Link from "@tiptap/extension-link";
-import Placeholder from "@tiptap/extension-placeholder";
-import TaskItem from "@tiptap/extension-task-item";
-import TaskList from "@tiptap/extension-task-list";
-import Dropcursor from "@tiptap/extension-dropcursor";
+import { Placeholder, Dropcursor } from "@tiptap/extensions";
+import { TaskList, TaskItem } from "@tiptap/extension-list";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 import { cn } from "@/lib/utils";
@@ -565,9 +562,21 @@ export function TicketRichEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [2, 3] },
+        // Se añade suelto abajo con color de marca y ancho 2px.
         dropcursor: false,
         // Reemplazado por CodeBlockLowlight (mismo nombre de nodo).
         codeBlock: false,
+        // Tiptap v3: Link ya viene en StarterKit — se configura aquí en vez
+        // de añadirlo como extensión suelta.
+        link: {
+          openOnClick: false,
+          autolink: true,
+          defaultProtocol: "https",
+          HTMLAttributes: {
+            class:
+              "cursor-pointer font-medium text-primary hover:opacity-80 underline underline-offset-2",
+          },
+        },
       }),
       ...createSharedExtensions(),
 
@@ -592,16 +601,6 @@ export function TicketRichEditor({
       }).extend({
         addNodeView() {
           return ReactNodeViewRenderer(ImageNodeView);
-        },
-      }),
-
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        defaultProtocol: "https",
-        HTMLAttributes: {
-          class:
-            "cursor-pointer font-medium text-primary hover:opacity-80 underline underline-offset-2",
         },
       }),
 
@@ -710,6 +709,11 @@ export function TicketRichEditor({
     content: value ?? "",
     editable: !disabled && !isLocked,
     immediatelyRender: false,
+    // Tiptap v3 pone este flag en `false` por defecto; los BubbleMenu y el
+    // contador de caracteres leen el estado del editor en render, así que
+    // necesitamos el re-render por transacción. La Fase 1 lo migrará a
+    // `useEditorState` para acotar el coste.
+    shouldRerenderOnTransaction: true,
 
     onUpdate: ({ editor: e }) => {
       onChangeRef.current(e.getJSON() as Record<string, unknown>);
@@ -731,7 +735,9 @@ export function TicketRichEditor({
     const current = JSON.stringify(editor.getJSON());
     const incoming = JSON.stringify(value);
     if (current === incoming) return;
-    editor.commands.setContent(value ?? "", false);
+    // v3: firma nueva `(content, options)` — sin el flag, `setContent` emite
+    // un update y dispararía `onChange` en bucle con el value externo.
+    editor.commands.setContent(value ?? "", { emitUpdate: false });
   }, [editor, value]);
 
   // ── Sync editable ─────────────────────────────────────────────────────────
@@ -911,7 +917,7 @@ export function TicketRichEditor({
         <BubbleMenu
           editor={editor}
           pluginKey="tableBubble"
-          tippyOptions={{ duration: 100, placement: "top" }}
+          options={{ placement: "top", offset: 8 }}
           shouldShow={({ editor: e }) => e.isActive("table")}
           className="flex items-center gap-0.5 rounded border-2 border-border bg-popover p-1 text-xs text-popover-foreground shadow-hard dark:shadow-hard-float z-50"
         >
@@ -953,7 +959,7 @@ export function TicketRichEditor({
         <BubbleMenu
           editor={editor}
           pluginKey="formatBubble"
-          tippyOptions={{ duration: 100, placement: "top", maxWidth: 480 }}
+          options={{ placement: "top", offset: 8 }}
           shouldShow={({ editor: e, state, from, to }) => {
             if (e.isActive("link")) return true;
             // Selección de texto no vacía y no dentro de un bloque de código.

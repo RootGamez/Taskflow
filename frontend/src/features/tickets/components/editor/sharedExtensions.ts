@@ -1,16 +1,10 @@
 import type { AnyExtension } from "@tiptap/core";
-import Underline from "@tiptap/extension-underline";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
-import CharacterCount from "@tiptap/extension-character-count";
-import Table from "@tiptap/extension-table";
-import TableRow from "@tiptap/extension-table-row";
-import TableHeader from "@tiptap/extension-table-header";
-import TableCell from "@tiptap/extension-table-cell";
+import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
+import { CharacterCount, TrailingNode } from "@tiptap/extensions";
 import { createLowlight } from "lowlight";
-
-import { TrailingNode } from "../extensions/TrailingNode";
 
 import ts from "highlight.js/lib/languages/typescript";
 import js from "highlight.js/lib/languages/javascript";
@@ -33,6 +27,11 @@ import markdown from "highlight.js/lib/languages/markdown";
  * IMPORTANTE: quien use esto debe `StarterKit.configure({ codeBlock: false })`
  * — `CodeBlockLowlight` reemplaza al `codeBlock` plano y comparte nombre de
  * nodo, así que los documentos existentes siguen siendo compatibles.
+ *
+ * Tiptap v3: `Underline`, `Link` y `ListKeymap` ya vienen dentro de
+ * `StarterKit`, así que no se listan aquí. `CharacterCount` y `TrailingNode`
+ * viven ahora en `@tiptap/extensions`; las 4 piezas de tabla salen todas de
+ * `@tiptap/extension-table`.
  */
 
 // Registro selectivo: `common`/`all` de highlight.js pesan ~1MB. Estos 10
@@ -67,7 +66,6 @@ export const SUPPORTED_CODE_LANGUAGES: Array<{ value: string; label: string }> =
 
 export function createSharedExtensions(): AnyExtension[] {
   return [
-    Underline,
     Highlight.configure({ multicolor: false }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     CodeBlockLowlight.configure({ lowlight, defaultLanguage: "plaintext" }),

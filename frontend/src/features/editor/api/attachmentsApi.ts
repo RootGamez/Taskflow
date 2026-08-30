@@ -8,18 +8,16 @@
  * `AttachmentUploadFn` ya cerrada sobre los ids, igual que hoy recibe
  * `onUploadImage`.
  *
- * A diferencia de imagenes y videos, la `url` que devuelve el backend es
- * PREFIRMADA y caduca en minutos, asi que NO se guarda en el JSON del
- * documento: el nodo `file` guarda el `id` y pide una URL fresca al
- * descargar.
+ * El backend NO devuelve ninguna URL del archivo: los documentos viven en
+ * un bucket privado y se sirven en streaming desde el endpoint de detalle
+ * del adjunto, que exige autenticacion. El nodo `file` guarda el `id` y
+ * construye la ruta con el.
  */
 
 import { apiClient } from "@/lib/axios";
 
 export interface Attachment {
   id: string;
-  /** URL prefirmada de vida corta. No persistirla en el documento. */
-  url: string;
   file_name: string;
   content_type: string;
   file_size: number;
@@ -64,9 +62,8 @@ export async function uploadPageAttachment(
 }
 
 /**
- * URL de descarga de un adjunto. Apunta al endpoint del backend, que
- * responde con un 302 a una URL firmada nueva -- por eso es estable y se
- * puede poner en un `href`, al contrario que `Attachment.url`.
+ * Ruta de descarga de un adjunto en la API. Estable: el backend sirve el
+ * archivo en streaming desde el bucket privado, sin redirigir a MinIO.
  */
 export function buildTicketAttachmentDownloadUrl(
   projectId: string,
@@ -85,9 +82,12 @@ export function buildPageAttachmentDownloadUrl(
 }
 
 /**
- * Descarga un adjunto por su URL de endpoint. Va por `apiClient` (y no por
- * un `<a href>`) porque el endpoint exige el header `Authorization`: un
- * enlace normal lo mandaria sin token y devolveria 401.
+ * Descarga un adjunto. Va por `apiClient` (y no por un `<a href>`) porque
+ * el endpoint exige el header `Authorization`: un enlace normal lo
+ * mandaria sin token y devolveria 401.
+ *
+ * El `Content-Type` real lo pone el backend; aqui se respeta el del blob
+ * para que el navegador abra el archivo con la aplicacion correcta.
  */
 export async function downloadAttachment(endpointUrl: string, fileName: string): Promise<void> {
   const { data } = await apiClient.get<Blob>(endpointUrl, { responseType: "blob" });

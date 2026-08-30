@@ -104,15 +104,34 @@ def _endpoint_url(endpoint: str, use_ssl: bool) -> str:
     return f"{scheme}://{endpoint}"
 
 
-def get_minio_client():
+def _build_client(endpoint: str):
     return boto3.client(
         "s3",
-        endpoint_url=_endpoint_url(settings.MINIO_ENDPOINT, settings.MINIO_USE_SSL),
+        endpoint_url=_endpoint_url(endpoint, settings.MINIO_USE_SSL),
         aws_access_key_id=settings.MINIO_ACCESS_KEY,
         aws_secret_access_key=settings.MINIO_SECRET_KEY,
         region_name="us-east-1",
         config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
     )
+
+
+def get_minio_client():
+    """Cliente para hablar con MinIO desde el servidor (red interna)."""
+    return _build_client(settings.MINIO_ENDPOINT)
+
+
+def get_public_minio_client():
+    """Cliente para FIRMAR URLs que va a abrir un navegador.
+
+    Tiene que apuntar a `MINIO_PUBLIC_ENDPOINT`, no a `MINIO_ENDPOINT`.
+    En Docker el servidor llega a MinIO por `minio:9000` pero el navegador
+    solo resuelve `localhost:9000`, y SigV4 firma la cabecera `Host`: una
+    URL firmada para `minio:9000` no solo apunta a un host inalcanzable,
+    sino que ademas deja de validar en cuanto alguien le cambia el host a
+    mano. Por eso la firma tiene que generarse ya contra el endpoint
+    publico.
+    """
+    return _build_client(settings.MINIO_PUBLIC_ENDPOINT)
 
 
 def ensure_bucket_exists(client, bucket_name: str) -> None:
@@ -180,8 +199,11 @@ def compute_checksum(file_obj) -> str:
 
 
 def build_presigned_url(object_key: str, file_name: str = "") -> str:
-    """URL de descarga temporal para un objeto del bucket privado."""
-    client = get_minio_client()
+    """URL de descarga temporal para un objeto del bucket privado.
+
+    Firmada contra el endpoint PUBLICO -- ver `get_public_minio_client`.
+    """
+    client = get_public_minio_client()
     params: dict[str, str] = {
         "Bucket": settings.MINIO_PRIVATE_BUCKET,
         "Key": object_key,
@@ -241,3 +263,27 @@ def upload_attachment(file_obj, scope: str, owner_id: str) -> tuple[str, str, st
     )
 
     return object_key, content_type, checksum, file_size
+
+
+def stream_attachment(object_key: str):
+    """Abre un objeto del bucket privado para servirlo desde el backend.
+
+    Returns:
+        `(body, content_type, content_length)`. `body` es un stream: hay
+        que cerrarlo, cosa que hace `FileResponse` por nosotros.
+
+    Se sirve a traves de Django en vez de redirigir a una URL prefirmada
+    porque el redirect tenia dos problemas encadenados: el navegador no
+    resuelve el host interno de MinIO, y al seguir el redirect arrastraba
+    la cabecera `Authorization` de la API, que S3 rechaza cuando la
+    peticion ya viene firmada por query string. Sirviendo desde aqui, el
+    navegador nunca habla con MinIO y el bucket privado sigue siendo
+    privado de verdad.
+    """
+    client = get_minio_client()
+    response = client.get_object(Bucket=settings.MINIO_PRIVATE_BUCKET, Key=object_key)
+    return (
+        response["Body"],
+        response.get("ContentType") or "application/octet-stream",
+        response.get("ContentLength") or 0,
+    )

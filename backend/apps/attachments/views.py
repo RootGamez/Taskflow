@@ -4,7 +4,7 @@ Dos superficies, un solo flujo:
 
 - `POST   /api/v1/projects/<project_id>/tickets/<ticket_id>/attachments/`
 - `POST   /api/v1/workspaces/<workspace_slug>/pages/<page_id>/attachments/`
-- `GET    .../attachments/<attachment_id>/download/` -> 302 a la URL firmada
+- `GET    .../attachments/<attachment_id>/` -> sirve el archivo
 - `DELETE .../attachments/<attachment_id>/`
 
 El scoping replica el de las vistas que ya existen: tickets pasan por
@@ -17,7 +17,7 @@ por id suelto -- un UUID valido de otro workspace da 404, no 403.
 
 from __future__ import annotations
 
-from django.shortcuts import redirect
+from django.http import FileResponse
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -28,12 +28,35 @@ from rest_framework.views import APIView
 
 from apps.attachments.models import Attachment
 from apps.attachments.serializers import AttachmentSerializer
-from apps.attachments.storage import build_presigned_url, upload_attachment
+from apps.attachments.storage import stream_attachment, upload_attachment
 from apps.pages.models import Page
 from apps.tickets.models import Ticket
 from apps.workspaces.access import WorkspaceRoleAccessMixin
 
 UPLOAD_FIELD = "file"
+
+
+def _download_response(attachment: Attachment) -> FileResponse:
+    """Sirve el adjunto desde el backend, sin exponer MinIO al navegador.
+
+    Antes esto era un `redirect` a una URL prefirmada, y fallaba por dos
+    motivos encadenados: el navegador no resuelve el host interno de MinIO
+    (`minio:9000`), y al seguir el redirect arrastraba la cabecera
+    `Authorization` de la API, que S3 rechaza cuando la peticion ya viene
+    firmada por query string. Sirviendo desde aqui el navegador nunca habla
+    con MinIO, asi que el bucket privado sigue siendo privado.
+    """
+    body, content_type, content_length = stream_attachment(attachment.object_key)
+
+    response = FileResponse(
+        body,
+        content_type=attachment.content_type or content_type,
+        as_attachment=True,
+        filename=attachment.file_name or str(attachment.id),
+    )
+    if content_length:
+        response["Content-Length"] = str(content_length)
+    return response
 
 
 def _create_attachment(request: Request, *, scope: str, owner_id: str, **owner_kwargs) -> Response:
@@ -109,9 +132,9 @@ class TicketAttachmentDetailView(WorkspaceRoleAccessMixin, APIView):
 
     def get(
         self, request: Request, project_id: str, ticket_id: str, attachment_id: str
-    ) -> Response:
+    ) -> FileResponse:
         attachment = self._get_attachment(request, project_id, ticket_id, attachment_id)
-        return redirect(build_presigned_url(attachment.object_key, attachment.file_name))
+        return _download_response(attachment)
 
     def delete(
         self, request: Request, project_id: str, ticket_id: str, attachment_id: str
@@ -163,9 +186,9 @@ class PageAttachmentDetailView(WorkspaceRoleAccessMixin, APIView):
 
     def get(
         self, request: Request, workspace_slug: str, page_id: str, attachment_id: str
-    ) -> Response:
+    ) -> FileResponse:
         attachment = self._get_attachment(request, workspace_slug, page_id, attachment_id)
-        return redirect(build_presigned_url(attachment.object_key, attachment.file_name))
+        return _download_response(attachment)
 
     def delete(
         self, request: Request, workspace_slug: str, page_id: str, attachment_id: str

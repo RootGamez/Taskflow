@@ -5,27 +5,23 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from apps.attachments.models import Attachment
-from apps.attachments.storage import build_presigned_url
 
 
 class AttachmentSerializer(serializers.ModelSerializer):
     """Representacion que consume el nodo `file` del editor.
 
-    `url` NO esta persistida: se firma en cada lectura porque los
-    documentos viven en el bucket privado y la firma caduca en minutos.
-    Por eso el frontend guarda el `id` en el JSON del documento, nunca la
-    URL -- una URL firmada guardada en el contenido estaria muerta al
-    dia siguiente.
+    No se expone ninguna URL: la descarga va por el endpoint de detalle
+    del adjunto, que es estable, exige autenticacion y sirve el archivo
+    en streaming desde el bucket privado. El frontend guarda el `id` en
+    el JSON del documento y construye la ruta con el.
     """
 
-    url = serializers.SerializerMethodField()
     uploaded_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Attachment
         fields = [
             "id",
-            "url",
             "file_name",
             "content_type",
             "file_size",
@@ -34,9 +30,6 @@ class AttachmentSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
-
-    def get_url(self, obj: Attachment) -> str:
-        return build_presigned_url(obj.object_key, obj.file_name)
 
     def get_uploaded_by_name(self, obj: Attachment) -> str:
         user = obj.uploaded_by

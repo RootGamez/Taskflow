@@ -53,6 +53,7 @@ import { BookmarkExtension } from "./BookmarkExtension";
 import { FileExtension } from "./FileExtension";
 import { SlashExtension, type SlashCommandItem } from "./SlashExtension";
 import { VideoExtension } from "./VideoExtension";
+import { CodeBlockNodeView } from "../components/CodeBlockNodeView";
 import { ImageNodeView } from "../components/ImageNodeView";
 import type { MentionItem } from "../components/MentionList";
 
@@ -191,7 +192,13 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       suggestion: emojiRenderer ? { char: ":", render: emojiRenderer } : undefined,
     }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
-    CodeBlockLowlight.configure({ lowlight, defaultLanguage: "plaintext" }),
+    // El NodeView anade la cabecera con selector de lenguaje y boton de
+    // copiar; sin el, `SUPPORTED_CODE_LANGUAGES` no tenia ninguna UI.
+    CodeBlockLowlight.configure({ lowlight, defaultLanguage: "plaintext" }).extend({
+      addNodeView() {
+        return ReactNodeViewRenderer(CodeBlockNodeView);
+      },
+    }),
 
     Table.configure({ resizable: true, lastColumnResizable: false }),
     TableRow,

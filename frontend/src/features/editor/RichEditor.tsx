@@ -428,7 +428,6 @@ export function RichEditor({
         {editor && canEdit && (
           <BlockControls
             editor={editor}
-            wrapperRef={wrapperRef}
             blockOptions={blockOptions}
             triggerImageFileInput={openImagePicker}
             disabled={!canEdit}

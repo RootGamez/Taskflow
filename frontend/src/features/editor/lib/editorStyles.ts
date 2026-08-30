@@ -108,6 +108,11 @@ export const EDITOR_STYLES = `
 
 .tf-editor .tiptap .ProseMirror-dropcursor { border-top: var(--border-width) solid hsl(var(--primary)); }
 
+/* Bloque de codigo con cabecera (ver CodeBlockNodeView) */
+.tf-editor .tiptap .tf-code-block { margin: 0.5rem 0; }
+.tf-editor .tiptap .tf-code-block pre { margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
+.tf-editor .tiptap .tf-code-block select { font-family: inherit; }
+
 /* Secciones plegables (Details) */
 .tf-editor .tiptap .tf-details {
   display: flex;

@@ -3,14 +3,21 @@
 /**
  * BlockControls.tsx
  *
- * Botones flotantes "+" y "⠿" (grip) que aparecen al pasar por un bloque, y
- * los menús que abren. Los menús se renderizan con `EditorMenuSurface`
- * (Radix Popover en escritorio, Sheet en móvil) — ver ese archivo para el
- * porqué de los bugs históricos de scroll / foco del buscador.
+ * Botones flotantes "+" y "⠿" (asa) junto al bloque bajo el cursor, y los
+ * menús que abren. Los menús se renderizan con `EditorMenuSurface` (Radix
+ * Popover en escritorio, Sheet en móvil) — ver ese archivo para el porqué
+ * de los bugs históricos de scroll / foco del buscador.
+ *
+ * El posicionamiento y el arrastre los hace `DragHandle` de Tiptap. Antes
+ * este archivo rastreaba el hover a mano (mousemove + `posAtCoords` + un
+ * rAF de throttle + temporizadores de ocultado, ~70 líneas) y aun así solo
+ * permitía mover bloques de uno en uno con "Mover arriba"/"Mover abajo",
+ * sin arrastre real.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
@@ -329,8 +336,6 @@ function BlockActionsMenuPopup({
 
 interface BlockControlsProps {
   editor: Editor;
-  /** Reference to the `.tf-editor-wrapper` div (must be position: relative) */
-  wrapperRef: React.RefObject<HTMLDivElement | null>;
   blockOptions: SlashCommandItem[];
   disabled?: boolean;
   triggerImageFileInput?: (() => void) | null;
@@ -338,16 +343,13 @@ interface BlockControlsProps {
 
 export function BlockControls({
   editor,
-  wrapperRef,
   blockOptions,
   disabled = false,
   triggerImageFileInput,
 }: BlockControlsProps) {
+  // `DragHandle` nos dice que bloque tiene el cursor encima; de ahi sale el
+  // indice que usan mover/borrar/insertar.
   const [hoveredBlockIndex, setHoveredBlockIndex] = useState<number | null>(null);
-  const [controlsTop, setControlsTop] = useState(0);
-  const [isHoveringControls, setIsHoveringControls] = useState(false);
-  const hideTimerRef = useRef<number | null>(null);
-  const rafRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
 
   const [blockMenu, setBlockMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
@@ -358,78 +360,6 @@ export function BlockControls({
     open: false,
     anchorRect: null,
   });
-
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleHide = useCallback(() => {
-    clearHideTimer();
-    hideTimerRef.current = window.setTimeout(() => {
-      if (!blockMenu.open && !actionsMenu.open && !isHoveringControls) {
-        setHoveredBlockIndex(null);
-      }
-    }, 140);
-  }, [blockMenu.open, actionsMenu.open, isHoveringControls, clearHideTimer]);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (disabled || !editor.view) return;
-      // N6: throttle a un frame — antes hacía setState en cada mousemove (~60Hz).
-      if (rafRef.current !== null) return;
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = null;
-        const wrapper = wrapperRef.current;
-        if (!wrapper) return;
-
-        const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-        let index = -1;
-        if (pos) {
-          index = getBlockIndexAtPos(editor, pos.pos);
-        } else {
-          const childCount = editor.state.doc.childCount;
-          if (childCount > 0) index = childCount - 1;
-        }
-
-        if (index === -1) {
-          setHoveredBlockIndex(null);
-          return;
-        }
-        setHoveredBlockIndex((prev) => (prev === index ? prev : index));
-
-        const range = getBlockRange(editor, index);
-        if (range) {
-          const wrapperRect = wrapper.getBoundingClientRect();
-          const coordTop = editor.view.coordsAtPos(range.from).top;
-          const nextTop = coordTop - wrapperRect.top + wrapper.scrollTop;
-          setControlsTop((prev) => (Math.abs(prev - nextTop) < 0.5 ? prev : nextTop));
-        }
-      });
-    },
-    [editor, disabled, wrapperRef],
-  );
-
-  useEffect(() => {
-    if (isMobile) return;
-    const editorEl = editor.view.dom;
-    editorEl.addEventListener("mousemove", handleMouseMove as EventListener);
-    editorEl.addEventListener("mouseleave", scheduleHide);
-    return () => {
-      editorEl.removeEventListener("mousemove", handleMouseMove as EventListener);
-      editorEl.removeEventListener("mouseleave", scheduleHide);
-    };
-  }, [editor, handleMouseMove, scheduleHide, isMobile]);
-
-  useEffect(
-    () => () => {
-      clearHideTimer();
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-    },
-    [clearHideTimer],
-  );
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -517,9 +447,6 @@ export function BlockControls({
 
   if (disabled) return null;
 
-  const showControls =
-    !isMobile && (hoveredBlockIndex !== null || blockMenu.open || actionsMenu.open);
-
   return (
     <>
       {/* Botón "+" persistente (siempre visible), en color de marca para que
@@ -535,18 +462,22 @@ export function BlockControls({
         <Plus className="h-5 w-5" />
       </button>
 
-      {showControls && (
-        <div
-          className="pointer-events-auto absolute flex items-center gap-0.5"
-          style={{ top: controlsTop, left: 4, transform: "translateY(-1px)", zIndex: 40 }}
-          onMouseEnter={() => {
-            clearHideTimer();
-            setIsHoveringControls(true);
+      {/*
+        `DragHandle` reemplaza el rastreo de hover que este componente hacia
+        a mano (mousemove + posAtCoords + rAF) y, sobre todo, permite
+        ARRASTRAR bloques de verdad: antes solo se podian mover de uno en
+        uno con "Mover arriba"/"Mover abajo".
+
+        En movil no se monta: el asa depende del puntero y ahi el hueco lo
+        cubre el FAB "+" de arriba.
+      */}
+      {!isMobile && (
+        <DragHandle
+          editor={editor}
+          onNodeChange={({ pos }) => {
+            setHoveredBlockIndex(pos >= 0 ? getBlockIndexAtPos(editor, pos) : null);
           }}
-          onMouseLeave={() => {
-            setIsHoveringControls(false);
-            if (!blockMenu.open && !actionsMenu.open) scheduleHide();
-          }}
+          className="pointer-events-auto flex items-center gap-0.5"
         >
           <button
             type="button"
@@ -558,17 +489,19 @@ export function BlockControls({
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
+          {/* Este boton es el asa: arrastrarlo mueve el bloque, y un clic
+              simple abre el menu de acciones (que conserva mover y borrar
+              para quien navegue por teclado, donde arrastrar no sirve). */}
           <button
             type="button"
-            aria-label="Opciones de bloque"
-            title="Mover o eliminar bloque"
+            aria-label="Mover o eliminar bloque"
+            title="Arrastra para mover, o haz clic para más acciones"
             className="flex h-6 w-6 cursor-grab items-center justify-center rounded bg-transparent text-muted-foreground transition hover:bg-accent hover:text-foreground active:cursor-grabbing"
-            onMouseDown={(e) => e.preventDefault()}
             onClick={openActionsMenu}
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </DragHandle>
       )}
 
       {blockMenu.open ? (

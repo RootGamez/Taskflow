@@ -21,7 +21,10 @@ import {
   Highlighter as HighlighterIcon,
   Italic as ItalicIcon,
   Link as LinkIcon,
+  Palette as PaletteIcon,
   Strikethrough as StrikethroughIcon,
+  Subscript as SubscriptIcon,
+  Superscript as SuperscriptIcon,
   Trash2,
   Underline as UnderlineIcon,
 } from "lucide-react";
@@ -38,8 +41,96 @@ interface FormatBubbleMenuProps {
 /** Clase compartida por los botones de icono de la barra. */
 const ICON_BUTTON = "flex h-8 w-8 items-center justify-center rounded transition-colors";
 
-const MARK_NAMES = ["bold", "italic", "underline", "strike", "code", "highlight"] as const;
+const MARK_NAMES = [
+  "bold",
+  "italic",
+  "underline",
+  "strike",
+  "code",
+  "highlight",
+  "subscript",
+  "superscript",
+] as const;
 const ALIGN_VALUES = ["left", "center", "right"] as const;
+
+/**
+ * Paleta de texto y resaltado. Valores literales, no tokens: se guardan
+ * en el JSON del documento y tienen que seguir significando lo mismo si
+ * manana cambia el tema o el documento se exporta fuera de la app.
+ * Elegidos para tener contraste suficiente sobre fondo claro y oscuro.
+ */
+const TEXT_COLORS = [
+  { label: "Por defecto", value: null },
+  { label: "Carmesí", value: "#B3261E" },
+  { label: "Ámbar", value: "#A66300" },
+  { label: "Verde", value: "#2E6E4E" },
+  { label: "Azul", value: "#1F5FA8" },
+  { label: "Violeta", value: "#6B4EA8" },
+] as const;
+
+const HIGHLIGHT_COLORS = [
+  { label: "Sin resaltado", value: null },
+  { label: "Amarillo", value: "#FDE68A" },
+  { label: "Verde", value: "#BBF7D0" },
+  { label: "Azul", value: "#BFDBFE" },
+  { label: "Rosa", value: "#FBCFE8" },
+  { label: "Gris", value: "#E5E7EB" },
+] as const;
+
+interface ColorSwatchesProps {
+  label: string;
+  icon: typeof HighlighterIcon;
+  colors: readonly { readonly label: string; readonly value: string | null }[];
+  activeValue: string | null;
+  onSelect: (value: string | null) => void;
+}
+
+/**
+ * Muestras de color desplegables. Se abre al pasar por encima y no con
+ * clic para no anadir un segundo popover dentro de la barra flotante,
+ * que ya vive dentro de un Popper: anidarlos daba problemas de foco y de
+ * cierre en cascada.
+ */
+function ColorSwatches({ label, icon: Icon, colors, activeValue, onSelect }: ColorSwatchesProps) {
+  return (
+    <div className="group/colors relative">
+      <button
+        type="button"
+        aria-label={label}
+        title={label}
+        onMouseDown={(e) => e.preventDefault()}
+        className={cn(
+          ICON_BUTTON,
+          activeValue
+            ? "bg-primary/10 text-primary"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </button>
+      <div className="invisible absolute left-1/2 top-full z-10 flex -translate-x-1/2 gap-1 rounded border-2 border-border bg-popover p-1 opacity-0 shadow-hard transition group-hover/colors:visible group-hover/colors:opacity-100 dark:shadow-hard-float">
+        {colors.map((color) => (
+          <button
+            key={color.label}
+            type="button"
+            aria-label={color.label}
+            aria-pressed={activeValue === color.value}
+            title={color.label}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onSelect(color.value)}
+            className={cn(
+              "h-5 w-5 shrink-0 rounded border-2",
+              activeValue === color.value ? "border-primary" : "border-border",
+            )}
+            style={color.value ? { background: color.value } : undefined}
+          >
+            {color.value ? null : <span aria-hidden="true" className="text-[10px]">/</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
   const [isEditingLink, setEditingLink] = useState(false);
@@ -55,6 +146,8 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
       activeAlign: ALIGN_VALUES.find((v) => e.isActive({ textAlign: v })) ?? null,
       isLink: e.isActive("link"),
       linkHref: (e.getAttributes("link").href as string | undefined) ?? "",
+      textColor: (e.getAttributes("textStyle").color as string | undefined) ?? null,
+      highlightColor: (e.getAttributes("highlight").color as string | undefined) ?? null,
     }),
   });
 
@@ -62,6 +155,8 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
   const activeAlign = state?.activeAlign ?? null;
   const isLinkActive = state?.isLink ?? false;
   const linkHref = state?.linkHref ?? "";
+  const textColor = state?.textColor ?? null;
+  const highlightColor = state?.highlightColor ?? null;
 
   const applyLink = useCallback(() => {
     const safe = normalizeUrl(linkInputUrl);
@@ -80,7 +175,8 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
     { icon: UnderlineIcon, label: "Subrayado", is: "underline", run: () => editor.chain().focus().toggleUnderline().run() },
     { icon: StrikethroughIcon, label: "Tachado", is: "strike", run: () => editor.chain().focus().toggleStrike().run() },
     { icon: InlineCodeIcon, label: "Código", is: "code", run: () => editor.chain().focus().toggleCode().run() },
-    { icon: HighlighterIcon, label: "Resaltar", is: "highlight", run: () => editor.chain().focus().toggleHighlight().run() },
+    { icon: SubscriptIcon, label: "Subíndice", is: "subscript", run: () => editor.chain().focus().toggleSubscript().run() },
+    { icon: SuperscriptIcon, label: "Superíndice", is: "superscript", run: () => editor.chain().focus().toggleSuperscript().run() },
   ];
 
   const alignments = [
@@ -144,6 +240,29 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
               <Icon className="h-4 w-4" />
             </button>
           ))}
+          <div className="mx-0.5 h-5 w-px bg-border" />
+          <ColorSwatches
+            label="Color del texto"
+            icon={PaletteIcon}
+            colors={TEXT_COLORS}
+            activeValue={textColor}
+            onSelect={(value) =>
+              value
+                ? editor.chain().focus().setColor(value).run()
+                : editor.chain().focus().unsetColor().run()
+            }
+          />
+          <ColorSwatches
+            label="Resaltado"
+            icon={HighlighterIcon}
+            colors={HIGHLIGHT_COLORS}
+            activeValue={highlightColor}
+            onSelect={(value) =>
+              value
+                ? editor.chain().focus().setHighlight({ color: value }).run()
+                : editor.chain().focus().unsetHighlight().run()
+            }
+          />
           <div className="mx-0.5 h-5 w-px bg-border" />
           <button
             type="button"

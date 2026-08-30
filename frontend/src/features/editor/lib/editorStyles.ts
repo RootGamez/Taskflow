@@ -108,6 +108,94 @@ export const EDITOR_STYLES = `
 
 .tf-editor .tiptap .ProseMirror-dropcursor { border-top: var(--border-width) solid hsl(var(--primary)); }
 
+/* Secciones plegables (Details) */
+.tf-editor .tiptap .tf-details {
+  display: flex;
+  gap: 0.5rem;
+  border: var(--border-width) solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.6rem 0.75rem;
+  margin: 0.5rem 0;
+  background: hsl(var(--card));
+}
+.tf-editor .tiptap .tf-details > button {
+  flex-shrink: 0;
+  align-self: flex-start;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: hsl(var(--muted-foreground));
+}
+.tf-editor .tiptap .tf-details > button::before {
+  content: 'B6';
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 0.7em;
+}
+.tf-editor .tiptap .tf-details.is-open > button::before { transform: rotate(90deg); }
+.tf-editor .tiptap .tf-details > div { flex: 1 1 auto; min-width: 0; }
+.tf-editor .tiptap .tf-details summary { font-weight: 600; list-style: none; }
+
+/* Formulas KaTeX */
+.tf-editor .tiptap .tiptap-mathematics-render {
+  padding: 0 0.15rem;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.tf-editor .tiptap .tiptap-mathematics-render--editable:hover {
+  background: hsl(var(--accent));
+}
+.tf-editor .tiptap .tiptap-mathematics-render[data-type='block-math'] {
+  display: block;
+  margin: 0.75rem 0;
+  text-align: center;
+}
+/* Una formula mal escrita no debe reventar la linea entera. */
+.tf-editor .tiptap .tiptap-mathematics-render .katex-error {
+  color: hsl(var(--destructive));
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+}
+
+/* Video de YouTube incrustado */
+.tf-editor .tiptap div[data-youtube-video] {
+  margin: 0.75rem 0;
+  border: var(--border-width) solid hsl(var(--border));
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* El iframe trae width/height fijos; esto lo hace responsive sin
+     tocar los atributos que Tiptap serializa al documento. */
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+}
+.tf-editor .tiptap div[data-youtube-video] iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Menciones y emojis */
+.tf-editor .tiptap .tf-mention {
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  border-radius: var(--radius);
+  padding: 0.05em 0.3em;
+  font-weight: 500;
+}
+.tf-editor .tiptap [data-type='emoji'] img {
+  display: inline-block;
+  height: 1.1em;
+  width: 1.1em;
+  vertical-align: -0.2em;
+}
+
+/* Sub / superindice */
+.tf-editor .tiptap sub, .tf-editor .tiptap sup { font-size: 0.75em; }
+
 /* Sugerencia del slash menu */
 .tf-editor .tiptap .suggestion { color: hsl(var(--muted-foreground)); }
 

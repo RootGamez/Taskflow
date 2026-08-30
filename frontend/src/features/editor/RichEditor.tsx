@@ -22,6 +22,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 
+// El CSS de KaTeX viaja en el chunk del editor, no en la hoja principal:
+// solo hace falta cuando hay una formula, y el editor ya se carga diferido.
+import "katex/dist/katex.min.css";
+
 import { cn } from "@/lib/utils";
 
 import { BlockControls } from "./components/BlockControls";
@@ -33,6 +37,11 @@ import {
   type MentionItem,
   type MentionReactState,
 } from "./components/MentionList";
+import {
+  EmojiList,
+  createEmojiRenderer,
+  type EmojiReactState,
+} from "./components/EmojiList";
 import {
   SlashCommandMenu,
   createSlashMenuRenderer,
@@ -60,7 +69,7 @@ import { EditorAttachmentContext, type EditorAttachmentScope } from "./context/E
 export type { ImageUploadFn, DocumentUploadFn } from "./lib/uploads";
 export type { EditorAttachmentScope } from "./context/EditorAttachmentContext";
 
-interface RichEditorProps {
+export interface RichEditorProps {
   /** JSON de ProseMirror, o `null`. */
   value: Record<string, unknown> | null;
   placeholder?: string;
@@ -160,6 +169,13 @@ export function RichEditor({
     clientRect: null,
     isVisible: false,
   });
+  const [emojiState, setEmojiState] = useState<EmojiReactState>({
+    items: [],
+    command: () => {},
+    clientRect: null,
+    isVisible: false,
+  });
+  const emojiKeyDownRef = useRef<((e: KeyboardEvent) => boolean) | null>(null);
   const mentionKeyDownRef = useRef<((e: KeyboardEvent) => boolean) | null>(null);
   const slashKeyDownRef = useRef<((e: KeyboardEvent) => boolean) | null>(null);
 
@@ -169,6 +185,10 @@ export function RichEditor({
   );
   const slashRenderer = useMemo(
     () => createSlashMenuRenderer(setSlashMenuState, slashKeyDownRef),
+    [],
+  );
+  const emojiRenderer = useMemo(
+    () => createEmojiRenderer(setEmojiState, emojiKeyDownRef),
     [],
   );
 
@@ -206,6 +226,7 @@ export function RichEditor({
         getMentionItems: () => mentionItemsRef.current,
         slashRenderer,
         mentionRenderer,
+        emojiRenderer,
         extraExtensions: [
           MediaPasteExtension.configure({
             getImageUploader: () => onUploadImageRef.current,
@@ -432,6 +453,13 @@ export function RichEditor({
         keyDownHandlerRef={slashKeyDownRef}
         container={menuContainer}
         onDismiss={() => setSlashMenuState((prev) => ({ ...prev, isVisible: false }))}
+      />
+
+      <EmojiList
+        state={emojiState}
+        keyDownHandlerRef={emojiKeyDownRef}
+        container={menuContainer}
+        onDismiss={() => setEmojiState((prev) => ({ ...prev, isVisible: false }))}
       />
 
       <MentionList

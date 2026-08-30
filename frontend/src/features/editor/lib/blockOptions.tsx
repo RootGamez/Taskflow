@@ -16,7 +16,10 @@ import { useMemo } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   CheckSquare2,
+  ChevronRight,
   Paperclip,
+  Sigma,
+  Youtube as YoutubeIcon,
   Code2,
   Heading2,
   Heading3,
@@ -118,6 +121,40 @@ export function useBlockOptions({
         keywords: ["check", "tarea", "todo", "checklist", "casilla"],
         icon: CheckSquare2,
         apply: (e) => e.chain().focus().toggleTaskList().run(),
+      },
+      {
+        id: "details",
+        label: "Sección plegable",
+        description: "Bloque que se abre y se cierra",
+        group: "advanced",
+        keywords: ["plegable", "details", "toggle", "acordeon", "colapsar", "spoiler"],
+        icon: ChevronRight,
+        apply: (e) => e.chain().focus().setDetails().run(),
+      },
+      {
+        id: "math",
+        label: "Fórmula",
+        description: "Bloque matemático (KaTeX)",
+        group: "advanced",
+        keywords: ["formula", "math", "matematica", "katex", "latex", "ecuacion"],
+        icon: Sigma,
+        apply: (e) => e.chain().focus().insertBlockMath({ latex: "" }).run(),
+      },
+      {
+        id: "youtube",
+        label: "YouTube",
+        description: "Incrusta un video de YouTube",
+        // "advanced" y no "media": es un embed por URL, como `bookmark`.
+        // No sube nada, asi que no debe depender de `canUploadMedia`.
+        group: "advanced",
+        keywords: ["youtube", "video", "embed", "incrustar", "yt"],
+        icon: YoutubeIcon,
+        apply: (e: Editor) => {
+          void requestUrl?.("URL del video de YouTube").then((url) => {
+            const safe = normalizeUrl(url);
+            if (safe) e.chain().focus().setYoutubeVideo({ src: safe }).run();
+          });
+        },
       },
       {
         id: "quote",

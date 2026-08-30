@@ -49,6 +49,19 @@ const EXPECTED_NAMES = [
   "bookmark",
   "video",
   "file",
+  "subscript",
+  "superscript",
+  "typography",
+  "textStyleKit",
+  "details",
+  "detailsSummary",
+  "detailsContent",
+  // Ojo con la mayuscula: `@tiptap/extension-mathematics` registra su
+  // extension como "Mathematics", a diferencia de todas las demas. Un
+  // test que busque "mathematics" en minuscula falla.
+  "Mathematics",
+  "youtube",
+  "emoji",
   "slashCommand",
 ];
 

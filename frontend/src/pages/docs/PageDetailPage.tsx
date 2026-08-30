@@ -12,7 +12,7 @@ import { PageEditorHeader } from "@/features/pages/components/PageEditorHeader";
 import { usePage } from "@/features/pages/hooks/usePage";
 import { useDeletePage, useUpdatePage } from "@/features/pages/hooks/usePages";
 import type { UpdatePagePayload } from "@/features/pages/types/page.types";
-import { RichEditor } from "@/features/editor/RichEditor";
+import { LazyRichEditor } from "@/features/editor/LazyRichEditor";
 import { uploadPageAttachment } from "@/features/editor/api/attachmentsApi";
 import type { EditorAttachmentScope } from "@/features/editor/context/EditorAttachmentContext";
 import type { DocumentUploadFn } from "@/features/editor/lib/uploads";
@@ -193,7 +193,7 @@ export default function PageDetailPage() {
 
       <PageEditorHeader icon={icon} title={title} canEdit={canEdit} onIconChange={setIcon} onTitleChange={setTitle} />
 
-      <RichEditor
+      <LazyRichEditor
         value={parseContentJson(contentJson)}
         disabled={!canEdit}
         placeholder="Escribe algo, o usa «/» para ver los comandos..."

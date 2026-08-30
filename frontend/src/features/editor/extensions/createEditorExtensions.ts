@@ -28,6 +28,14 @@ import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { TaskList, TaskItem } from "@tiptap/extension-list";
 import { CharacterCount, Dropcursor, Placeholder, TrailingNode } from "@tiptap/extensions";
+import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
+import { Emoji, gitHubEmojis } from "@tiptap/extension-emoji";
+import { Mathematics } from "@tiptap/extension-mathematics";
+import Youtube from "@tiptap/extension-youtube";
+import Typography from "@tiptap/extension-typography";
+import Subscript from "@tiptap/extension-subscript";
+import Superscript from "@tiptap/extension-superscript";
+import { TextStyleKit } from "@tiptap/extension-text-style";
 import { createLowlight } from "lowlight";
 
 import ts from "highlight.js/lib/languages/typescript";
@@ -107,6 +115,8 @@ export interface EditorExtensionsConfig {
   slashRenderer: SuggestionRendererFactory;
   /** `render` del suggestion de arroba (ver MentionList). */
   mentionRenderer: SuggestionRendererFactory;
+  /** `render` del suggestion de dos puntos para emojis. Opcional. */
+  emojiRenderer?: SuggestionRendererFactory;
   /** Plugins extra (subida por pegado/arrastre, colaboracion...). */
   extraExtensions?: AnyExtension[];
 }
@@ -119,6 +129,7 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
     getMentionItems,
     slashRenderer,
     mentionRenderer,
+    emojiRenderer,
     extraExtensions = [],
   } = config;
 
@@ -140,7 +151,45 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       },
     }),
 
-    Highlight.configure({ multicolor: false }),
+    // `multicolor` activo: el usuario elige el color del resaltado desde la
+    // barra flotante, no hay un unico amarillo.
+    Highlight.configure({ multicolor: true }),
+    Subscript,
+    Superscript,
+
+    // Comillas tipograficas, guiones largos, flechas y fracciones al
+    // escribir. Puramente de entrada: no cambia el esquema.
+    Typography,
+
+    // Habilita el atributo `color` del texto (y de paso font-family,
+    // font-size y line-height, que quedan disponibles para mas adelante).
+    TextStyleKit,
+
+    // Secciones plegables. `Details` necesita sus dos hijos declarados:
+    // el resumen visible y el contenido que se colapsa.
+    Details.configure({
+      persist: true,
+      HTMLAttributes: { class: "tf-details" },
+    }),
+    DetailsSummary,
+    DetailsContent,
+
+    // Formulas KaTeX, inline (`$...$`) y en bloque (`$$...$$`).
+    Mathematics,
+
+    Youtube.configure({
+      controls: true,
+      nocookie: true,
+      // Sin esto el iframe desborda el contenedor en movil.
+      width: 640,
+      height: 360,
+    }),
+
+    Emoji.configure({
+      emojis: gitHubEmojis,
+      enableEmoticons: true,
+      suggestion: emojiRenderer ? { char: ":", render: emojiRenderer } : undefined,
+    }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     CodeBlockLowlight.configure({ lowlight, defaultLanguage: "plaintext" }),
 

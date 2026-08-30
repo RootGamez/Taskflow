@@ -17,11 +17,11 @@ import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
 import { TicketSprintsRow } from "@/features/sprints/components/TicketSprintsRow";
 import { TicketRelationsSection } from "@/features/relations/components/TicketRelationsSection";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
-import {
-  RichEditor,
-  type DocumentUploadFn,
-  type EditorAttachmentScope,
-  type ImageUploadFn,
+import { LazyRichEditor } from "@/features/editor/LazyRichEditor";
+import type {
+  DocumentUploadFn,
+  EditorAttachmentScope,
+  ImageUploadFn,
 } from "@/features/editor/RichEditor";
 import type { MentionItem } from "@/features/editor/components/MentionList";
 import { TicketSubtasksSection } from "@/features/subtasks/components/TicketSubtasksSection";
@@ -952,7 +952,7 @@ export function TicketDetail({
             ) : null}
 
             <div className="flex-1 space-y-5 border-t-2 border-border pt-6">
-              <RichEditor
+              <LazyRichEditor
                 value={parseRichTextJson(description)}
                 placeholder="Describe el contexto, avances y decisiones del ticket..."
                 disabled={isLoading || !canEdit}

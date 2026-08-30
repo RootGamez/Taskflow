@@ -195,6 +195,7 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
   const [linkInputUrl, setLinkInputUrl] = useState("");
   // Un solo desplegable de color abierto a la vez.
   const [openSwatches, setOpenSwatches] = useState<"text" | "highlight" | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   // La cascara (`RichEditor`) ya no se re-renderiza en cada transaccion, asi
   // que el estado activo de los botones se suscribe aqui y solo a lo que se
@@ -208,6 +209,10 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
       linkHref: (e.getAttributes("link").href as string | undefined) ?? "",
       textColor: (e.getAttributes("textStyle").color as string | undefined) ?? null,
       highlightColor: (e.getAttributes("highlight").color as string | undefined) ?? null,
+      // Se sigue la seleccion para poder salir del modo edicion de URL
+      // cuando el usuario se mueve a otra parte del documento.
+      from: e.state.selection.from,
+      to: e.state.selection.to,
     }),
   });
 
@@ -217,17 +222,66 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
   const linkHref = state?.linkHref ?? "";
   const textColor = state?.textColor ?? null;
   const highlightColor = state?.highlightColor ?? null;
+  const selectionFrom = state?.from ?? 0;
+  const selectionTo = state?.to ?? 0;
 
-  const applyLink = useCallback(() => {
-    const safe = normalizeUrl(linkInputUrl);
-    if (safe) {
-      editor.chain().focus().setLink({ href: safe, target: "_blank" }).run();
-    } else if (!linkInputUrl.trim()) {
-      editor.chain().focus().unsetLink().run();
-    }
+  /**
+   * Reinicia los modos de la barra al mover la seleccion.
+   *
+   * Sin esto, pulsar el boton de enlace sin querer dejaba la barra atrapada
+   * en el campo de URL: `isEditingLink` no se limpiaba nunca porque el
+   * componente no se desmonta al ocultarse la barra, asi que la siguiente
+   * seleccion volvia a mostrar el campo en vez de los botones de formato y
+   * no habia forma evidente de volver.
+   *
+   * Escribir en el campo no mueve la seleccion del editor, asi que esto no
+   * interrumpe a quien esta escribiendo una URL de verdad.
+   */
+  useEffect(() => {
     setEditingLink(false);
     setLinkInputUrl("");
-  }, [editor, linkInputUrl]);
+    setLinkError(null);
+    setOpenSwatches(null);
+  }, [selectionFrom, selectionTo]);
+
+  /**
+   * Quita el enlace bajo el cursor.
+   *
+   * `extendMarkRange("link")` es imprescindible: `unsetLink` opera sobre la
+   * seleccion, y al hacer clic dentro de un enlace la seleccion queda
+   * COLAPSADA, asi que sin extenderla al rango de la marca no se borraba
+   * nada y el enlace parecia imposible de quitar.
+   */
+  const removeLink = useCallback(() => {
+    editor.chain().focus().extendMarkRange("link").unsetLink().run();
+    setEditingLink(false);
+    setLinkInputUrl("");
+    setLinkError(null);
+  }, [editor]);
+
+  const applyLink = useCallback(() => {
+    // Input vacio = quitar el enlace. Es la salida natural cuando alguien
+    // abrio el campo sin querer.
+    if (!linkInputUrl.trim()) {
+      removeLink();
+      return;
+    }
+
+    const safe = normalizeUrl(linkInputUrl);
+    if (!safe) {
+      // Antes esto no hacia nada y cerraba el campo en silencio: el usuario
+      // se quedaba sin enlace y sin saber por que.
+      setLinkError("Escribe una URL válida (por ejemplo, ejemplo.com).");
+      return;
+    }
+
+    // `extendMarkRange` tambien al aplicar: editar un enlace existente con
+    // el cursor dentro debe reemplazarlo entero, no partirlo en dos.
+    editor.chain().focus().extendMarkRange("link").setLink({ href: safe, target: "_blank" }).run();
+    setEditingLink(false);
+    setLinkInputUrl("");
+    setLinkError(null);
+  }, [editor, linkInputUrl, removeLink]);
 
   const marks = [
     { icon: BoldIcon, label: "Negrita", is: "bold", run: () => editor.chain().focus().toggleBold().run() },
@@ -343,22 +397,50 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
           </button>
         </div>
       ) : isEditingLink ? (
-        <div className="flex items-center gap-2 p-1">
-          <Input
-            autoFocus
-            type="url"
-            value={linkInputUrl}
-            onChange={(e) => setLinkInputUrl(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") applyLink();
-              if (e.key === "Escape") setEditingLink(false);
-            }}
-            className="h-8 w-64"
-            placeholder="https://..."
-          />
-          <Button onClick={applyLink} size="sm">
-            Guardar
-          </Button>
+        <div className="p-1">
+          <div className="flex items-center gap-2">
+            <Input
+              autoFocus
+              type="url"
+              value={linkInputUrl}
+              onChange={(e) => {
+                setLinkInputUrl(e.target.value);
+                setLinkError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") applyLink();
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setEditingLink(false);
+                  setLinkError(null);
+                }
+              }}
+              aria-invalid={linkError !== null}
+              aria-describedby={linkError ? "tf-link-error" : undefined}
+              className="h-8 w-64"
+              placeholder="https://..."
+            />
+            <Button onClick={applyLink} size="sm">
+              Guardar
+            </Button>
+            {/* Salida siempre visible: quita el enlace y cierra el campo,
+                para quien abrio esto sin querer. */}
+            <Button
+              onClick={removeLink}
+              size="sm"
+              variant="ghost"
+              title="Quitar enlace"
+              aria-label="Quitar enlace"
+              className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+          {linkError ? (
+            <p id="tf-link-error" role="alert" className="mt-1 px-1 text-xs text-destructive">
+              {linkError}
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="flex items-center gap-1 p-1">
@@ -379,6 +461,7 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
               e.preventDefault();
               e.stopPropagation();
               setLinkInputUrl(linkHref);
+              setLinkError(null);
               setEditingLink(true);
             }}
             className="h-7 w-7 rounded text-muted-foreground transition hover:bg-accent hover:text-foreground"
@@ -389,9 +472,9 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => editor.chain().focus().unsetLink().run()}
+            onClick={removeLink}
             className="h-7 w-7 rounded text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
-            title="Eliminar enlace"
+            title="Quitar enlace"
           >
             <Trash2 className="h-4 w-4" />
           </Button>

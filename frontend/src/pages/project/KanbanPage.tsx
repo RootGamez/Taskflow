@@ -11,7 +11,6 @@ import { KanbanBoard } from "@/features/tickets/components/KanbanBoard";
 import { KanbanBoardMobile } from "@/features/tickets/components/KanbanBoardMobile";
 import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
-import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
 import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import {
@@ -32,6 +31,7 @@ import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useAuthStore } from "@/store/authStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+import { useTicketEditorUploads } from "@/features/editor/hooks/useTicketEditorUploads";
 
 type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes" | "assignees";
 
@@ -369,17 +369,11 @@ export default function KanbanPage() {
     sendSocketMessage({ action: "typing", field, value });
   }, [sendSocketMessage]);
 
-  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
-    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
-    const result = await uploadTicketImage(projectId, selectedTicketId, file);
-    return result.url;
-  }, [projectId, selectedTicketId]);
-
-  const handleUploadVideo = useCallback(async (file: File): Promise<string> => {
-    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
-    const result = await uploadTicketVideo(projectId, selectedTicketId, file);
-    return result.url;
-  }, [projectId, selectedTicketId]);
+  // Las tres subidas del editor (imagen, video, documento) y el scope
+  // de adjuntos, en un solo hook -- antes estos callbacks estaban
+  // duplicados literalmente en tres paginas.
+  const { onUploadImage, onUploadVideo, onUploadDocument, attachmentScope } =
+    useTicketEditorUploads(projectId, selectedTicketId);
 
   if (!project) {
     return <p className="text-sm text-muted-foreground">No se encontro el proyecto.</p>;
@@ -482,8 +476,10 @@ export default function KanbanPage() {
         onLockField={handleLockField}
         onUnlockField={handleUnlockField}
         onTypingField={handleTypingField}
-        onUploadImage={canMutate ? handleUploadImage : undefined}
-        onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        onUploadImage={canMutate ? onUploadImage : undefined}
+        onUploadVideo={canMutate ? onUploadVideo : undefined}
+        onUploadDocument={canMutate ? onUploadDocument : undefined}
+        attachmentScope={attachmentScope}
         mentionItems={mentionItems}
         onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}

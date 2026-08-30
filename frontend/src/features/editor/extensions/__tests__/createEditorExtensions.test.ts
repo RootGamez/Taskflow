@@ -48,6 +48,7 @@ const EXPECTED_NAMES = [
   "image",
   "bookmark",
   "video",
+  "file",
   "slashCommand",
 ];
 

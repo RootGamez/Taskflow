@@ -171,3 +171,73 @@ export function handleVideoUpload(
     insertAtPos,
   );
 }
+
+// --- Documentos (PDF, Word, Excel...) ---------------------------------------
+
+/** Sube un documento y resuelve con el adjunto ya persistido. */
+export type DocumentUploadFn = (file: File) => Promise<{ id: string }>;
+
+/**
+ * Inserta una tarjeta de archivo optimista y reconcilia al resolver.
+ *
+ * A diferencia de imagen y video, aqui NO hay `src`: el nodo guarda el
+ * `attachmentId` y la URL se firma en cada descarga. Por eso el nodo
+ * optimista se identifica por su `fileName` + `uploading`, y no por un
+ * object URL.
+ */
+export function handleDocumentUpload(
+  view: Editor["view"],
+  file: File,
+  uploadFn: DocumentUploadFn,
+  insertAtPos?: number,
+): void {
+  const { state } = view;
+  const nodeType = state.schema.nodes.file;
+  if (!nodeType) return;
+
+  // Marca unica para reencontrar ESTE nodo: dos subidas simultaneas del
+  // mismo archivo tendrian el mismo nombre y tamano.
+  const pendingId = `pending-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+
+  const previewNode = nodeType.create({
+    attachmentId: pendingId,
+    fileName: file.name,
+    mimeType: file.type,
+    size: file.size,
+    uploading: true,
+  });
+
+  const { tr } = state;
+  tr.insert(insertAtPos ?? state.selection.to, previewNode);
+  view.dispatch(tr);
+
+  const withPendingNode = (
+    mutate: (nodePos: number, nodeSize: number, attrs: Record<string, unknown>) => void,
+  ) => {
+    view.state.doc.descendants((node, nodePos) => {
+      if (node.type.name === "file" && node.attrs.attachmentId === pendingId) {
+        mutate(nodePos, node.nodeSize, node.attrs as Record<string, unknown>);
+      }
+    });
+  };
+
+  uploadFn(file)
+    .then((attachment) => {
+      withPendingNode((nodePos, _size, attrs) => {
+        view.dispatch(
+          view.state.tr.setNodeMarkup(nodePos, undefined, {
+            ...attrs,
+            attachmentId: attachment.id,
+            uploading: false,
+          }),
+        );
+      });
+    })
+    .catch(async () => {
+      withPendingNode((nodePos, nodeSize) => {
+        view.dispatch(view.state.tr.delete(nodePos, nodePos + nodeSize));
+      });
+      const { default: toast } = await import("react-hot-toast");
+      toast.error("No se pudo subir el archivo.");
+    });
+}

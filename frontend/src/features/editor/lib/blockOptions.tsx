@@ -16,6 +16,7 @@ import { useMemo } from "react";
 import type { Editor } from "@tiptap/react";
 import {
   CheckSquare2,
+  Paperclip,
   Code2,
   Heading2,
   Heading3,
@@ -37,15 +38,20 @@ import { normalizeUrl } from "./url";
 interface BlockOptionsConfig {
   /** Si falta, las opciones de media no se ofrecen. */
   canUploadMedia: boolean;
+  /** Si falta, no se ofrece adjuntar documentos. */
+  canUploadDocuments?: boolean;
   onPickImage?: (() => void) | null;
   onPickVideo?: (() => void) | null;
+  onPickDocument?: (() => void) | null;
   requestUrl?: RequestUrlFn;
 }
 
 export function useBlockOptions({
   canUploadMedia,
+  canUploadDocuments = false,
   onPickImage,
   onPickVideo,
+  onPickDocument,
   requestUrl,
 }: BlockOptionsConfig): SlashCommandItem[] {
   return useMemo<SlashCommandItem[]>(() => {
@@ -182,6 +188,21 @@ export function useBlockOptions({
       );
     }
 
+    if (canUploadDocuments) {
+      options.push({
+        id: "file",
+        label: "Archivo",
+        description: "Comparte un PDF, Word, Excel, ZIP... con el equipo",
+        group: "media",
+        keywords: [
+          "archivo", "file", "adjunto", "attachment", "pdf", "word", "docx",
+          "excel", "xlsx", "csv", "powerpoint", "zip", "documento",
+        ],
+        icon: Paperclip,
+        apply: () => onPickDocument?.(),
+      });
+    }
+
     return options;
-  }, [canUploadMedia, onPickImage, onPickVideo, requestUrl]);
+  }, [canUploadMedia, canUploadDocuments, onPickImage, onPickVideo, onPickDocument, requestUrl]);
 }

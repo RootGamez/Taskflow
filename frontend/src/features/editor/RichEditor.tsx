@@ -46,14 +46,19 @@ import { EDITOR_STYLES } from "./lib/editorStyles";
 import {
   ALLOWED_IMAGE_TYPES,
   ALLOWED_VIDEO_TYPES,
+  handleDocumentUpload,
   handleImageUpload,
   handleVideoUpload,
   validateImageFile,
   validateVideoFile,
+  type DocumentUploadFn,
   type ImageUploadFn,
 } from "./lib/uploads";
+import { ALLOWED_DOCUMENT_EXTENSIONS, validateDocumentFile } from "./lib/fileTypes";
+import { EditorAttachmentContext, type EditorAttachmentScope } from "./context/EditorAttachmentContext";
 
-export type { ImageUploadFn } from "./lib/uploads";
+export type { ImageUploadFn, DocumentUploadFn } from "./lib/uploads";
+export type { EditorAttachmentScope } from "./context/EditorAttachmentContext";
 
 interface RichEditorProps {
   /** JSON de ProseMirror, o `null`. */
@@ -70,6 +75,14 @@ interface RichEditorProps {
   onUploadImage?: ImageUploadFn;
   /** Sube un video y resuelve con su URL publica. */
   onUploadVideo?: ImageUploadFn;
+  /** Sube un documento (PDF, Word, Excel...) y resuelve con el adjunto. */
+  onUploadDocument?: DocumentUploadFn;
+  /**
+   * Documento al que pertenece el editor. Lo necesitan los NodeView de
+   * adjunto para saber a que endpoint pedir la descarga; sin el, las
+   * tarjetas se pintan pero no descargan.
+   */
+  attachmentScope?: EditorAttachmentScope | null;
   /** Miembros mencionables con arroba. Si falta, las menciones no ofrecen nada. */
   mentionItems?: MentionItem[];
   /**
@@ -109,12 +122,15 @@ export function RichEditor({
   onBlur,
   onUploadImage,
   onUploadVideo,
+  onUploadDocument,
+  attachmentScope = null,
   mentionItems,
   characterLimit = MAX_DOC_CHARS,
 }: RichEditorProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const { requestUrl, urlPromptDialog } = useUrlPrompt();
 
@@ -123,11 +139,13 @@ export function RichEditor({
   const onChangeRef = useRef(onChange);
   const onUploadImageRef = useRef(onUploadImage);
   const onUploadVideoRef = useRef(onUploadVideo);
+  const onUploadDocumentRef = useRef(onUploadDocument);
   const mentionItemsRef = useRef<MentionItem[]>(mentionItems ?? []);
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onUploadImageRef.current = onUploadImage; }, [onUploadImage]);
   useEffect(() => { onUploadVideoRef.current = onUploadVideo; }, [onUploadVideo]);
+  useEffect(() => { onUploadDocumentRef.current = onUploadDocument; }, [onUploadDocument]);
   useEffect(() => { mentionItemsRef.current = mentionItems ?? []; }, [mentionItems]);
 
   const [mentionState, setMentionState] = useState<MentionReactState>({
@@ -156,11 +174,14 @@ export function RichEditor({
 
   const openImagePicker = useCallback(() => imageInputRef.current?.click(), []);
   const openVideoPicker = useCallback(() => videoInputRef.current?.click(), []);
+  const openDocumentPicker = useCallback(() => documentInputRef.current?.click(), []);
 
   const blockOptions = useBlockOptions({
     canUploadMedia: Boolean(onUploadImage),
+    canUploadDocuments: Boolean(onUploadDocument),
     onPickImage: openImagePicker,
     onPickVideo: openVideoPicker,
+    onPickDocument: openDocumentPicker,
     requestUrl,
   });
 
@@ -189,6 +210,7 @@ export function RichEditor({
           MediaPasteExtension.configure({
             getImageUploader: () => onUploadImageRef.current,
             getVideoUploader: () => onUploadVideoRef.current,
+            getDocumentUploader: () => onUploadDocumentRef.current,
           }),
         ],
       }),
@@ -265,6 +287,33 @@ export function RichEditor({
     [editor],
   );
 
+  /**
+   * Adjunta el documento como tarjeta descargable.
+   *
+   * Deliberadamente NO convierte Word/Excel a contenido del editor: el caso
+   * de uso es compartir el archivo con el equipo, y una tabla volcada en el
+   * documento no es el archivo -- pierde formulas, formato y hojas, y deja
+   * dos fuentes de verdad que se desincronizan en cuanto alguien edita una.
+   */
+  const handleDocumentPicked = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      const upload = onUploadDocument;
+      if (!file || !editor || !upload) return;
+
+      const error = validateDocumentFile(file);
+      if (error) {
+        const { default: toast } = await import("react-hot-toast");
+        toast.error(error);
+        return;
+      }
+
+      handleDocumentUpload(editor.view, file, upload);
+    },
+    [editor, onUploadDocument],
+  );
+
   const canEdit = !disabled && !isLocked;
 
   const counters = useEditorState({
@@ -287,6 +336,7 @@ export function RichEditor({
   );
 
   return (
+    <EditorAttachmentContext.Provider value={attachmentScope}>
     <div className="relative">
       <style suppressHydrationWarning>{EDITOR_STYLES}</style>
 
@@ -321,6 +371,18 @@ export function RichEditor({
             }
           />
         </>
+      )}
+
+      {onUploadDocument && canEdit && (
+        <input
+          ref={documentInputRef}
+          type="file"
+          accept={ALLOWED_DOCUMENT_EXTENSIONS.join(",")}
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(e) => void handleDocumentPicked(e)}
+        />
       )}
 
       {/*
@@ -384,5 +446,6 @@ export function RichEditor({
       {editor && <TableBubbleMenu editor={editor} />}
       {editor && <FormatBubbleMenu editor={editor} />}
     </div>
+    </EditorAttachmentContext.Provider>
   );
 }

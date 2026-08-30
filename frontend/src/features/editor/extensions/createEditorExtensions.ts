@@ -42,6 +42,7 @@ import yaml from "highlight.js/lib/languages/yaml";
 import markdown from "highlight.js/lib/languages/markdown";
 
 import { BookmarkExtension } from "./BookmarkExtension";
+import { FileExtension } from "./FileExtension";
 import { SlashExtension, type SlashCommandItem } from "./SlashExtension";
 import { VideoExtension } from "./VideoExtension";
 import { ImageNodeView } from "../components/ImageNodeView";
@@ -183,6 +184,7 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
 
     BookmarkExtension,
     VideoExtension,
+    FileExtension,
 
     SlashExtension.configure({
       suggestion: {

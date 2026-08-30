@@ -12,7 +12,6 @@ import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useDeleteTicket, useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
-import { uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
 import { SprintSelector, SprintSummaryCard } from "@/features/sprints";
@@ -24,6 +23,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { useAuthStore } from "@/store/authStore";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+import { useTicketEditorUploads } from "@/features/editor/hooks/useTicketEditorUploads";
 
 type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes" | "assignees";
 
@@ -293,17 +293,11 @@ export default function ListPage() {
     sendSocketMessage({ action: "typing", field, value });
   }, [sendSocketMessage]);
 
-  const handleUploadImage = useCallback(async (file: File): Promise<string> => {
-    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
-    const result = await uploadTicketImage(projectId, selectedTicketId, file);
-    return result.url;
-  }, [projectId, selectedTicketId]);
-
-  const handleUploadVideo = useCallback(async (file: File): Promise<string> => {
-    if (!selectedTicketId) throw new Error("No hay ticket seleccionado.");
-    const result = await uploadTicketVideo(projectId, selectedTicketId, file);
-    return result.url;
-  }, [projectId, selectedTicketId]);
+  // Las tres subidas del editor (imagen, video, documento) y el scope
+  // de adjuntos, en un solo hook -- antes estos callbacks estaban
+  // duplicados literalmente en tres paginas.
+  const { onUploadImage, onUploadVideo, onUploadDocument, attachmentScope } =
+    useTicketEditorUploads(projectId, selectedTicketId);
 
   return (
     <div className="space-y-4">
@@ -357,8 +351,10 @@ export default function ListPage() {
         onLockField={handleLockField}
         onUnlockField={handleUnlockField}
         onTypingField={handleTypingField}
-        onUploadImage={canMutate ? handleUploadImage : undefined}
-        onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        onUploadImage={canMutate ? onUploadImage : undefined}
+        onUploadVideo={canMutate ? onUploadVideo : undefined}
+        onUploadDocument={canMutate ? onUploadDocument : undefined}
+        attachmentScope={attachmentScope}
         mentionItems={mentionItems}
         onDelete={canMutate ? handleDeleteSelectedTicket : undefined}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}

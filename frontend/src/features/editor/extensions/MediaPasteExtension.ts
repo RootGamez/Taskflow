@@ -10,24 +10,31 @@
  * valor congelaria la primera version de la prop. `RichEditor` pasa getters
  * que leen de un ref.
  *
- * La Fase 2 lo sustituira por `@tiptap/extension-file-handler`, que ademas
- * cubre documentos (PDF, Word, Excel).
+ * Cubre imagenes, videos y documentos (PDF, Word, Excel...). Se mantiene
+ * como plugin propio en vez de `@tiptap/extension-file-handler` porque
+ * necesita enrutar por tipo a tres uploaders distintos y, para los
+ * convertibles, insertar contenido ADEMAS de adjuntar el original --
+ * logica que el handler oficial no expone.
  */
 
 import { Extension } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 
 import {
+  handleDocumentUpload,
   handleImageUpload,
   handleVideoUpload,
   isImageFile,
   isVideoFile,
+  type DocumentUploadFn,
   type ImageUploadFn,
 } from "../lib/uploads";
+import { isDocumentFile } from "../lib/fileTypes";
 
 export interface MediaPasteOptions {
   getImageUploader: () => ImageUploadFn | undefined;
   getVideoUploader: () => ImageUploadFn | undefined;
+  getDocumentUploader: () => DocumentUploadFn | undefined;
 }
 
 const PLUGIN_KEY = new PluginKey("mediaUpload");
@@ -39,11 +46,12 @@ export const MediaPasteExtension = Extension.create<MediaPasteOptions>({
     return {
       getImageUploader: () => undefined,
       getVideoUploader: () => undefined,
+      getDocumentUploader: () => undefined,
     };
   },
 
   addProseMirrorPlugins() {
-    const { getImageUploader, getVideoUploader } = this.options;
+    const { getImageUploader, getVideoUploader, getDocumentUploader } = this.options;
 
     /** Enruta un archivo al uploader que le toca. `false` si no hay. */
     const uploadFile = (
@@ -63,6 +71,12 @@ export const MediaPasteExtension = Extension.create<MediaPasteOptions>({
         handleVideoUpload(view, file, upload, pos);
         return true;
       }
+      if (isDocumentFile(file)) {
+        const upload = getDocumentUploader();
+        if (!upload) return false;
+        handleDocumentUpload(view, file, upload, pos);
+        return true;
+      }
       return false;
     };
 
@@ -74,7 +88,11 @@ export const MediaPasteExtension = Extension.create<MediaPasteOptions>({
             const files = Array.from((event as ClipboardEvent).clipboardData?.items ?? [])
               .filter((item) => item.kind === "file")
               .map((item) => item.getAsFile())
-              .filter((file): file is File => file !== null && (isImageFile(file) || isVideoFile(file)));
+              .filter(
+                (file): file is File =>
+                  file !== null &&
+                  (isImageFile(file) || isVideoFile(file) || isDocumentFile(file)),
+              );
 
             if (files.length === 0) return false;
 
@@ -90,7 +108,7 @@ export const MediaPasteExtension = Extension.create<MediaPasteOptions>({
             if (moved) return false;
 
             const files = Array.from((event as DragEvent).dataTransfer?.files ?? []).filter(
-              (file) => isImageFile(file) || isVideoFile(file),
+              (file) => isImageFile(file) || isVideoFile(file) || isDocumentFile(file),
             );
             if (files.length === 0) return false;
 

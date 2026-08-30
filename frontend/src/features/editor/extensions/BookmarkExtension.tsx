@@ -3,7 +3,7 @@ import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tip
 import { useEffect, useState } from "react";
 import { Link as LinkIcon, AlertCircle } from "lucide-react";
 
-import { normalizeUrl, safeHostname } from "./editor/url";
+import { normalizeUrl, safeHostname } from "../lib/url";
 
 interface OGPData {
   title?: string;

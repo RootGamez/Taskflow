@@ -50,6 +50,15 @@
     --shadow-hard-accent: 4px 4px 0 0 hsl(var(--primary));
     --shadow-hard-float: var(--shadow-hard-lg);
 
+    /* Superficie del bloque de codigo. NO se redefine bajo `.dark` a
+       proposito: la paleta de highlight.js de mas abajo cambia a sus
+       colores de tema oscuro (#a5d6ff, #ff7b72...) cuando hay `.dark`, y
+       esos tonos solo tienen contraste suficiente sobre un fondo oscuro.
+       Si esta superficie siguiera a `--foreground` (que en oscuro es casi
+       blanco) el codigo quedaria ilegible. */
+    --editor-code-bg: 20 19% 9%;
+    --editor-code-fg: 42 33% 94%;
+
     /* Colores de prioridad de ticket (docs/DESIGN_SYSTEM.md §2, recalibrados
        para la paleta C — §3.1 del plan brutalista). "-bg" es un fondo sólido
        de badge, nunca opacidad calculada sobre el color de texto. */

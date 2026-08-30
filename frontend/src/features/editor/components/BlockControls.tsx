@@ -17,7 +17,7 @@ import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
-import { createTapSelectHandlers } from "./tapSelect";
+import { createTapSelectHandlers } from "../lib/tapSelect";
 import { EditorMenuSurface } from "./EditorMenuSurface";
 
 // ── ProseMirror helpers ───────────────────────────────────────────────────────
@@ -479,10 +479,9 @@ export function BlockControls({
         option.apply(editor);
       }
 
-      if (option.id === "image") {
-        triggerImageFileInput?.();
-      }
-
+      // `option.apply` ya abre el file picker para las opciones de media
+      // (lib/blockOptions.tsx). Antes se volvia a llamar aqui, disparando
+      // `input.click()` dos veces en el mismo tick.
       setBlockMenu({ open: false, anchorRect: null });
     },
     [editor, triggerImageFileInput],

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/shadcn/dialog";
 import { Button } from "@/components/ui/shadcn/button";
 import { Input } from "@/components/ui/shadcn/input";
-import { normalizeUrl } from "./url";
+import { normalizeUrl } from "../lib/url";
 
 /**
  * Reemplazo de `window.prompt` para pedir una URL desde el editor.

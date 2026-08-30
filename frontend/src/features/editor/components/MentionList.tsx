@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion";
 
 import { cn } from "@/lib/utils";
-import { createTapSelectHandlers } from "./tapSelect";
+import { createTapSelectHandlers } from "../lib/tapSelect";
 import { EditorMenuSurface } from "./EditorMenuSurface";
 
 export interface MentionItem {

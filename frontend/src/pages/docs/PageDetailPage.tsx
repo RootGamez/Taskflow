@@ -12,7 +12,7 @@ import { PageEditorHeader } from "@/features/pages/components/PageEditorHeader";
 import { usePage } from "@/features/pages/hooks/usePage";
 import { useDeletePage, useUpdatePage } from "@/features/pages/hooks/usePages";
 import type { UpdatePagePayload } from "@/features/pages/types/page.types";
-import { TicketRichEditor } from "@/features/tickets/components/TicketRichEditor";
+import { RichEditor } from "@/features/editor/RichEditor";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -54,7 +54,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 
 /**
  * Editor de pagina (D18 de docs/PHASE_4_PLAN.md): titulo + icono
- * (`PageEditorHeader`) + breadcrumb + `TicketRichEditor` (D7: se reusa
+ * (`PageEditorHeader`) + breadcrumb + `RichEditor` (D7: se reusa
  * tal cual, sus props son agnosticas de ticket). Autoguarda con debounce
  * (D14): concurrencia optimista via `expected_updated_at`, mandado SOLO
  * en los PATCH que incluyen `content` -- un rename o cambio de icono
@@ -176,7 +176,7 @@ export default function PageDetailPage() {
 
       <PageEditorHeader icon={icon} title={title} canEdit={canEdit} onIconChange={setIcon} onTitleChange={setTitle} />
 
-      <TicketRichEditor
+      <RichEditor
         value={parseContentJson(contentJson)}
         disabled={!canEdit}
         placeholder="Escribe algo, o usa «/» para ver los comandos..."

@@ -7,7 +7,7 @@
  * Tiptap del detalle de un ticket dispara el atajo `c` y abre el modal de
  * creacion encima.
  *
- * El editor Tiptap (`TicketRichEditor.tsx`, via ProseMirror/`EditorContent`)
+ * El editor Tiptap (`features/editor/RichEditor.tsx`, via ProseMirror/`EditorContent`)
  * usa `[contenteditable="true"]`, NO `<textarea>` -- y el `target` real de
  * un keydown mientras se escribe casi siempre es un nodo HIJO del
  * contenteditable (un parrafo, un span), nunca el div raiz. Por eso la

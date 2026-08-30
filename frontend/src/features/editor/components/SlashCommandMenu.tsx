@@ -5,7 +5,7 @@ import type { SuggestionProps, SuggestionKeyDownProps } from "@tiptap/suggestion
 import type { SlashCommandItem } from "../extensions/SlashExtension";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
-import { createTapSelectHandlers } from "./tapSelect";
+import { createTapSelectHandlers } from "../lib/tapSelect";
 import { EditorMenuSurface } from "./EditorMenuSurface";
 
 // ── Types ─────────────────────────────────────────────────────────────────────

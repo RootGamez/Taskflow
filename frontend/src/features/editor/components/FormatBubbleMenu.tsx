@@ -8,7 +8,7 @@
  * Extraída de `RichEditor.tsx` en la Fase 1 del repotenciado.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorState, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import {
@@ -82,52 +82,110 @@ interface ColorSwatchesProps {
   icon: typeof HighlighterIcon;
   colors: readonly { readonly label: string; readonly value: string | null }[];
   activeValue: string | null;
+  isOpen: boolean;
+  onToggle: (open: boolean) => void;
   onSelect: (value: string | null) => void;
 }
 
 /**
- * Muestras de color desplegables. Se abre al pasar por encima y no con
- * clic para no anadir un segundo popover dentro de la barra flotante,
- * que ya vive dentro de un Popper: anidarlos daba problemas de foco y de
- * cierre en cascada.
+ * Muestras de color desplegables.
+ *
+ * Se abre con clic y no con hover: el panel se cerraba en cuanto el raton
+ * salia del boton camino de las muestras, y en tactil no habia forma de
+ * abrirlo. Se posiciona absoluto dentro de la barra, que ya es un elemento
+ * flotante de Floating UI y por tanto vive en la capa correcta; lo unico
+ * que faltaba era que la barra no recortase a sus hijos.
  */
-function ColorSwatches({ label, icon: Icon, colors, activeValue, onSelect }: ColorSwatchesProps) {
+function ColorSwatches({
+  label,
+  icon: Icon,
+  colors,
+  activeValue,
+  isOpen,
+  onToggle,
+  onSelect,
+}: ColorSwatchesProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Cierra con Escape o con un clic fuera. En captura, para adelantarse a
+  // los manejadores del editor.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onToggle(false);
+      }
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) onToggle(false);
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+    };
+  }, [isOpen, onToggle]);
+
   return (
-    <div className="group/colors relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
         aria-label={label}
         title={label}
+        aria-haspopup="true"
+        aria-expanded={isOpen}
         onMouseDown={(e) => e.preventDefault()}
+        onClick={() => onToggle(!isOpen)}
         className={cn(
           ICON_BUTTON,
-          activeValue
+          isOpen || activeValue
             ? "bg-primary/10 text-primary"
             : "text-muted-foreground hover:bg-accent hover:text-foreground",
         )}
       >
         <Icon className="h-4 w-4" />
       </button>
-      <div className="invisible absolute left-1/2 top-full z-10 flex -translate-x-1/2 gap-1 rounded border-2 border-border bg-popover p-1 opacity-0 shadow-hard transition group-hover/colors:visible group-hover/colors:opacity-100 dark:shadow-hard-float">
-        {colors.map((color) => (
-          <button
-            key={color.label}
-            type="button"
-            aria-label={color.label}
-            aria-pressed={activeValue === color.value}
-            title={color.label}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onSelect(color.value)}
-            className={cn(
-              "h-5 w-5 shrink-0 rounded border-2",
-              activeValue === color.value ? "border-primary" : "border-border",
-            )}
-            style={color.value ? { background: color.value } : undefined}
-          >
-            {color.value ? null : <span aria-hidden="true" className="text-[10px]">/</span>}
-          </button>
-        ))}
-      </div>
+
+      {isOpen && (
+        <div
+          role="group"
+          aria-label={label}
+          className="absolute left-1/2 top-[calc(100%+0.4rem)] z-[60] flex -translate-x-1/2 gap-1 rounded border-2 border-border bg-popover p-1 shadow-hard dark:shadow-hard-float"
+        >
+          {colors.map((color) => (
+            <button
+              key={color.label}
+              type="button"
+              aria-label={color.label}
+              aria-pressed={activeValue === color.value}
+              title={color.label}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onSelect(color.value);
+                onToggle(false);
+              }}
+              className={cn(
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition",
+                activeValue === color.value
+                  ? "border-primary ring-2 ring-primary/30"
+                  : "border-border hover:border-foreground",
+              )}
+              style={color.value ? { background: color.value } : undefined}
+            >
+              {/* La opcion "sin color" no tiene muestra que ensenar. */}
+              {color.value ? null : (
+                <span aria-hidden="true" className="text-xs text-muted-foreground">
+                  &#215;
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -135,6 +193,8 @@ function ColorSwatches({ label, icon: Icon, colors, activeValue, onSelect }: Col
 export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
   const [isEditingLink, setEditingLink] = useState(false);
   const [linkInputUrl, setLinkInputUrl] = useState("");
+  // Un solo desplegable de color abierto a la vez.
+  const [openSwatches, setOpenSwatches] = useState<"text" | "highlight" | null>(null);
 
   // La cascara (`RichEditor`) ya no se re-renderiza en cada transaccion, asi
   // que el estado activo de los botones se suscribe aqui y solo a lo que se
@@ -197,7 +257,7 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
         if (e.isActive("codeBlock")) return false;
         return state.doc.textBetween(from, to).trim().length > 0;
       }}
-      className="z-50 flex items-center gap-0.5 overflow-hidden rounded border-2 border-border bg-popover p-1 text-popover-foreground shadow-hard dark:shadow-hard-float"
+      className="z-50 flex items-center gap-0.5 rounded border-2 border-border bg-popover p-1 text-popover-foreground shadow-hard dark:shadow-hard-float"
     >
       {!isEditingLink && !isLinkActive ? (
         <div className="flex items-center gap-0.5">
@@ -246,6 +306,8 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
             icon={PaletteIcon}
             colors={TEXT_COLORS}
             activeValue={textColor}
+            isOpen={openSwatches === "text"}
+            onToggle={(open) => setOpenSwatches(open ? "text" : null)}
             onSelect={(value) =>
               value
                 ? editor.chain().focus().setColor(value).run()
@@ -257,6 +319,8 @@ export function FormatBubbleMenu({ editor }: FormatBubbleMenuProps) {
             icon={HighlighterIcon}
             colors={HIGHLIGHT_COLORS}
             activeValue={highlightColor}
+            isOpen={openSwatches === "highlight"}
+            onToggle={(open) => setOpenSwatches(open ? "highlight" : null)}
             onSelect={(value) =>
               value
                 ? editor.chain().focus().setHighlight({ color: value }).run()

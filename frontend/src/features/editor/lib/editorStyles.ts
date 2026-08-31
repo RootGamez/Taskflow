@@ -181,6 +181,10 @@ export const EDITOR_STYLES = `
   width: 100%;
   height: 100%;
   border: none;
+  /* Explicito: el iframe tiene que recibir toques y gestos propios aunque
+     viva dentro del area editable. */
+  pointer-events: auto;
+  touch-action: auto;
 }
 
 /* Menciones y emojis */

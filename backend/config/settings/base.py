@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.projects",
     "apps.tickets",
     "apps.attachments",
+    "apps.linkpreview",
     "apps.comments",
     "apps.activities",
     "apps.notifications",
@@ -151,6 +152,12 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
+    # Solo para el scope "link_preview": ese endpoint abre una conexion
+    # saliente por peticion, asi que necesita techo aunque el resto de la
+    # API no lo tenga.
+    "DEFAULT_THROTTLE_RATES": {
+        "link_preview": os.getenv("LINK_PREVIEW_THROTTLE", "60/hour"),
+    },
 }
 
 SPECTACULAR_SETTINGS = {

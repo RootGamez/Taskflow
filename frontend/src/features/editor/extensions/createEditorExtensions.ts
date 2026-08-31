@@ -51,6 +51,7 @@ import markdown from "highlight.js/lib/languages/markdown";
 
 import { BookmarkExtension } from "./BookmarkExtension";
 import { FileExtension } from "./FileExtension";
+import { PasteUrlExtension } from "./PasteUrlExtension";
 import { SlashExtension, type SlashCommandItem } from "./SlashExtension";
 import { VideoExtension } from "./VideoExtension";
 import { CodeBlockNodeView } from "../components/CodeBlockNodeView";
@@ -184,6 +185,21 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       // Sin esto el iframe desborda el contenedor en movil.
       width: 640,
       height: 360,
+    }).extend({
+      /**
+       * El envoltorio del video tiene que ser `contenteditable="false"`.
+       *
+       * La extension oficial renderiza `<div data-youtube-video><iframe>`
+       * sin esa marca, asi que el iframe queda dentro del arbol editable.
+       * En escritorio se tolera, pero en movil el navegador NO entrega los
+       * toques al iframe -- el video se veia pero no se podia dar al play.
+       */
+      renderHTML(props) {
+        const rendered = this.parent?.(props);
+        if (!Array.isArray(rendered)) return rendered as never;
+        const [tag, attrs, ...rest] = rendered as [string, Record<string, unknown>, ...unknown[]];
+        return [tag, { ...attrs, contenteditable: "false" }, ...rest] as never;
+      },
     }),
 
     Emoji.configure({
@@ -241,6 +257,7 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
     BookmarkExtension,
     VideoExtension,
     FileExtension,
+    PasteUrlExtension,
 
     SlashExtension.configure({
       suggestion: {

@@ -42,6 +42,7 @@ urlpatterns = [
     path('api/v1/', include('apps.projects.urls')),
     path('api/v1/', include('apps.tickets.urls')),
     path('api/v1/', include('apps.attachments.urls')),
+    path('api/v1/', include('apps.linkpreview.urls')),
     path('api/v1/', include('apps.notifications.urls')),
     path('api/v1/', include('apps.comments.urls')),
     path('api/v1/', include('apps.activities.urls')),

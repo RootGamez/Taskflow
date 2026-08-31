@@ -49,6 +49,7 @@ const EXPECTED_NAMES = [
   "bookmark",
   "video",
   "file",
+  "pasteUrlAsBookmark",
   "subscript",
   "superscript",
   "typography",

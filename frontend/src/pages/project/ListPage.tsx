@@ -10,6 +10,7 @@ import { useMembers } from "@/features/members/hooks/useMembers";
 import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useDeleteTicket, useTicketsSuspense, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
+import { useTicketCollaboration } from "@/features/tickets/hooks/useTicketCollaboration";
 import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -25,7 +26,6 @@ import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 import { useTicketEditorUploads } from "@/features/editor/hooks/useTicketEditorUploads";
 
-type CollaborativeField = "title" | "priority" | "due_date" | "column_id" | "description" | "progress_notes" | "assignees";
 
 export default function ListPage() {
   const navigate = useNavigate();
@@ -64,31 +64,18 @@ export default function ListPage() {
   }, [projectId, clearDateFilter, clearSprintScope]);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const { upsertTicketInCache, removeTicketFromCache } = useTicketRealtimeCache(projectId);
-  const [fieldLocks, setFieldLocks] = useState<{
-    title: { userId: string; userName: string } | null;
-    priority: { userId: string; userName: string } | null;
-    due_date: { userId: string; userName: string } | null;
-    column_id: { userId: string; userName: string } | null;
-    description: { userId: string; userName: string } | null;
-    progress_notes: { userId: string; userName: string } | null;
-    assignees: { userId: string; userName: string } | null;
-  }>({
-    title: null,
-    priority: null,
-    due_date: null,
-    column_id: null,
-    description: null,
-    progress_notes: null,
-    assignees: null,
+  // Socket del ticket, bloqueos de campo y valores en vivo de los demas.
+  // Estaba escrito a mano aqui y, identico, en `KanbanPage`.
+  const {
+    fieldLocks,
+    remoteLiveValues,
+    onLockField: handleLockField,
+    onUnlockField: handleUnlockField,
+    onTypingField: handleTypingField,
+  } = useTicketCollaboration({
+    ticketId: selectedTicketId,
+    onTicketUpdated: upsertTicketInCache,
   });
-  const [remoteLiveValues, setRemoteLiveValues] = useState<{
-    title?: string;
-    priority?: "urgent" | "high" | "medium" | "low" | "none";
-    due_date?: string | null;
-    column_id?: string;
-    description?: string;
-    progress_notes?: string;
-  }>({});
 
   // El modal de detalle busca el ticket seleccionado en la lista SIN
   // filtrar: si buscara en filteredTickets, el modal se cerraría solo al
@@ -109,89 +96,6 @@ export default function ListPage() {
     () => [...(project?.columns ?? [])].sort((a, b) => a.order - b.order),
     [project?.columns],
   );
-
-  useEffect(() => {
-    setFieldLocks({
-      title: null,
-      priority: null,
-      due_date: null,
-      column_id: null,
-      description: null,
-      progress_notes: null,
-      assignees: null,
-    });
-    setRemoteLiveValues({});
-  }, [selectedTicketId]);
-
-  const handleTicketSocketMessage = useCallback((event: MessageEvent<string>) => {
-    try {
-      const data = JSON.parse(event.data) as {
-        type?: string;
-        ticket?: Ticket;
-        detail?: string;
-        source?: string;
-        field?: CollaborativeField;
-        user_id?: string;
-        user_name?: string;
-        value?: unknown;
-      };
-
-      if (data.type === "field.locked" && data.field && data.user_id && data.user_name) {
-        const field = data.field;
-        setFieldLocks((prev) => ({
-          ...prev,
-          [field]: {
-            userId: data.user_id,
-            userName: data.user_name,
-          },
-        }));
-        return;
-      }
-
-      if (data.type === "field.released" && data.field) {
-        const field = data.field;
-        setFieldLocks((prev) => ({
-          ...prev,
-          [field]: null,
-        }));
-        return;
-      }
-
-      if (data.type === "field.typing" && data.field) {
-        const field = data.field;
-        const normalizedValue =
-          typeof data.value === "string"
-            ? data.value
-            : data.value == null
-              ? ""
-              : JSON.stringify(data.value);
-
-        if (!currentUserId || data.user_id !== currentUserId) {
-          setRemoteLiveValues((prev) => ({
-            ...prev,
-            [field]: normalizedValue,
-          }));
-        }
-        return;
-      }
-
-      if (data.type === "field.lock_denied") {
-        toast.error(`${data.user_name ?? "Otro usuario"} esta editando, por favor espera.`);
-        return;
-      }
-
-      if (data.type === "ticket.updated" && data.ticket) {
-        upsertTicketInCache(data.ticket);
-        return;
-      }
-
-      if (data.type === "error") {
-        toast.error(data.detail ?? "No se pudo sincronizar el ticket");
-      }
-    } catch {
-      toast.error("No se pudo procesar una actualizacion en vivo del ticket");
-    }
-  }, [currentUserId, upsertTicketInCache]);
 
   const handleProjectSocketMessage = useCallback((event: MessageEvent<string>) => {
     try {
@@ -224,23 +128,6 @@ export default function ListPage() {
       onMessage: handleProjectSocketMessage,
     },
   );
-
-  const ticketSocketRef = useWebSocket(
-    selectedTicketId && accessToken
-      ? `/tickets/${selectedTicketId}/?token=${encodeURIComponent(accessToken)}`
-      : "",
-    {
-      enabled: Boolean(selectedTicketId && accessToken),
-      onMessage: handleTicketSocketMessage,
-    },
-  );
-
-  const sendSocketMessage = useCallback((payload: Record<string, unknown>) => {
-    const socket = ticketSocketRef.current;
-    if (socket?.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify(payload));
-    }
-  }, [ticketSocketRef]);
 
   const handlePatchSelectedTicket = async (payload: {
     title?: string;
@@ -280,18 +167,6 @@ export default function ListPage() {
       throw error;
     }
   };
-
-  const handleLockField = useCallback((field: CollaborativeField) => {
-    sendSocketMessage({ action: "lock_field", field });
-  }, [sendSocketMessage]);
-
-  const handleUnlockField = useCallback((field: CollaborativeField) => {
-    sendSocketMessage({ action: "unlock_field", field });
-  }, [sendSocketMessage]);
-
-  const handleTypingField = useCallback((field: CollaborativeField, value: string) => {
-    sendSocketMessage({ action: "typing", field, value });
-  }, [sendSocketMessage]);
 
   // Las tres subidas del editor (imagen, video, documento) y el scope
   // de adjuntos, en un solo hook -- antes estos callbacks estaban

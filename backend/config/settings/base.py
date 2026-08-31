@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 
@@ -202,7 +203,17 @@ CHANNEL_LAYERS = {
 #
 # DB aparte de la 0 para no mezclar las claves con la cola de Celery ni con
 # las de Channels.
-CACHE_URL = os.getenv("CACHE_URL", REDIS_URL.rsplit("/", 1)[0] + "/1")
+#
+# Se reemplaza el path con urlsplit en vez de recortar por la ultima "/":
+# recortando, un `REDIS_URL` sin indice de base -- `redis://redis:6379`, que
+# es valido y habitual -- daba `redis://1`, y con eso no arrancan ni la cache
+# ni el contador del throttle que vive en ella.
+def _redis_db_url(url: str, db: int) -> str:
+    """La misma URL de Redis apuntando a otra base de datos."""
+    return urlunsplit(urlsplit(url)._replace(path=f"/{db}"))
+
+
+CACHE_URL = os.getenv("CACHE_URL", _redis_db_url(REDIS_URL, 1))
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.redis.RedisCache",

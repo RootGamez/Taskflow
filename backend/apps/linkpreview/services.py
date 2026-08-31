@@ -93,6 +93,17 @@ class UnsafeUrlError(ValueError):
         self.public_message = public_message
 
 
+class UnreadablePageError(Exception):
+    """Se llego al destino, pero no hay metadatos que sacar de ahi.
+
+    Distinta de `UnsafeUrlError` a proposito: el enlace es legitimo y no hay
+    nada que denunciar al usuario. Un PDF publico, o una cadena de redirects
+    demasiado larga, entran aqui y degradan a la vista previa minima -- antes
+    daban un 400 y la tarjeta se pintaba rota, cuando un simple 404 si
+    degradaba bien.
+    """
+
+
 @dataclass(frozen=True)
 class LinkPreview:
     url: str
@@ -271,7 +282,7 @@ def _fetch_html(url: str) -> tuple[str, str]:
             location = response.headers.get("Location", "")
             response.close()
             if not location:
-                raise UnsafeUrlError("Redireccion sin destino.")
+                raise UnreadablePageError("Redireccion sin destino.")
             current = assert_url_is_safe(urljoin(current, location))
             continue
 
@@ -279,7 +290,7 @@ def _fetch_html(url: str) -> tuple[str, str]:
             response.raise_for_status()
             content_type = response.headers.get("Content-Type", "")
             if "html" not in content_type.lower():
-                raise UnsafeUrlError("El enlace no es una pagina web.")
+                raise UnreadablePageError("El enlace no es una pagina web.")
 
             # Lectura acotada: `stream=True` + corte manual, para que una
             # respuesta enorme o sin fin no agote la memoria del worker.
@@ -310,7 +321,7 @@ def _fetch_html(url: str) -> tuple[str, str]:
         finally:
             response.close()
 
-    raise UnsafeUrlError("Demasiadas redirecciones.")
+    raise UnreadablePageError("Demasiadas redirecciones.")
 
 
 def build_link_preview(url: str) -> LinkPreview:
@@ -327,6 +338,11 @@ def build_link_preview(url: str) -> LinkPreview:
 
     try:
         html, final_url = _fetch_html(safe_url)
+    except UnreadablePageError:
+        # Se llego, pero no hay metadatos: un PDF, una imagen suelta, una
+        # cadena de redirects demasiado larga. El enlace es bueno, asi que se
+        # pinta la tarjeta con el host en vez de darle un error al usuario.
+        return LinkPreview(url=safe_url, title=host, site_name=host)
     except UnsafeUrlError:
         raise
     except requests.RequestException:

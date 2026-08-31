@@ -17,6 +17,7 @@ from apps.linkpreview.services import (
     MAX_HTML_BYTES,
     MAX_REDIRECTS,
     TOTAL_DEADLINE_SECONDS,
+    UnreadablePageError,
     UnsafeUrlError,
     _fetch_html,
     _MetaTagParser,
@@ -184,6 +185,28 @@ def test_returns_a_minimal_preview_when_the_page_does_not_respond():
 
     # Nunca lanza por un fallo de red: el frontend siempre puede pintar algo.
     assert preview.url == "https://ejemplo.com/roto"
+    assert preview.title == "ejemplo.com"
+    assert preview.site_name == "ejemplo.com"
+
+
+@pytest.mark.parametrize(
+    ("caso", "fallo"),
+    [
+        ("un PDF publico", UnreadablePageError("El enlace no es una pagina web.")),
+        ("demasiados redirects", UnreadablePageError("Demasiadas redirecciones.")),
+    ],
+)
+def test_a_reachable_page_without_metadata_degrades_instead_of_failing(caso, fallo):
+    # El enlace es legitimo: no hay nada que reprocharle al usuario. Antes
+    # esto daba un 400 y la tarjeta se pintaba rota, mientras que un simple
+    # 404 si degradaba bien -- justo al reves de lo razonable.
+    with patch(
+        "apps.linkpreview.services.socket.getaddrinfo",
+        return_value=_resolves_to("93.184.216.34"),
+    ):
+        with patch("apps.linkpreview.services._fetch_html", side_effect=fallo):
+            preview = build_link_preview("https://ejemplo.com/manual.pdf")
+
     assert preview.title == "ejemplo.com"
     assert preview.site_name == "ejemplo.com"
 
@@ -366,7 +389,7 @@ def test_gives_up_after_too_many_redirects():
     session, _ = _session_returning(*hops)
 
     with PUBLIC_DNS, session:
-        with pytest.raises(UnsafeUrlError, match="[Dd]emasiadas"):
+        with pytest.raises(UnreadablePageError, match="[Dd]emasiadas"):
             _fetch_html("https://origen.com/")
 
 
@@ -375,7 +398,7 @@ def test_rejects_a_response_that_is_not_html():
     session, _ = _session_returning(pdf)
 
     with PUBLIC_DNS, session:
-        with pytest.raises(UnsafeUrlError, match="pagina web"):
+        with pytest.raises(UnreadablePageError, match="pagina web"):
             _fetch_html("https://ejemplo.com/manual.pdf")
 
 

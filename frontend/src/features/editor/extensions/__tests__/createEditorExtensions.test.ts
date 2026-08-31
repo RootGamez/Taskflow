@@ -40,7 +40,7 @@ const EXPECTED_NAMES = [
   "tableCell",
   "taskList",
   "taskItem",
-  "trailingNode",
+  // `trailingNode` no aparece: lo aporta StarterKit, no se anade suelto.
   "characterCount",
   "dropCursor",
   "placeholder",
@@ -111,6 +111,23 @@ describe("createEditorExtensions", () => {
     const dropCursor = find(exts, "dropCursor");
     expect(dropCursor.options.color).toBe("hsl(var(--primary))");
     expect(dropCursor.options.width).toBe(2);
+  });
+
+  it("no añade TrailingNode suelto, porque StarterKit ya lo trae", () => {
+    // Tenerlo dos veces hacía que Tiptap avisara por consola en cada montaje
+    // ("Duplicate extension names found: ['trailingNode']") y registraba dos
+    // plugins con el mismo cometido. StarterKit lo deja activo por defecto,
+    // así que aquí sobra.
+    const exts = build();
+
+    expect(names(exts)).not.toContain("trailingNode");
+    expect(find(exts, "starterKit").options.trailingNode).not.toBe(false);
+  });
+
+  it("no registra dos extensiones con el mismo nombre", () => {
+    const found = names(build());
+
+    expect(found).toHaveLength(new Set(found).size);
   });
 
   it("configura CharacterCount con el límite de MAX_DOC_CHARS", () => {

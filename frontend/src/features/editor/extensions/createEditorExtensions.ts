@@ -11,10 +11,10 @@
  * de nodo, asi que los documentos guardados siguen siendo validos), por eso
  * StarterKit se configura con `codeBlock: false`.
  *
- * Tiptap v3: `Underline`, `Link` y `ListKeymap` ya vienen dentro de
- * `StarterKit`; `CharacterCount`, `TrailingNode`, `Placeholder` y
- * `Dropcursor` viven en `@tiptap/extensions`; las 4 piezas de tabla y las
- * de lista salen de `@tiptap/extension-table` y `@tiptap/extension-list`.
+ * Tiptap v3: `Underline`, `Link`, `ListKeymap` y `TrailingNode` ya vienen
+ * dentro de `StarterKit`; `CharacterCount`, `Placeholder` y `Dropcursor`
+ * viven en `@tiptap/extensions`; las 4 piezas de tabla y las de lista salen
+ * de `@tiptap/extension-table` y `@tiptap/extension-list`.
  */
 
 import type { AnyExtension, Editor } from "@tiptap/core";
@@ -27,7 +27,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import { Table, TableRow, TableHeader, TableCell } from "@tiptap/extension-table";
 import { TaskList, TaskItem } from "@tiptap/extension-list";
-import { CharacterCount, Dropcursor, Placeholder, TrailingNode } from "@tiptap/extensions";
+import { CharacterCount, Dropcursor, Placeholder } from "@tiptap/extensions";
 import { Details, DetailsContent, DetailsSummary } from "@tiptap/extension-details";
 import { Emoji, gitHubEmojis } from "@tiptap/extension-emoji";
 import { Mathematics } from "@tiptap/extension-mathematics";
@@ -224,7 +224,10 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
     TaskList,
     TaskItem.configure({ nested: true }),
 
-    TrailingNode,
+    // `TrailingNode` NO se anade aqui: StarterKit v3 ya lo monta, y tenerlo
+    // dos veces registraba dos plugins con el mismo nombre ("Duplicate
+    // extension names found: ['trailingNode']" en consola) que insertaban
+    // el parrafo final por duplicado.
     CharacterCount.configure({ limit: characterLimit }),
     Dropcursor.configure({ color: "hsl(var(--primary))", width: 2 }),
     Placeholder.configure({

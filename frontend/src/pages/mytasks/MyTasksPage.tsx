@@ -1,45 +1,81 @@
 import { ListTodo } from "lucide-react";
 import { useEffect, useMemo } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 
 import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
-import { MyTasksProjectGroup } from "@/features/mytasks/components/MyTasksProjectGroup";
+import { MyTasksBoard } from "@/features/mytasks/components/MyTasksBoard";
+import { MyTasksSprintFilter } from "@/features/mytasks/components/MyTasksSprintFilter";
 import { MyTasksSummary } from "@/features/mytasks/components/MyTasksSummary";
-import { useMyTasks } from "@/features/mytasks/hooks/useMyTasks";
+import { useMoveMyTask } from "@/features/mytasks/hooks/useMoveMyTask";
+import { useMyTasksBoard } from "@/features/mytasks/hooks/useMyTasksBoard";
 import type { MyTask } from "@/features/mytasks/types/myTask.types";
-import { groupTasksByProject } from "@/features/mytasks/utils/groupTasksByProject";
-import { TicketDateFilter } from "@/features/tickets/components/TicketDateFilter";
-import { useTicketFilterStore } from "@/features/tickets/store/useTicketFilterStore";
-import { filterTicketsByDate } from "@/features/tickets/utils/filterTicketsByDate";
+import type { MergedStatusColumn } from "@/features/mytasks/utils/mergeWorkspaceStatuses";
+import { filterTasksBySprint } from "@/features/mytasks/utils/myTasksBoardModel";
+import { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
+import { useIsMobile } from "@/hooks/useBreakpoint";
+import { getApiErrorMessage } from "@/lib/errors";
 
 export default function MyTasksPage() {
   const navigate = useNavigate();
-  const { data: tasks = [], isLoading } = useMyTasks();
-  const dateFilter = useTicketFilterStore((state) => state.dateFilter);
-  const clearDateFilter = useTicketFilterStore((state) => state.clear);
+  const isMobile = useIsMobile();
+  const {
+    tasks,
+    columns,
+    columnIdByStatusId,
+    activeSprintIdByWorkspaceSlug,
+    sprintsByWorkspace,
+    canMutateWorkspaceSlug,
+    isLoading,
+  } = useMyTasksBoard();
 
-  // El store de filtro de fecha es global y compartido con Kanban/Lista/
-  // Calendario (D6/D33 del plan de Fase 2): sin este reset, un filtro
-  // activo en otra pagina queda pegado silenciosamente al entrar aca.
+  const scope = useSprintScopeStore((state) => state.scope);
+  const setScope = useSprintScopeStore((state) => state.setScope);
+  const clearScope = useSprintScopeStore((state) => state.clear);
+  const moveTask = useMoveMyTask();
+
+  // El store de scope es global y compartido con el tablero de sprint y el
+  // Kanban: sin este reset, el scope elegido en otra página queda pegado al
+  // entrar acá. `clear()` deja el scope por defecto de esta vista: el sprint
+  // actual de cada espacio.
   useEffect(() => {
-    clearDateFilter();
-  }, [clearDateFilter]);
+    clearScope();
+  }, [clearScope]);
 
-  // `filterTicketsByDate` devuelve `Ticket[]`, pero los objetos en runtime
-  // siguen siendo los mismos `MyTask` que entraron (solo filtra, nunca
-  // crea tickets nuevos) -- el cast es seguro.
-  const filteredTasks = useMemo(
-    () => filterTicketsByDate(tasks, dateFilter) as MyTask[],
-    [tasks, dateFilter],
+  const visibleTasks = useMemo(
+    () => filterTasksBySprint(tasks, scope, activeSprintIdByWorkspaceSlug),
+    [activeSprintIdByWorkspaceSlug, scope, tasks],
   );
-  const groups = useMemo(() => groupTasksByProject(filteredTasks), [filteredTasks]);
 
   const handleOpenTask = (task: MyTask) => {
     // Mismo alcance que CalendarPage.tsx (D35): navega a la ruta propia del
     // detalle en vez de duplicar el manejo de estado colaborativo (locks,
     // WebSocket, typing) por cuarta vez.
     navigate(`/tickets/${task.id}`);
+  };
+
+  const handleMoveTask = async (task: MyTask, column: MergedStatusColumn) => {
+    if (!canMutateWorkspaceSlug(task.project.workspace_slug)) {
+      toast.error("No tienes permisos para mover tickets en este espacio");
+      return;
+    }
+
+    // La columna fusiona estados de varios espacios: hay que resolver el
+    // estado real del espacio de ESTA tarea. Si ese espacio no tiene un estado
+    // con ese nombre, el movimiento no existe.
+    const workspaceStatusId = column.statusIdByWorkspaceSlug.get(task.project.workspace_slug);
+    if (!workspaceStatusId) {
+      toast.error(`El espacio de ${task.project.name} no tiene el estado "${column.name}"`);
+      return;
+    }
+    if (workspaceStatusId === task.workspace_status_id) return;
+
+    try {
+      await moveTask.mutateAsync({ task, workspaceStatusId });
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo mover el ticket"));
+    }
   };
 
   if (isLoading) {
@@ -54,12 +90,16 @@ export default function MyTasksPage() {
           <h1 className="font-display text-fluid-xl font-bold tracking-tight text-foreground">
             Mis tareas
           </h1>
-          <MyTasksSummary tasks={filteredTasks} />
+          <MyTasksSummary tasks={visibleTasks} />
         </div>
-        <TicketDateFilter />
+        <MyTasksSprintFilter
+          sprintsByWorkspace={sprintsByWorkspace}
+          scope={scope}
+          onChange={setScope}
+        />
       </div>
 
-      {groups.length === 0 ? (
+      {tasks.length === 0 ? (
         <EmptyState
           icon={ListTodo}
           title="No tienes tareas asignadas"
@@ -67,11 +107,15 @@ export default function MyTasksPage() {
           action={{ label: "Ir a Espacios", onClick: () => navigate("/workspaces") }}
         />
       ) : (
-        <div className="space-y-6">
-          {groups.map((group) => (
-            <MyTasksProjectGroup key={group.project.id} group={group} onOpenTask={handleOpenTask} />
-          ))}
-        </div>
+        <MyTasksBoard
+          tasks={visibleTasks}
+          columns={columns}
+          columnIdByStatusId={columnIdByStatusId}
+          canMoveTask={(task) => canMutateWorkspaceSlug(task.project.workspace_slug)}
+          isMobile={isMobile}
+          onOpenTask={handleOpenTask}
+          onMoveTask={(task, column) => void handleMoveTask(task, column)}
+        />
       )}
     </div>
   );

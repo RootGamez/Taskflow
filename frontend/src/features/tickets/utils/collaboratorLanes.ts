@@ -72,6 +72,11 @@ interface GroupByLaneAndStatusParams {
   statusIds: string[];
   /** Cómo leer del ticket la columna a la que pertenece. */
   getStatusId: (ticket: Ticket) => string | null | undefined;
+  /**
+   * En qué filas va cada ticket. Por defecto, una por responsable; "Mis
+   * tareas" lo sobreescribe para agrupar por proyecto.
+   */
+  getLaneIds?: (ticket: Ticket) => string[];
 }
 
 /**
@@ -85,6 +90,7 @@ export function groupTicketsByLaneAndStatus({
   laneIds,
   statusIds,
   getStatusId,
+  getLaneIds = getTicketLaneIds,
 }: GroupByLaneAndStatusParams): Map<string, Map<string, Ticket[]>> {
   const grouped = new Map<string, Map<string, Ticket[]>>();
 
@@ -100,7 +106,7 @@ export function groupTicketsByLaneAndStatus({
     const statusId = getStatusId(ticket);
     if (!statusId) continue;
 
-    for (const laneId of getTicketLaneIds(ticket)) {
+    for (const laneId of getLaneIds(ticket)) {
       grouped.get(laneId)?.get(statusId)?.push(ticket);
     }
   }

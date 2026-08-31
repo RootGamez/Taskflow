@@ -52,6 +52,7 @@ import { MediaPasteExtension } from "./extensions/MediaPasteExtension";
 import { useUrlPrompt } from "./hooks/useUrlPrompt";
 import { useBlockOptions } from "./lib/blockOptions";
 import { EDITOR_STYLES } from "./lib/editorStyles";
+import { decideExternalSync } from "./lib/externalSync";
 import {
   ALLOWED_IMAGE_TYPES,
   ALLOWED_VIDEO_TYPES,
@@ -255,6 +256,9 @@ export function RichEditor({
     onUpdate: ({ editor: e }) => {
       const json = e.getJSON() as Record<string, unknown>;
       lastSyncedJsonRef.current = JSON.stringify(json);
+      // Queda pendiente hasta que el `value` de vuelta traiga este mismo
+      // contenido. Ver el efecto de sincronizacion.
+      hasUnconfirmedEditRef.current = true;
       onChangeRef.current(json);
     },
     onFocus: () => onFocus?.(),
@@ -270,11 +274,35 @@ export function RichEditor({
   // este efecto se dispara con cada tecla.
   const lastSyncedJsonRef = useRef<string | null>(null);
 
+  /**
+   * Hay una edicion emitida que el `value` de vuelta todavia no refleja.
+   *
+   * El foco no basta como salvaguarda. Una subida de media termina de forma
+   * asincrona, casi siempre con el editor ya sin foco (abrir el selector de
+   * archivos lo quita), y emite su `onChange` entonces. Si el consumidor
+   * descarta ese cambio -- `TicketDetail` lo hacia cuando el campo ya no
+   * estaba activo --, el `value` que baja es anterior a la subida y este
+   * efecto lo aplicaba: la imagen recien subida DESAPARECIA en cuanto se
+   * hacia clic fuera, y volvia con Ctrl+Z (que deshacia ese `setContent`).
+   */
+  const hasUnconfirmedEditRef = useRef(false);
+
   // Sincroniza `value` externo -> editor, sin pisar lo que el usuario escribe.
   useEffect(() => {
     if (!editor || editor.isFocused) return;
     const incoming = JSON.stringify(value ?? null);
-    if (incoming === lastSyncedJsonRef.current) return;
+    const decision = decideExternalSync({
+      incoming,
+      lastSynced: lastSyncedJsonRef.current,
+      hasUnconfirmedEdit: hasUnconfirmedEditRef.current,
+    });
+
+    if (decision === "confirm") {
+      hasUnconfirmedEditRef.current = false;
+      return;
+    }
+    if (decision === "skip") return;
+
     lastSyncedJsonRef.current = incoming;
     // v3: firma `(content, options)`. Sin `emitUpdate: false` esto dispararia
     // `onChange` y entraria en bucle con el `value` de arriba.

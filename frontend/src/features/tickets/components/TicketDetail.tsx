@@ -968,10 +968,19 @@ export function TicketDetail({
                 attachmentScope={attachmentScope}
                 mentionItems={mentionItems}
                 onChange={(next) => {
-                  if (activeFieldRef.current !== "description") {
-                    return;
-                  }
-
+                  // Sin condicionar al foco a proposito. Antes se exigia que
+                  // "description" fuese el campo activo, y eso tiraba las
+                  // subidas de media: abrir el selector de archivos quita el
+                  // foco (`onBlur` limpia `activeFieldRef`) y la subida
+                  // termina despues, de modo que su cambio llegaba aqui con
+                  // el campo ya inactivo y se descartaba. El resultado era
+                  // que la imagen recien subida ni se guardaba ni sobrevivia
+                  // al siguiente clic fuera.
+                  //
+                  // No hace falta esa guarda: el editor solo emite `onChange`
+                  // por ediciones locales (las sincronizaciones entran con
+                  // `emitUpdate: false`), y si otro usuario tiene el bloqueo
+                  // el editor no es editable y no emite nada.
                   const serialized = JSON.stringify(next);
 
                   if (serialized === description) {

@@ -3,20 +3,22 @@ import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tip
 import { useEffect, useState } from "react";
 import { Link as LinkIcon, AlertCircle } from "lucide-react";
 
-import { normalizeUrl, safeHostname } from "./editor/url";
+import { apiClient } from "@/lib/axios";
+import { normalizeUrl, safeHostname } from "../lib/url";
 
-interface OGPData {
-  title?: string;
-  description?: string;
-  image?: { url: string };
-  url?: string;
-  publisher?: string;
+/** Respuesta de `/api/v1/link-preview/` (apps.linkpreview). */
+interface LinkPreviewData {
+  url: string;
+  title: string;
+  description: string;
+  image: string;
+  site_name: string;
 }
 
 export function BookmarkNode({ node }: NodeViewProps) {
   const rawUrl = typeof node.attrs.url === "string" ? node.attrs.url : "";
   const safeUrl = normalizeUrl(rawUrl);
-  const [data, setData] = useState<OGPData | null>(null);
+  const [data, setData] = useState<LinkPreviewData | null>(null);
   const [loading, setLoading] = useState(Boolean(safeUrl));
   const [error, setError] = useState(false);
 
@@ -28,13 +30,15 @@ export function BookmarkNode({ node }: NodeViewProps) {
     let cancelled = false;
     setLoading(true);
     setError(false);
-    // TODO(fase 4): reemplazar por el proxy propio /api/v1/link-preview/.
-    fetch(`https://api.microlink.io?url=${encodeURIComponent(safeUrl)}`)
-      .then((res) => res.json())
-      .then((res) => {
-        if (cancelled) return;
-        if (res.status === "success") setData(res.data);
-        else setError(true);
+    // Antes esto llamaba a `api.microlink.io` DIRECTAMENTE desde el
+    // navegador: cada URL que alguien pegaba en un ticket viajaba a un
+    // tercero junto con la IP del usuario, y la vista previa dependia de la
+    // cuota de un servicio ajeno. Ahora va por nuestro backend, que ademas
+    // cachea el resultado 24 h.
+    apiClient
+      .get<LinkPreviewData>("/link-preview/", { params: { url: safeUrl } })
+      .then((response) => {
+        if (!cancelled) setData(response.data);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -61,7 +65,7 @@ export function BookmarkNode({ node }: NodeViewProps) {
     );
   }
 
-  const previewImage = data?.image?.url ? normalizeUrl(data.image.url) : null;
+  const previewImage = data?.image ? normalizeUrl(data.image) : null;
 
   return (
     <NodeViewWrapper draggable="true" data-drag-handle>
@@ -102,7 +106,7 @@ export function BookmarkNode({ node }: NodeViewProps) {
               ) : null}
               <div className="mt-2 flex items-center gap-2 font-mono text-xs text-muted-foreground">
                 <LinkIcon className="h-3 w-3" />
-                <span className="truncate">{data?.publisher || safeHostname(safeUrl)}</span>
+                <span className="truncate">{data?.site_name || safeHostname(safeUrl)}</span>
               </div>
             </div>
           )}

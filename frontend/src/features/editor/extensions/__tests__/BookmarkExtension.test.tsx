@@ -3,6 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NodeViewProps } from "@tiptap/react";
 
 import { BookmarkNode } from "../BookmarkExtension";
+import { apiClient } from "@/lib/axios";
+
+// La vista previa ya no la pide el navegador a un tercero, sino nuestro
+// backend (`/api/v1/link-preview/`), asi que se mockea el cliente de la API
+// en vez del `fetch` global.
+vi.mock("@/lib/axios", () => ({
+  apiClient: { get: vi.fn() },
+}));
 
 // El NodeView de Tiptap se monta dentro de <NodeViewWrapper>, que necesita el
 // contexto del ReactNodeView. Para un test unitario lo mockeamos a un <div>.
@@ -19,31 +27,28 @@ function nodeProps(url: unknown): NodeViewProps {
 }
 
 describe("BookmarkNode", () => {
-  const originalFetch = global.fetch;
+  const mockedGet = vi.mocked(apiClient.get);
 
   beforeEach(() => {
-    global.fetch = vi.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({ status: "success", data: {} }) }),
-    ) as unknown as typeof fetch;
+    mockedGet.mockResolvedValue({ data: { url: "", title: "", description: "", image: "", site_name: "" } });
   });
 
   afterEach(() => {
-    global.fetch = originalFetch;
     vi.clearAllMocks();
   });
 
-  it("muestra 'URL no válida' y NO hace fetch para una URL javascript: (XSS)", () => {
+  it("muestra 'URL no válida' y NO pide la preview para una URL javascript: (XSS)", () => {
     render(<BookmarkNode {...nodeProps("javascript:alert(1)")} />);
     expect(screen.getByText(/URL no válida/)).toBeInTheDocument();
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(mockedGet).not.toHaveBeenCalled();
   });
 
   it("no crashea con una URL sin esquema y la normaliza antes de pedir la preview", () => {
     render(<BookmarkNode {...nodeProps("google.com")} />);
     expect(screen.queryByText(/URL no válida/)).not.toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining(encodeURIComponent("https://google.com/")),
-    );
+    expect(mockedGet).toHaveBeenCalledWith("/link-preview/", {
+      params: { url: "https://google.com/" },
+    });
   });
 
   it("trata un atributo url no-string como inválido sin lanzar", () => {

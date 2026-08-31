@@ -18,7 +18,7 @@ vi.mock("@/features/pages/hooks/usePages", () => ({
   useDeletePage: vi.fn(),
 }));
 
-// `TicketRichEditor` monta Tiptap/ProseMirror real (D7: se reusa tal
+// `RichEditor` monta Tiptap/ProseMirror real (D7: se reusa tal
 // cual). `immediatelyRender: false` (SSR-safety de Tiptap) difiere su
 // contenido inicial mas alla de lo que `findByText` puede esperar de
 // forma determinista en jsdom cuando el `value` llega recien en un
@@ -26,8 +26,8 @@ vi.mock("@/features/pages/hooks/usePages", () => ({
 // `CreateTicketModal`, que lo pasa sincrono a `useEditor`). Se mockea
 // para testear el CONTRATO de `PageDetailPage` (que props le manda),
 // no el pipeline interno de Tiptap.
-vi.mock("@/features/tickets/components/TicketRichEditor", () => ({
-  TicketRichEditor: ({ value, disabled }: { value: Record<string, unknown> | null; disabled?: boolean }) => (
+vi.mock("@/features/editor/RichEditor", () => ({
+  RichEditor: ({ value, disabled }: { value: Record<string, unknown> | null; disabled?: boolean }) => (
     <div data-testid="rich-editor" data-disabled={String(Boolean(disabled))}>
       {JSON.stringify(value)}
     </div>

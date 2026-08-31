@@ -32,7 +32,7 @@ describe("isTypingTarget", () => {
     expect(isTypingTarget(editable)).toBe(true);
   });
 
-  // RD1 / Tiptap: el editor real (TicketRichEditor.tsx via ProseMirror) es
+  // RD1 / Tiptap: el editor real (features/editor/RichEditor.tsx via ProseMirror) es
   // un `[contenteditable="true"]` con nodos hijos (parrafos, spans). El
   // `target` de un keydown mientras se escribe es casi siempre ese hijo
   // anidado, nunca el div raiz -- si la guarda solo mirara el nodo

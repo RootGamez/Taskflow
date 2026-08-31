@@ -7,7 +7,7 @@
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer } from "@tiptap/react";
-import { VideoNodeView } from "../editor/VideoNodeView";
+import { VideoNodeView } from "../components/VideoNodeView";
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useParams } from "react-router-dom";
 
@@ -12,7 +12,10 @@ import { PageEditorHeader } from "@/features/pages/components/PageEditorHeader";
 import { usePage } from "@/features/pages/hooks/usePage";
 import { useDeletePage, useUpdatePage } from "@/features/pages/hooks/usePages";
 import type { UpdatePagePayload } from "@/features/pages/types/page.types";
-import { TicketRichEditor } from "@/features/tickets/components/TicketRichEditor";
+import { LazyRichEditor } from "@/features/editor/LazyRichEditor";
+import { uploadPageAttachment } from "@/features/editor/api/attachmentsApi";
+import type { EditorAttachmentScope } from "@/features/editor/context/EditorAttachmentContext";
+import type { DocumentUploadFn } from "@/features/editor/lib/uploads";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -54,7 +57,7 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 
 /**
  * Editor de pagina (D18 de docs/PHASE_4_PLAN.md): titulo + icono
- * (`PageEditorHeader`) + breadcrumb + `TicketRichEditor` (D7: se reusa
+ * (`PageEditorHeader`) + breadcrumb + `RichEditor` (D7: se reusa
  * tal cual, sus props son agnosticas de ticket). Autoguarda con debounce
  * (D14): concurrencia optimista via `expected_updated_at`, mandado SOLO
  * en los PATCH que incluyen `content` -- un rename o cambio de icono
@@ -150,6 +153,20 @@ export default function PageDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedTitle, debouncedIcon, debouncedContentJson, canEdit]);
 
+  // Hasta la Fase 2 del repotenciado, la documentacion no podia adjuntar
+  // NADA: reusaba el editor de tickets pero sin ninguna funcion de subida,
+  // porque `TicketImage`/`TicketVideo` exigen un ticket. `apps.attachments`
+  // es workspace-aware y cierra ese hueco.
+  const handleUploadDocument = useCallback<DocumentUploadFn>(
+    (file) => uploadPageAttachment(workspaceSlug, pageId, file),
+    [workspaceSlug, pageId],
+  );
+
+  const attachmentScope = useMemo<EditorAttachmentScope | null>(
+    () => (workspaceSlug && pageId ? { scope: "page", workspaceSlug, pageId } : null),
+    [workspaceSlug, pageId],
+  );
+
   if (isLoading || !page) {
     return <LoadingSpinner />;
   }
@@ -176,11 +193,13 @@ export default function PageDetailPage() {
 
       <PageEditorHeader icon={icon} title={title} canEdit={canEdit} onIconChange={setIcon} onTitleChange={setTitle} />
 
-      <TicketRichEditor
+      <LazyRichEditor
         value={parseContentJson(contentJson)}
         disabled={!canEdit}
         placeholder="Escribe algo, o usa «/» para ver los comandos..."
         onChange={(value) => setContentJson(JSON.stringify(value))}
+        onUploadDocument={canEdit ? handleUploadDocument : undefined}
+        attachmentScope={attachmentScope}
       />
 
       <PageDeleteDialog

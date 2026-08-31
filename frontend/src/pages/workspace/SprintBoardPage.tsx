@@ -20,7 +20,7 @@ import { SprintSummaryCard } from "@/features/sprints";
 import { useSprints } from "@/features/sprints/hooks/useSprints";
 import { useSprintScopeStore } from "@/features/sprints/store/useSprintScopeStore";
 import type { SprintScope } from "@/features/sprints/types/sprint.types";
-import { updateTicket, uploadTicketImage, uploadTicketVideo } from "@/features/tickets/api/ticketsApi";
+import { updateTicket } from "@/features/tickets/api/ticketsApi";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useDeleteTicket } from "@/features/tickets/hooks/useTickets";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
@@ -29,6 +29,7 @@ import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useAuthStore } from "@/store/authStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
+import { useTicketEditorUploads } from "@/features/editor/hooks/useTicketEditorUploads";
 
 function scopeToParam(scope: SprintScope, activeSprintId: string | null): string {
   if (scope.kind === "backlog") return "backlog";
@@ -156,23 +157,11 @@ export default function SprintBoardPage() {
     }
   };
 
-  const handleUploadImage = useCallback(
-    async (file: File): Promise<string> => {
-      if (!selectedTicket || !selectedProjectId) throw new Error("No hay ticket seleccionado.");
-      const result = await uploadTicketImage(selectedProjectId, selectedTicket.id, file);
-      return result.url;
-    },
-    [selectedProjectId, selectedTicket],
-  );
-
-  const handleUploadVideo = useCallback(
-    async (file: File): Promise<string> => {
-      if (!selectedTicket || !selectedProjectId) throw new Error("No hay ticket seleccionado.");
-      const result = await uploadTicketVideo(selectedProjectId, selectedTicket.id, file);
-      return result.url;
-    },
-    [selectedProjectId, selectedTicket],
-  );
+  // Las tres subidas del editor (imagen, video, documento) y el scope
+  // de adjuntos, en un solo hook -- antes estos callbacks estaban
+  // duplicados literalmente en tres paginas.
+  const { onUploadImage, onUploadVideo, onUploadDocument, attachmentScope } =
+    useTicketEditorUploads(selectedProjectId ?? "", selectedTicket?.id ?? null);
 
   if (!workspaceSlug) {
     return <p className="text-sm text-muted-foreground">Selecciona un espacio.</p>;
@@ -238,8 +227,10 @@ export default function SprintBoardPage() {
         mentionItems={mentionItems}
         onPatch={handlePatch}
         onDelete={canMutate ? handleDelete : undefined}
-        onUploadImage={canMutate ? handleUploadImage : undefined}
-        onUploadVideo={canMutate ? handleUploadVideo : undefined}
+        onUploadImage={canMutate ? onUploadImage : undefined}
+        onUploadVideo={canMutate ? onUploadVideo : undefined}
+        onUploadDocument={canMutate ? onUploadDocument : undefined}
+        attachmentScope={attachmentScope}
         onOpenChange={(open) => (!open ? setSelectedTicketId(null) : undefined)}
       />
     </div>

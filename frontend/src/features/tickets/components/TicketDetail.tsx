@@ -17,8 +17,13 @@ import { TicketLabelsRow } from "@/features/labels/components/TicketLabelsRow";
 import { TicketSprintsRow } from "@/features/sprints/components/TicketSprintsRow";
 import { TicketRelationsSection } from "@/features/relations/components/TicketRelationsSection";
 import { TicketDiscussion } from "@/features/tickets/components/TicketDiscussion";
-import { TicketRichEditor, type ImageUploadFn } from "@/features/tickets/components/TicketRichEditor";
-import type { MentionItem } from "@/features/tickets/components/editor/MentionList";
+import { LazyRichEditor } from "@/features/editor/LazyRichEditor";
+import type {
+  DocumentUploadFn,
+  EditorAttachmentScope,
+  ImageUploadFn,
+} from "@/features/editor/RichEditor";
+import type { MentionItem } from "@/features/editor/components/MentionList";
 import { TicketSubtasksSection } from "@/features/subtasks/components/TicketSubtasksSection";
 import { TicketAssigneeSelect } from "./TicketAssigneeSelect";
 import { TicketCalendarPicker } from "./TicketCalendarPicker";
@@ -84,6 +89,10 @@ interface TicketDetailProps {
   onUploadImage?: ImageUploadFn;
   /** Función para subir videos al servidor desde el editor de contenido. */
   onUploadVideo?: ImageUploadFn;
+  /** Función para adjuntar documentos (PDF, Word, Excel...) desde el editor. */
+  onUploadDocument?: DocumentUploadFn;
+  /** Documento al que pertenece el editor, para descargar adjuntos. */
+  attachmentScope?: EditorAttachmentScope | null;
   /** Miembros mencionables con `@` en el editor. */
   mentionItems?: MentionItem[];
 }
@@ -289,6 +298,8 @@ export function TicketDetail({
   onDelete,
   onUploadImage,
   onUploadVideo,
+  onUploadDocument,
+  attachmentScope,
   mentionItems,
 }: TicketDetailProps) {
   const [draftState, dispatch] = useReducer(draftReducer, initialDraft);
@@ -941,7 +952,7 @@ export function TicketDetail({
             ) : null}
 
             <div className="flex-1 space-y-5 border-t-2 border-border pt-6">
-              <TicketRichEditor
+              <LazyRichEditor
                 value={parseRichTextJson(description)}
                 placeholder="Describe el contexto, avances y decisiones del ticket..."
                 disabled={isLoading || !canEdit}
@@ -953,6 +964,8 @@ export function TicketDetail({
                 }
                 onUploadImage={onUploadImage}
                 onUploadVideo={onUploadVideo}
+                onUploadDocument={onUploadDocument}
+                attachmentScope={attachmentScope}
                 mentionItems={mentionItems}
                 onChange={(next) => {
                   if (activeFieldRef.current !== "description") {

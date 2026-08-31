@@ -5,6 +5,8 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useProject } from "@/features/projects/hooks/useProjects";
 import { TicketDetail } from "@/features/tickets/components/TicketDetail";
+import { useTicketCollaboration } from "@/features/tickets/hooks/useTicketCollaboration";
+import { useTicketRealtimeCache } from "@/features/tickets/hooks/useTicketRealtimeCache";
 import { useDeleteTicket, useTicket, useUpdateTicket } from "@/features/tickets/hooks/useTickets";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
@@ -33,6 +35,17 @@ export default function TicketDetailPage() {
 
   const updateTicketMutation = useUpdateTicket(projectId);
   const deleteTicketMutation = useDeleteTicket(projectId);
+
+  // Edicion en vivo. Esta pagina no la tenia: a diferencia del tablero y de
+  // la lista, aqui el detalle no es un modal, y al montarlo nadie cableo el
+  // socket del ticket. Se podia editar, pero sin bloqueos de campo y sin ver
+  // los cambios de los demas -- justo por donde se entra desde una
+  // notificacion o desde un enlace de relacion.
+  const { upsertTicketInCache } = useTicketRealtimeCache(projectId);
+  const collaboration = useTicketCollaboration({
+    ticketId: ticket?.id ?? null,
+    onTicketUpdated: upsertTicketInCache,
+  });
 
   const close = () => navigate(-1);
 
@@ -73,6 +86,11 @@ export default function TicketDetailPage() {
       columns={columns}
       currentUserId={currentUserId}
       autoFocusTitle={justCreated}
+      fieldLocks={collaboration.fieldLocks}
+      remoteLiveValues={collaboration.remoteLiveValues}
+      onLockField={collaboration.onLockField}
+      onUnlockField={collaboration.onUnlockField}
+      onTypingField={collaboration.onTypingField}
       onPatch={handlePatch}
       onDelete={ticket && canEdit ? handleDeleteTicket : undefined}
       onOpenChange={(open) => {

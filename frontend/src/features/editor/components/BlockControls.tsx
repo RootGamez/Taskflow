@@ -3,21 +3,30 @@
 /**
  * BlockControls.tsx
  *
- * Botones flotantes "+" y "⠿" (grip) que aparecen al pasar por un bloque, y
- * los menús que abren. Los menús se renderizan con `EditorMenuSurface`
- * (Radix Popover en escritorio, Sheet en móvil) — ver ese archivo para el
- * porqué de los bugs históricos de scroll / foco del buscador.
+ * Botones flotantes "+" y "⠿" (asa) junto al bloque bajo el cursor, y los
+ * menús que abren. Los menús se renderizan con `EditorMenuSurface` (Radix
+ * Popover en escritorio, Sheet en móvil) — ver ese archivo para el porqué
+ * de los bugs históricos de scroll / foco del buscador.
+ *
+ * El posicionamiento y el arrastre los hace `DragHandle` de Tiptap. Antes
+ * este archivo rastreaba el hover a mano (mousemove + `posAtCoords` + un
+ * rAF de throttle + temporizadores de ocultado, ~70 líneas) y aun así solo
+ * permitía mover bloques de uno en uno con "Mover arriba"/"Mover abajo",
+ * sin arrastre real.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Editor } from "@tiptap/react";
-import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useEditorState, type Editor } from "@tiptap/react";
+import { DragHandle } from "@tiptap/extension-drag-handle-react";
+import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown, Undo2, Redo2 } from "lucide-react";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
-import { createTapSelectHandlers } from "./tapSelect";
+import { createTapSelectHandlers } from "../lib/tapSelect";
 import { EditorMenuSurface } from "./EditorMenuSurface";
 
 // ── ProseMirror helpers ───────────────────────────────────────────────────────
@@ -329,8 +338,6 @@ function BlockActionsMenuPopup({
 
 interface BlockControlsProps {
   editor: Editor;
-  /** Reference to the `.tf-editor-wrapper` div (must be position: relative) */
-  wrapperRef: React.RefObject<HTMLDivElement | null>;
   blockOptions: SlashCommandItem[];
   disabled?: boolean;
   triggerImageFileInput?: (() => void) | null;
@@ -338,17 +345,25 @@ interface BlockControlsProps {
 
 export function BlockControls({
   editor,
-  wrapperRef,
   blockOptions,
   disabled = false,
   triggerImageFileInput,
 }: BlockControlsProps) {
+  // `DragHandle` nos dice que bloque tiene el cursor encima; de ahi sale el
+  // indice que usan mover/borrar/insertar.
   const [hoveredBlockIndex, setHoveredBlockIndex] = useState<number | null>(null);
-  const [controlsTop, setControlsTop] = useState(0);
-  const [isHoveringControls, setIsHoveringControls] = useState(false);
-  const hideTimerRef = useRef<number | null>(null);
-  const rafRef = useRef<number | null>(null);
   const isMobile = useIsMobile();
+  const keyboardInset = useKeyboardInset();
+
+  // Para poder apagar los botones de deshacer/rehacer cuando no hay nada que
+  // deshacer. `useEditorState` suscribe solo a esto, no al documento entero.
+  const history = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      canUndo: e?.can().undo() ?? false,
+      canRedo: e?.can().redo() ?? false,
+    }),
+  }) ?? { canUndo: false, canRedo: false };
 
   const [blockMenu, setBlockMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
     open: false,
@@ -358,78 +373,6 @@ export function BlockControls({
     open: false,
     anchorRect: null,
   });
-
-  const clearHideTimer = useCallback(() => {
-    if (hideTimerRef.current !== null) {
-      window.clearTimeout(hideTimerRef.current);
-      hideTimerRef.current = null;
-    }
-  }, []);
-
-  const scheduleHide = useCallback(() => {
-    clearHideTimer();
-    hideTimerRef.current = window.setTimeout(() => {
-      if (!blockMenu.open && !actionsMenu.open && !isHoveringControls) {
-        setHoveredBlockIndex(null);
-      }
-    }, 140);
-  }, [blockMenu.open, actionsMenu.open, isHoveringControls, clearHideTimer]);
-
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (disabled || !editor.view) return;
-      // N6: throttle a un frame — antes hacía setState en cada mousemove (~60Hz).
-      if (rafRef.current !== null) return;
-      rafRef.current = window.requestAnimationFrame(() => {
-        rafRef.current = null;
-        const wrapper = wrapperRef.current;
-        if (!wrapper) return;
-
-        const pos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
-        let index = -1;
-        if (pos) {
-          index = getBlockIndexAtPos(editor, pos.pos);
-        } else {
-          const childCount = editor.state.doc.childCount;
-          if (childCount > 0) index = childCount - 1;
-        }
-
-        if (index === -1) {
-          setHoveredBlockIndex(null);
-          return;
-        }
-        setHoveredBlockIndex((prev) => (prev === index ? prev : index));
-
-        const range = getBlockRange(editor, index);
-        if (range) {
-          const wrapperRect = wrapper.getBoundingClientRect();
-          const coordTop = editor.view.coordsAtPos(range.from).top;
-          const nextTop = coordTop - wrapperRect.top + wrapper.scrollTop;
-          setControlsTop((prev) => (Math.abs(prev - nextTop) < 0.5 ? prev : nextTop));
-        }
-      });
-    },
-    [editor, disabled, wrapperRef],
-  );
-
-  useEffect(() => {
-    if (isMobile) return;
-    const editorEl = editor.view.dom;
-    editorEl.addEventListener("mousemove", handleMouseMove as EventListener);
-    editorEl.addEventListener("mouseleave", scheduleHide);
-    return () => {
-      editorEl.removeEventListener("mousemove", handleMouseMove as EventListener);
-      editorEl.removeEventListener("mouseleave", scheduleHide);
-    };
-  }, [editor, handleMouseMove, scheduleHide, isMobile]);
-
-  useEffect(
-    () => () => {
-      clearHideTimer();
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-    },
-    [clearHideTimer],
-  );
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -479,10 +422,9 @@ export function BlockControls({
         option.apply(editor);
       }
 
-      if (option.id === "image") {
-        triggerImageFileInput?.();
-      }
-
+      // `option.apply` ya abre el file picker para las opciones de media
+      // (lib/blockOptions.tsx). Antes se volvia a llamar aqui, disparando
+      // `input.click()` dos veces en el mismo tick.
       setBlockMenu({ open: false, anchorRect: null });
     },
     [editor, triggerImageFileInput],
@@ -518,36 +460,112 @@ export function BlockControls({
 
   if (disabled) return null;
 
-  const showControls =
-    !isMobile && (hoveredBlockIndex !== null || blockMenu.open || actionsMenu.open);
+  const roundButton =
+    "pointer-events-auto flex items-center justify-center rounded border-2 border-border shadow-hard transition active:scale-95 dark:shadow-hard-float disabled:opacity-40 disabled:active:scale-100";
 
-  return (
-    <>
-      {/* Botón "+" persistente (siempre visible), en color de marca para que
-          destaque sobre el editor. */}
+  const insertButtonElement = isMobile ? (
+    // En movil el "+" no va solo: le acompanan deshacer y rehacer, que sin
+    // teclado fisico no tienen ningun otro acceso. Van en la misma barra
+    // para compartir anclaje y no repetir el calculo del teclado.
+    <div
+      className="fixed right-4 z-[60] flex items-center gap-2 transition-[bottom] duration-150"
+      style={{
+        // Con el teclado abierto hay que subirla por encima de el: en iOS
+        // `fixed` se ancla al viewport de layout, que el teclado no encoge,
+        // asi que los botones quedaban tapados justo mientras se escribe.
+        // Cerrado el teclado basta con librar la barra de gestos
+        // (`safe-area-inset-bottom`), que ahi si aplica.
+        bottom: keyboardInset
+          ? `calc(1rem + ${keyboardInset}px)`
+          : "calc(1rem + env(safe-area-inset-bottom, 0px))",
+      }}
+    >
+      <button
+        type="button"
+        aria-label="Deshacer"
+        title="Deshacer"
+        disabled={!history.canUndo}
+        className={cn(roundButton, "h-11 w-11 bg-card text-foreground hover:bg-accent")}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().undo().run()}
+      >
+        <Undo2 className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Rehacer"
+        title="Rehacer"
+        disabled={!history.canRedo}
+        className={cn(roundButton, "h-11 w-11 bg-card text-foreground hover:bg-accent")}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().redo().run()}
+      >
+        <Redo2 className="h-5 w-5" />
+      </button>
       <button
         type="button"
         aria-label="Insertar bloque"
         title="Insertar bloque"
-        className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-10 w-10 items-center justify-center rounded border-2 border-border bg-primary text-primary-foreground shadow-hard transition hover:bg-primary/90 active:scale-95 dark:shadow-hard-float"
+        className={cn(
+          roundButton,
+          "h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90",
+        )}
         onPointerDown={(e) => e.preventDefault()}
         onClick={openBlockMenuFromButton}
       >
-        <Plus className="h-5 w-5" />
+        <Plus className="h-6 w-6" />
       </button>
+    </div>
+  ) : (
+    <button
+      type="button"
+      aria-label="Insertar bloque"
+      title="Insertar bloque"
+      className={cn(
+        roundButton,
+        "absolute bottom-2 right-1 z-40 h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90",
+      )}
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={openBlockMenuFromButton}
+    >
+      <Plus className="h-5 w-5" />
+    </button>
+  );
 
-      {showControls && (
-        <div
-          className="pointer-events-auto absolute flex items-center gap-0.5"
-          style={{ top: controlsTop, left: 4, transform: "translateY(-1px)", zIndex: 40 }}
-          onMouseEnter={() => {
-            clearHideTimer();
-            setIsHoveringControls(true);
+  // En movil va por portal a `document.body`: el editor puede vivir dentro
+  // de un dialogo de Radix, y un ancestro con `transform` convierte
+  // `position: fixed` en relativo a ese ancestro, no al viewport.
+  //
+  // `z-[60]` no es arbitrario: el editor suele vivir dentro de un dialogo
+  // (TicketDetail), y su overlay y su contenido son `z-50`, asi que con el
+  // `z-40` de escritorio la barra quedaba enterrada bajo el modal. Por
+  // arriba la limita el menu que abre el propio "+" (EditorMenuSurface,
+  // `zIndex: 9999`), que debe taparla.
+  const insertButton =
+    isMobile && typeof document !== "undefined"
+      ? createPortal(insertButtonElement, document.body)
+      : insertButtonElement;
+
+  return (
+    <>
+      {insertButton}
+
+      {/*
+        `DragHandle` reemplaza el rastreo de hover que este componente hacia
+        a mano (mousemove + posAtCoords + rAF) y, sobre todo, permite
+        ARRASTRAR bloques de verdad: antes solo se podian mover de uno en
+        uno con "Mover arriba"/"Mover abajo".
+
+        En movil no se monta: el asa depende del puntero y ahi el hueco lo
+        cubre el FAB "+" de arriba.
+      */}
+      {!isMobile && (
+        <DragHandle
+          editor={editor}
+          onNodeChange={({ pos }) => {
+            setHoveredBlockIndex(pos >= 0 ? getBlockIndexAtPos(editor, pos) : null);
           }}
-          onMouseLeave={() => {
-            setIsHoveringControls(false);
-            if (!blockMenu.open && !actionsMenu.open) scheduleHide();
-          }}
+          className="pointer-events-auto flex items-center gap-0.5"
         >
           <button
             type="button"
@@ -559,17 +577,19 @@ export function BlockControls({
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
+          {/* Este boton es el asa: arrastrarlo mueve el bloque, y un clic
+              simple abre el menu de acciones (que conserva mover y borrar
+              para quien navegue por teclado, donde arrastrar no sirve). */}
           <button
             type="button"
-            aria-label="Opciones de bloque"
-            title="Mover o eliminar bloque"
+            aria-label="Mover o eliminar bloque"
+            title="Arrastra para mover, o haz clic para más acciones"
             className="flex h-6 w-6 cursor-grab items-center justify-center rounded bg-transparent text-muted-foreground transition hover:bg-accent hover:text-foreground active:cursor-grabbing"
-            onMouseDown={(e) => e.preventDefault()}
             onClick={openActionsMenu}
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </DragHandle>
       )}
 
       {blockMenu.open ? (

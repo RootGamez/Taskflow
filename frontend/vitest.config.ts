@@ -57,6 +57,12 @@ const COVERED_PATHS = [
   "src/components/ui/shadcn/input.tsx",
   "src/components/ui/shadcn/textarea.tsx",
   "src/components/ui/shadcn/label.tsx",
+  // Repotenciado del editor Tiptap (Fase 1): el editor salio de
+  // `features/tickets/` a `features/editor/` y se troceo en modulos con
+  // tests propios. Se cubre el directorio entero para que las fases
+  // siguientes (adjuntos, conversion Office, colaboracion) hereden el
+  // umbral desde su primer commit en vez de anadirse una por una.
+  "src/features/editor/**",
 ];
 
 export default defineConfig({

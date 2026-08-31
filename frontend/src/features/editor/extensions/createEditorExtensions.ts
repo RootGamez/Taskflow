@@ -187,12 +187,28 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       height: 360,
     }).extend({
       /**
-       * El envoltorio del video tiene que ser `contenteditable="false"`.
+       * Sin esto no se puede dar al play en movil.
+       *
+       * El nodo de la extension oficial se declara `draggable`, asi que
+       * ProseMirror le pone `draggable="true"` al envoltorio. Sobre un
+       * contenedor con un iframe dentro, un gesto tactil se interpreta como
+       * el inicio de un arrastre y el toque NUNCA llega al iframe: el video
+       * se ve, pero no responde a nada. Con raton no se nota, porque el
+       * arrastre solo arranca si hay desplazamiento y el clic seco pasa
+       * antes.
+       *
+       * Se pierde arrastrar el video agarrandolo por el propio reproductor
+       * -- que en tactil no funcionaba de todos modos. El bloque se sigue
+       * moviendo desde el asa, que es el gesto que existe en escritorio.
+       */
+      draggable: false,
+
+      /**
+       * Y el envoltorio tiene que ser `contenteditable="false"`.
        *
        * La extension oficial renderiza `<div data-youtube-video><iframe>`
-       * sin esa marca, asi que el iframe queda dentro del arbol editable.
-       * En escritorio se tolera, pero en movil el navegador NO entrega los
-       * toques al iframe -- el video se veia pero no se podia dar al play.
+       * sin esa marca, asi que el iframe queda dentro del arbol editable y
+       * los navegadores moviles tampoco le entregan los toques.
        */
       renderHTML(props) {
         const rendered = this.parent?.(props);

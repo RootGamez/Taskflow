@@ -124,6 +124,28 @@ describe("createEditorExtensions", () => {
     expect(find(exts, "starterKit").options.trailingNode).not.toBe(false);
   });
 
+  it("deja el vídeo de YouTube manipulable en táctil", () => {
+    // El nodo NO debe ser draggable: ProseMirror le pondría
+    // `draggable="true"` al envoltorio y, sobre un contenedor con un iframe,
+    // el navegador móvil interpreta el toque como el inicio de un arrastre y
+    // nunca se lo entrega al reproductor. Y el envoltorio tiene que salir
+    // como `contenteditable="false"`, o los toques tampoco llegan.
+    // `config` es una unión de Extension/Node/Mark; aquí sabemos que es un
+    // nodo, y sólo interesan estas dos piezas.
+    const youtube = find(build(), "youtube").config as {
+      draggable?: boolean;
+      renderHTML?: (this: unknown, props: unknown) => [string, Record<string, unknown>];
+    };
+
+    expect(youtube.draggable).toBe(false);
+
+    const rendered = youtube.renderHTML?.call(
+      { parent: () => ["div", { "data-youtube-video": "" }, ["iframe", {}]] },
+      { HTMLAttributes: {}, node: {} },
+    );
+    expect(rendered?.[1]).toMatchObject({ contenteditable: "false" });
+  });
+
   it("no registra dos extensiones con el mismo nombre", () => {
     const found = names(build());
 

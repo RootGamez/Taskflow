@@ -12,9 +12,16 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 
-import { TicketCard } from "@/features/tickets/components/TicketCard";
+import { Badge } from "@/components/ui/shadcn/badge";
+import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import type { WorkspaceStatus } from "@/features/sprints/types/sprint.types";
+import { TicketCard } from "@/features/tickets/components/TicketCard";
+import {
+  buildCollaboratorLanes,
+  groupTicketsByLaneAndStatus,
+} from "@/features/tickets/utils/collaboratorLanes";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
+import { cn } from "@/lib/utils";
 
 interface SprintBoardProps {
   statuses: WorkspaceStatus[];
@@ -24,21 +31,31 @@ interface SprintBoardProps {
   onChangeStatus: (ticket: Ticket, statusId: string) => void;
 }
 
-const NO_STATUS = "__no_status__";
+function getCellDropId(laneId: string, statusId: string) {
+  return `cell::${laneId}::${statusId}`;
+}
+
+function getTicketDragId(ticketId: string, laneId: string) {
+  return `ticket::${ticketId}::${laneId}`;
+}
 
 function DraggableCard({
   ticket,
+  laneId,
   canMutate,
   onOpen,
   accentColor,
 }: {
   ticket: Ticket;
+  laneId: string;
   canMutate: boolean;
   onOpen: (ticket: Ticket) => void;
   accentColor?: string;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: ticket.id,
+    // Un ticket con varios responsables se repite en varias filas: el id de
+    // drag lleva la fila para que cada copia sea un draggable distinto.
+    id: getTicketDragId(ticket.id, laneId),
     disabled: !canMutate,
     data: { ticket },
   });
@@ -48,103 +65,54 @@ function DraggableCard({
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={`select-none ${canMutate ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-30" : ""}`}
+      className={cn(
+        "touch-none select-none",
+        canMutate && "cursor-grab active:cursor-grabbing",
+        isDragging && "opacity-30",
+      )}
     >
       <TicketCard ticket={ticket} onOpen={onOpen} showProject accentColor={accentColor} />
     </div>
   );
 }
 
-function StatusColumn({
+function TicketCell({
+  laneId,
   status,
   tickets,
   canMutate,
   onOpenTicket,
 }: {
-  status: { id: string; name: string; color: string; is_done: boolean };
+  laneId: string;
+  status: WorkspaceStatus;
   tickets: Ticket[];
   canMutate: boolean;
   onOpenTicket: (ticket: Ticket) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status.id });
-
-  // Agrupar por proyecto, ordenar por nombre de proyecto y luego por `order`.
-  const groups = useMemo(() => {
-    const byProject = new Map<string, { name: string; color: string; tickets: Ticket[] }>();
-    for (const ticket of tickets) {
-      const key = ticket.project?.id ?? ticket.project_id;
-      const existing = byProject.get(key);
-      if (existing) {
-        existing.tickets.push(ticket);
-      } else {
-        byProject.set(key, {
-          name: ticket.project?.name ?? "Proyecto",
-          color: ticket.project?.color ?? "#94a3b8",
-          tickets: [ticket],
-        });
-      }
-    }
-    return [...byProject.values()]
-      .sort((a, b) => a.name.localeCompare(b.name, "es"))
-      .map((group) => ({
-        ...group,
-        tickets: group.tickets.sort(
-          (a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at),
-        ),
-      }));
-  }, [tickets]);
+  const { setNodeRef, isOver } = useDroppable({
+    id: getCellDropId(laneId, status.id),
+    data: { laneId, statusId: status.id, type: "cell" },
+  });
 
   return (
     <section
       ref={setNodeRef}
-      className={`flex w-[320px] shrink-0 flex-col rounded border-2 bg-card transition-colors ${
-        isOver ? "border-primary bg-primary/5" : "border-border"
-      }`}
+      className={cn(
+        "border-2 bg-background p-2 transition-colors",
+        isOver ? "border-primary ring-2 ring-ring" : "border-border",
+      )}
     >
-      <div className="flex items-center justify-between border-b-2 border-border px-2.5 py-2">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className="h-3 w-3 shrink-0 border-2 border-border"
-            style={{ backgroundColor: status.color }}
-            aria-hidden
+      <div className="max-h-[430px] space-y-2 overflow-y-auto pr-1">
+        {tickets.map((ticket) => (
+          <DraggableCard
+            key={getTicketDragId(ticket.id, laneId)}
+            ticket={ticket}
+            laneId={laneId}
+            canMutate={canMutate}
+            onOpen={onOpenTicket}
+            accentColor={status.color}
           />
-          <h3 className="truncate font-display text-sm font-bold tracking-tight text-foreground">
-            {status.name}
-          </h3>
-        </div>
-        <span className="shrink-0 border-[1.5px] border-border bg-muted px-1.5 py-0.5 font-mono text-xs tabular-nums text-muted-foreground">
-          {tickets.length}
-        </span>
-      </div>
-
-      <div className="max-h-[calc(100dvh-16rem)] space-y-3 overflow-y-auto p-2">
-        {groups.length === 0 ? (
-          <p className="border-2 border-dashed border-border px-2 py-6 text-center text-xs text-muted-foreground">
-            Sin tickets
-          </p>
-        ) : (
-          groups.map((group) => (
-            <div key={group.name} className="space-y-2">
-              <div className="flex items-center gap-1.5 border-b border-border px-1 pb-1 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                <span
-                  className="h-2 w-2 shrink-0 border border-border"
-                  style={{ backgroundColor: group.color }}
-                  aria-hidden
-                />
-                {group.name}
-              </div>
-              {group.tickets.map((ticket) => (
-                <DraggableCard
-                  key={ticket.id}
-                  ticket={ticket}
-                  canMutate={canMutate}
-                  onOpen={onOpenTicket}
-                  accentColor={status.color}
-                />
-              ))}
-            </div>
-          ))
-        )}
+        ))}
       </div>
     </section>
   );
@@ -158,38 +126,96 @@ export function SprintBoard({
   onChangeStatus,
 }: SprintBoardProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
-  const [activeTicket, setActiveTicket] = useState<Ticket | null>(null);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
   const orderedStatuses = useMemo(
     () => [...statuses].sort((a, b) => a.order - b.order),
     [statuses],
   );
 
-  const ticketsByStatus = useMemo(() => {
-    const mapping = new Map<string, Ticket[]>();
-    for (const status of orderedStatuses) mapping.set(status.id, []);
-    mapping.set(NO_STATUS, []);
-    for (const ticket of tickets) {
-      const key = ticket.workspace_status_id ?? NO_STATUS;
-      (mapping.get(key) ?? mapping.get(NO_STATUS))!.push(ticket);
-    }
-    return mapping;
-  }, [orderedStatuses, tickets]);
+  const collaboratorLanes = useMemo(() => buildCollaboratorLanes(tickets), [tickets]);
 
-  const unmapped = ticketsByStatus.get(NO_STATUS) ?? [];
+  const ticketsByLaneAndStatus = useMemo(
+    () =>
+      groupTicketsByLaneAndStatus({
+        tickets,
+        laneIds: collaboratorLanes.map((lane) => lane.id),
+        statusIds: orderedStatuses.map((status) => status.id),
+        getStatusId: (ticket) => ticket.workspace_status_id,
+      }),
+    [collaboratorLanes, orderedStatuses, tickets],
+  );
+
+  const countByStatus = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const ticket of tickets) {
+      const statusId = ticket.workspace_status_id;
+      if (!statusId) continue;
+      counts.set(statusId, (counts.get(statusId) ?? 0) + 1);
+    }
+    return counts;
+  }, [tickets]);
+
+  const laneTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const [laneId, cells] of ticketsByLaneAndStatus.entries()) {
+      let total = 0;
+      for (const cellTickets of cells.values()) total += cellTickets.length;
+      totals.set(laneId, total);
+    }
+    return totals;
+  }, [ticketsByLaneAndStatus]);
+
+  // Tickets cuya columna de proyecto no mapea a ningun estado del espacio: no
+  // caben en ninguna celda, asi que se avisan aparte en vez de perderse.
+  const unmappedCount = useMemo(
+    () =>
+      tickets.filter(
+        (ticket) =>
+          !ticket.workspace_status_id ||
+          !orderedStatuses.some((status) => status.id === ticket.workspace_status_id),
+      ).length,
+    [orderedStatuses, tickets],
+  );
+
+  const ticketById = useMemo(
+    () => new Map(tickets.map((ticket) => [ticket.id, ticket])),
+    [tickets],
+  );
+
+  const activeTicket = useMemo(() => {
+    if (!activeDragId) return null;
+    const [, ticketId] = activeDragId.split("::");
+    return ticketById.get(ticketId ?? "") ?? null;
+  }, [activeDragId, ticketById]);
 
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveTicket((event.active.data.current?.ticket as Ticket) ?? null);
+    setActiveDragId(String(event.active.id));
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    setActiveTicket(null);
+    setActiveDragId(null);
+    if (!canMutate || !event.over) return;
+
     const ticket = event.active.data.current?.ticket as Ticket | undefined;
-    const targetStatusId = event.over ? String(event.over.id) : null;
-    if (!ticket || !targetStatusId || targetStatusId === NO_STATUS) return;
+    const targetStatusId = (event.over.data.current as { statusId?: string } | undefined)?.statusId;
+    if (!ticket || !targetStatusId) return;
+    // Soltar en la fila de otro colaborador no reasigna (igual que el tablero
+    // de proyectos): del destino solo cuenta la columna.
     if (ticket.workspace_status_id === targetStatusId) return;
+
     onChangeStatus(ticket, targetStatusId);
   };
+
+  if (collaboratorLanes.length === 0) {
+    return (
+      <div className="border-2 border-border bg-card p-6 text-center text-sm text-muted-foreground">
+        No hay tickets para mostrar el tablero por colaboradores.
+      </div>
+    );
+  }
+
+  const gridTemplateColumns = `240px repeat(${Math.max(orderedStatuses.length, 1)}, minmax(300px, 1fr))`;
 
   return (
     <DndContext
@@ -197,30 +223,83 @@ export function SprintBoard({
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveTicket(null)}
+      onDragCancel={() => setActiveDragId(null)}
     >
-      <div className="flex gap-3 overflow-x-auto pb-3">
-        {orderedStatuses.map((status) => (
-          <StatusColumn
-            key={status.id}
-            status={status}
-            tickets={ticketsByStatus.get(status.id) ?? []}
-            canMutate={canMutate}
-            onOpenTicket={onOpenTicket}
-          />
-        ))}
+      <div className="overflow-x-auto pb-2">
+        <div className="min-w-[1280px] space-y-3">
+          <div className="grid gap-3" style={{ gridTemplateColumns }}>
+            <div className="flex items-end px-3 py-2">
+              <span className="eyebrow">Colaboradores</span>
+            </div>
+            {orderedStatuses.map((status) => (
+              <div key={`header-${status.id}`} className="border-2 border-border bg-card">
+                {/* Color arbitrario del usuario: barra superior de 3px, nunca
+                    fondo del texto (DESIGN_SYSTEM.md §3). */}
+                <div
+                  className="h-[3px] w-full"
+                  style={{ backgroundColor: status.color }}
+                  aria-hidden
+                />
+                <div className="flex items-center justify-between gap-2 px-3 py-2">
+                  <h3 className="truncate font-display text-sm font-bold uppercase tracking-wide text-foreground">
+                    {status.name}
+                  </h3>
+                  <Badge variant="secondary" mono>
+                    {countByStatus.get(status.id) ?? 0}
+                  </Badge>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {collaboratorLanes.map((lane) => {
+            const cells = ticketsByLaneAndStatus.get(lane.id);
+            const total = laneTotals.get(lane.id) ?? 0;
+
+            return (
+              <div key={lane.id} className="grid gap-3" style={{ gridTemplateColumns }}>
+                <aside className="border-2 border-border bg-card p-3">
+                  <div className="mb-1 flex min-w-0 items-center gap-2">
+                    {lane.user ? (
+                      <MemberAvatar user={lane.user} size="sm" />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-border bg-muted text-xs font-semibold text-muted-foreground">
+                        SA
+                      </div>
+                    )}
+                    <h4 className="truncate text-sm font-semibold text-foreground">{lane.name}</h4>
+                  </div>
+                  <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {total} tickets
+                  </p>
+                </aside>
+
+                {orderedStatuses.map((status) => (
+                  <TicketCell
+                    key={`${lane.id}-${status.id}`}
+                    laneId={lane.id}
+                    status={status}
+                    tickets={cells?.get(status.id) ?? []}
+                    canMutate={canMutate}
+                    onOpenTicket={onOpenTicket}
+                  />
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {unmapped.length > 0 ? (
+      {unmappedCount > 0 ? (
         <p className="mt-2 border-2 border-mustard bg-mustard/10 px-3 py-2 text-xs text-mustard">
-          {unmapped.length} ticket(s) en columnas de proyecto que no corresponden a ningún
-          estado del espacio.
+          {unmappedCount} ticket(s) en columnas de proyecto que no corresponden a ningún estado
+          del espacio.
         </p>
       ) : null}
 
       <DragOverlay dropAnimation={null}>
         {activeTicket ? (
-          <div className="w-[300px] rotate-1 cursor-grabbing shadow-hard-lg dark:shadow-hard-float">
+          <div className="w-[300px] rotate-1 cursor-grabbing">
             <TicketCard
               ticket={activeTicket}
               onOpen={onOpenTicket}
@@ -228,6 +307,7 @@ export function SprintBoard({
               accentColor={
                 orderedStatuses.find((s) => s.id === activeTicket.workspace_status_id)?.color
               }
+              className="shadow-hard dark:shadow-hard-float"
             />
           </div>
         ) : null}

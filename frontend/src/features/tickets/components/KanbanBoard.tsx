@@ -22,6 +22,11 @@ import type { Column } from "@/features/projects/types/project.types";
 import { MemberAvatar } from "@/features/members/components/MemberAvatar";
 import { TicketCard } from "@/features/tickets/components/TicketCard";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
+import {
+  buildCollaboratorLanes,
+  getTicketLaneIds,
+  groupTicketsByLaneAndStatus,
+} from "@/features/tickets/utils/collaboratorLanes";
 import { resolveDropOrder } from "@/features/tickets/utils/resolveDropOrder";
 import { cn } from "@/lib/utils";
 
@@ -45,14 +50,6 @@ interface KanbanBoardProps {
     toOrder: number;
   }) => void | Promise<void>;
 }
-
-interface CollaboratorLane {
-  id: string;
-  name: string;
-  user: Ticket["assignees"][number] | null;
-}
-
-const UNASSIGNED_LANE_ID = "__unassigned__";
 
 function getCellDropId(laneId: string, columnId: string) {
   return `cell::${laneId}::${columnId}`;
@@ -205,70 +202,18 @@ export function KanbanBoard({
   // desaparecer solo porque el filtro de fecha oculta todos los tickets
   // visibles de esa persona en este momento — para ese caso está el placeholder
   // de "ningún ticket coincide" por celda, no la desaparición de la fila entera.
-  const collaboratorLanes = useMemo(() => {
-    const mapping = new Map<string, CollaboratorLane>();
+  const collaboratorLanes = useMemo(() => buildCollaboratorLanes(allTickets), [allTickets]);
 
-    for (const ticket of allTickets) {
-      for (const assignee of ticket.assignees) {
-        if (!mapping.has(assignee.id)) {
-          mapping.set(assignee.id, {
-            id: assignee.id,
-            name: assignee.full_name,
-            user: assignee,
-          });
-        }
-      }
-    }
-
-    const lanes = Array.from(mapping.values()).sort((a, b) =>
-      a.name.localeCompare(b.name, "es"),
-    );
-
-    const hasUnassigned = allTickets.some((ticket) => ticket.assignees.length === 0);
-    if (hasUnassigned) {
-      lanes.push({ id: UNASSIGNED_LANE_ID, name: "Sin asignar", user: null });
-    }
-
-    return lanes;
-  }, [allTickets]);
-
-  const ticketsByLaneAndColumn = useMemo(() => {
-    const mapping = new Map<string, Map<string, Ticket[]>>();
-
-    for (const lane of collaboratorLanes) {
-      const laneColumns = new Map<string, Ticket[]>();
-      for (const column of orderedColumns) {
-        laneColumns.set(column.id, []);
-      }
-      mapping.set(lane.id, laneColumns);
-    }
-
-    for (const ticket of tickets) {
-      const targetLaneIds =
-        ticket.assignees.length === 0
-          ? [UNASSIGNED_LANE_ID]
-          : ticket.assignees.map((assignee) => assignee.id);
-
-      for (const laneId of targetLaneIds) {
-        const laneColumns = mapping.get(laneId);
-        if (!laneColumns) continue;
-        laneColumns.get(ticket.column_id)?.push(ticket);
-      }
-    }
-
-    for (const laneColumns of mapping.values()) {
-      for (const [columnId, columnTickets] of laneColumns.entries()) {
-        laneColumns.set(
-          columnId,
-          [...columnTickets].sort(
-            (a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at),
-          ),
-        );
-      }
-    }
-
-    return mapping;
-  }, [collaboratorLanes, orderedColumns, tickets]);
+  const ticketsByLaneAndColumn = useMemo(
+    () =>
+      groupTicketsByLaneAndStatus({
+        tickets,
+        laneIds: collaboratorLanes.map((lane) => lane.id),
+        statusIds: orderedColumns.map((column) => column.id),
+        getStatusId: (ticket) => ticket.column_id,
+      }),
+    [collaboratorLanes, orderedColumns, tickets],
+  );
 
   // Deriva SIEMPRE de allTickets (sin filtrar): se usa para calcular el
   // destino real de un drag (ver resolveDropOrder), que no debe verse
@@ -316,12 +261,7 @@ export function KanbanBoard({
   const allTicketsCountByLaneColumn = useMemo(() => {
     const mapping = new Map<string, number>();
     for (const ticket of allTickets) {
-      const targetLaneIds =
-        ticket.assignees.length === 0
-          ? [UNASSIGNED_LANE_ID]
-          : ticket.assignees.map((assignee) => assignee.id);
-
-      for (const laneId of targetLaneIds) {
+      for (const laneId of getTicketLaneIds(ticket)) {
         const key = `${laneId}::${ticket.column_id}`;
         mapping.set(key, (mapping.get(key) ?? 0) + 1);
       }

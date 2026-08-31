@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SprintBoard } from "@/features/board/components/SprintBoard";
+import { SprintBoardMobile } from "@/features/board/components/SprintBoardMobile";
 import { SprintBoardSelector } from "@/features/board/components/SprintBoardSelector";
 import {
   useMoveTicketOnBoard,
@@ -25,6 +26,7 @@ import { TicketDetail } from "@/features/tickets/components/TicketDetail";
 import { useDeleteTicket } from "@/features/tickets/hooks/useTickets";
 import type { Ticket } from "@/features/tickets/types/ticket.types";
 import { canMutateWorkspace } from "@/features/workspaces/lib/permissions";
+import { useIsMobile } from "@/hooks/useBreakpoint";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { getApiErrorMessage } from "@/lib/errors";
 import { useAuthStore } from "@/store/authStore";
@@ -40,6 +42,7 @@ function scopeToParam(scope: SprintScope, activeSprintId: string | null): string
 
 export default function SprintBoardPage() {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { workspaceSlug = "" } = useParams();
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -207,6 +210,14 @@ export default function SprintBoardPage() {
               ? "No hay tickets en el backlog."
               : "Este sprint no tiene tickets todavía."
           }
+        />
+      ) : isMobile ? (
+        <SprintBoardMobile
+          statuses={board.statuses}
+          tickets={board.tickets}
+          canMutate={canMutate}
+          onOpenTicket={(ticket) => setSelectedTicketId(ticket.id)}
+          onChangeStatus={handleChangeStatus}
         />
       ) : (
         <SprintBoard

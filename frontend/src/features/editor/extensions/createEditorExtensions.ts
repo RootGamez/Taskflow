@@ -100,6 +100,49 @@ export const MAX_DOC_CHARS = 100_000;
 /** Maximo de menciones ofrecidas en el desplegable de arroba. */
 const MAX_MENTION_SUGGESTIONS = 8;
 
+/**
+ * Permisos que hay que delegarle al iframe de YouTube.
+ *
+ * La extension oficial no pone `allow`, y sin el la politica de permisos
+ * deniega por defecto lo que el reproductor necesita: sin `encrypted-media`
+ * no puede descifrar el stream, y `autoplay` es lo que le deja reproducir a
+ * partir de un gesto del usuario.
+ */
+const YOUTUBE_IFRAME_ALLOW = [
+  "accelerometer",
+  "autoplay",
+  "clipboard-write",
+  "encrypted-media",
+  "gyroscope",
+  "picture-in-picture",
+  "web-share",
+  "fullscreen",
+].join("; ");
+
+/**
+ * Anade `playsinline=1` a la URL del embed.
+ *
+ * Sin el, un movil abre el video a pantalla completa en vez de reproducirlo
+ * dentro de la pagina. La extension de Tiptap no expone ninguna opcion para
+ * esto, asi que se pone sobre la URL ya construida.
+ *
+ * Se anadio buscando por que no se podia dar al play en movil, y NO era eso:
+ * un iframe identico colgado del body, fuera del editor, tampoco reproducia.
+ * Se conserva porque es lo correcto para un embed que se ve en movil, no
+ * porque arreglara aquello.
+ */
+function withPlaysInline(src: string): string {
+  try {
+    const url = new URL(src, "https://www.youtube-nocookie.com");
+    url.searchParams.set("playsinline", "1");
+    return url.toString();
+  } catch {
+    // Un `src` que no parsea se deja intacto: mejor sin el parametro que
+    // romper el nodo.
+    return src;
+  }
+}
+
 // El tipo real de `render` de @tiptap/suggestion es generico y ruidoso; lo
 // que importa aqui es que sea la factory que devuelven
 // `createSlashMenuRenderer` / `createMentionRenderer`.
@@ -187,19 +230,20 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       height: 360,
     }).extend({
       /**
-       * Sin esto no se puede dar al play en movil.
-       *
        * El nodo de la extension oficial se declara `draggable`, asi que
        * ProseMirror le pone `draggable="true"` al envoltorio. Sobre un
        * contenedor con un iframe dentro, un gesto tactil se interpreta como
-       * el inicio de un arrastre y el toque NUNCA llega al iframe: el video
-       * se ve, pero no responde a nada. Con raton no se nota, porque el
-       * arrastre solo arranca si hay desplazamiento y el clic seco pasa
-       * antes.
+       * el inicio de un arrastre en vez de llegar al reproductor.
        *
        * Se pierde arrastrar el video agarrandolo por el propio reproductor
-       * -- que en tactil no funcionaba de todos modos. El bloque se sigue
+       * -- que en tactil no funcionaba igualmente. El bloque se sigue
        * moviendo desde el asa, que es el gesto que existe en escritorio.
+       *
+       * Aviso para quien venga detras: esto se anadio buscando por que no se
+       * podia dar al play en movil, y NO era la causa. Un iframe identico
+       * colgado del body, fuera del editor, tampoco reproducia: era el
+       * emulador de Chrome. Se conserva porque el bloqueo del gesto tactil
+       * es real, pero nadie ha comprobado que arregle nada visible.
        */
       draggable: false,
 
@@ -213,8 +257,33 @@ export function createEditorExtensions(config: EditorExtensionsConfig): AnyExten
       renderHTML(props) {
         const rendered = this.parent?.(props);
         if (!Array.isArray(rendered)) return rendered as never;
-        const [tag, attrs, ...rest] = rendered as [string, Record<string, unknown>, ...unknown[]];
-        return [tag, { ...attrs, contenteditable: "false" }, ...rest] as never;
+        const [tag, attrs, ...children] = rendered as [
+          string,
+          Record<string, unknown>,
+          ...unknown[],
+        ];
+
+        // Y al iframe hay que delegarle los permisos y pedirle reproduccion
+        // en linea (ver YOUTUBE_IFRAME_ALLOW y withPlaysInline).
+        const conPermisos = children.map((child) => {
+          if (!Array.isArray(child) || child[0] !== "iframe") return child;
+          const [childTag, childAttrs, ...childRest] = child as [
+            string,
+            Record<string, unknown>,
+            ...unknown[],
+          ];
+          const src =
+            typeof childAttrs.src === "string"
+              ? withPlaysInline(childAttrs.src)
+              : childAttrs.src;
+          return [
+            childTag,
+            { ...childAttrs, src, allow: YOUTUBE_IFRAME_ALLOW },
+            ...childRest,
+          ];
+        });
+
+        return [tag, { ...attrs, contenteditable: "false" }, ...conPermisos] as never;
       },
     }),
 

@@ -134,16 +134,37 @@ describe("createEditorExtensions", () => {
     // nodo, y sólo interesan estas dos piezas.
     const youtube = find(build(), "youtube").config as {
       draggable?: boolean;
-      renderHTML?: (this: unknown, props: unknown) => [string, Record<string, unknown>];
+      renderHTML?: (this: unknown, props: unknown) => unknown[];
     };
 
     expect(youtube.draggable).toBe(false);
 
     const rendered = youtube.renderHTML?.call(
-      { parent: () => ["div", { "data-youtube-video": "" }, ["iframe", {}]] },
+      {
+        parent: () => [
+          "div",
+          { "data-youtube-video": "" },
+          ["iframe", { src: "https://www.youtube-nocookie.com/embed/abc123?rel=1" }],
+        ],
+      },
       { HTMLAttributes: {}, node: {} },
     );
     expect(rendered?.[1]).toMatchObject({ contenteditable: "false" });
+
+    const iframe = rendered?.[2] as [string, Record<string, string>];
+    expect(iframe[0]).toBe("iframe");
+
+    // Permisos: sin `encrypted-media` el reproductor no puede descifrar el
+    // stream, y `autoplay` es lo que le deja arrancar con un gesto.
+    expect(iframe[1].allow).toContain("encrypted-media");
+    expect(iframe[1].allow).toContain("autoplay");
+
+    // `playsinline=1`: sin él, en móvil el reproductor intenta ir a pantalla
+    // completa en vez de reproducir dentro de la página, y no pasa nada.
+    expect(iframe[1].src).toContain("playsinline=1");
+    // Sin perder lo que la extensión ya había puesto en la URL.
+    expect(iframe[1].src).toContain("rel=1");
+    expect(iframe[1].src).toContain("/embed/abc123");
   });
 
   it("no registra dos extensiones con el mismo nombre", () => {

@@ -17,9 +17,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { Editor } from "@tiptap/react";
+import { useEditorState, type Editor } from "@tiptap/react";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
-import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown, Undo2, Redo2 } from "lucide-react";
 import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
@@ -355,6 +355,16 @@ export function BlockControls({
   const isMobile = useIsMobile();
   const keyboardInset = useKeyboardInset();
 
+  // Para poder apagar los botones de deshacer/rehacer cuando no hay nada que
+  // deshacer. `useEditorState` suscribe solo a esto, no al documento entero.
+  const history = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      canUndo: e?.can().undo() ?? false,
+      canRedo: e?.can().redo() ?? false,
+    }),
+  }) ?? { canUndo: false, canRedo: false };
+
   const [blockMenu, setBlockMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
     open: false,
     anchorRect: null,
@@ -450,51 +460,87 @@ export function BlockControls({
 
   if (disabled) return null;
 
-  const insertButtonElement = (
+  const roundButton =
+    "pointer-events-auto flex items-center justify-center rounded border-2 border-border shadow-hard transition active:scale-95 dark:shadow-hard-float disabled:opacity-40 disabled:active:scale-100";
+
+  const insertButtonElement = isMobile ? (
+    // En movil el "+" no va solo: le acompanan deshacer y rehacer, que sin
+    // teclado fisico no tienen ningun otro acceso. Van en la misma barra
+    // para compartir anclaje y no repetir el calculo del teclado.
+    <div
+      className="fixed right-4 z-[60] flex items-center gap-2 transition-[bottom] duration-150"
+      style={{
+        // Con el teclado abierto hay que subirla por encima de el: en iOS
+        // `fixed` se ancla al viewport de layout, que el teclado no encoge,
+        // asi que los botones quedaban tapados justo mientras se escribe.
+        // Cerrado el teclado basta con librar la barra de gestos
+        // (`safe-area-inset-bottom`), que ahi si aplica.
+        bottom: keyboardInset
+          ? `calc(1rem + ${keyboardInset}px)`
+          : "calc(1rem + env(safe-area-inset-bottom, 0px))",
+      }}
+    >
+      <button
+        type="button"
+        aria-label="Deshacer"
+        title="Deshacer"
+        disabled={!history.canUndo}
+        className={cn(roundButton, "h-11 w-11 bg-card text-foreground hover:bg-accent")}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().undo().run()}
+      >
+        <Undo2 className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Rehacer"
+        title="Rehacer"
+        disabled={!history.canRedo}
+        className={cn(roundButton, "h-11 w-11 bg-card text-foreground hover:bg-accent")}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().redo().run()}
+      >
+        <Redo2 className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
+        aria-label="Insertar bloque"
+        title="Insertar bloque"
+        className={cn(
+          roundButton,
+          "h-12 w-12 bg-primary text-primary-foreground hover:bg-primary/90",
+        )}
+        onPointerDown={(e) => e.preventDefault()}
+        onClick={openBlockMenuFromButton}
+      >
+        <Plus className="h-6 w-6" />
+      </button>
+    </div>
+  ) : (
     <button
       type="button"
       aria-label="Insertar bloque"
       title="Insertar bloque"
       className={cn(
-        "pointer-events-auto flex items-center justify-center rounded border-2 border-border bg-primary text-primary-foreground shadow-hard transition hover:bg-primary/90 active:scale-95 dark:shadow-hard-float",
-        isMobile
-          ? // Anclado al viewport y no al final del editor: en un ticket
-            // largo, el boton quedaba fuera de pantalla justo cuando hacia
-            // falta -- para insertar algo en medio habia que bajar hasta el
-            // final del documento.
-            //
-            // `z-[60]` no es arbitrario: el editor suele vivir dentro de un
-            // dialogo (TicketDetail), y su overlay y su contenido son `z-50`,
-            // asi que con el `z-40` de escritorio el boton quedaba enterrado
-            // bajo el modal. Por arriba lo limita el menu que abre este mismo
-            // boton (EditorMenuSurface, `zIndex: 9999`), que debe taparlo.
-            "fixed right-4 z-[60] h-12 w-12 transition-[bottom] duration-150"
-          : "absolute bottom-2 right-1 z-40 h-10 w-10",
+        roundButton,
+        "absolute bottom-2 right-1 z-40 h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90",
       )}
-      style={
-        isMobile
-          ? {
-              // Con el teclado abierto hay que subirlo por encima de el: en
-              // iOS `fixed` se ancla al viewport de layout, que el teclado no
-              // encoge, asi que el boton quedaba tapado justo mientras se
-              // escribe. Cerrado el teclado basta con librar la barra de
-              // gestos (`safe-area-inset-bottom`), que ahi si aplica.
-              bottom: keyboardInset
-                ? `calc(1rem + ${keyboardInset}px)`
-                : "calc(1rem + env(safe-area-inset-bottom, 0px))",
-            }
-          : undefined
-      }
       onPointerDown={(e) => e.preventDefault()}
       onClick={openBlockMenuFromButton}
     >
-      <Plus className={isMobile ? "h-6 w-6" : "h-5 w-5"} />
+      <Plus className="h-5 w-5" />
     </button>
   );
 
   // En movil va por portal a `document.body`: el editor puede vivir dentro
   // de un dialogo de Radix, y un ancestro con `transform` convierte
   // `position: fixed` en relativo a ese ancestro, no al viewport.
+  //
+  // `z-[60]` no es arbitrario: el editor suele vivir dentro de un dialogo
+  // (TicketDetail), y su overlay y su contenido son `z-50`, asi que con el
+  // `z-40` de escritorio la barra quedaba enterrada bajo el modal. Por
+  // arriba la limita el menu que abre el propio "+" (EditorMenuSurface,
+  // `zIndex: 9999`), que debe taparla.
   const insertButton =
     isMobile && typeof document !== "undefined"
       ? createPortal(insertButtonElement, document.body)

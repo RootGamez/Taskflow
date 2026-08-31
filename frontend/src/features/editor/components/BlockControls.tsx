@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { DragHandle } from "@tiptap/extension-drag-handle-react";
 import { Plus, GripVertical, Trash2, ArrowUp, ArrowDown } from "lucide-react";
@@ -23,6 +24,7 @@ import { Fragment } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/useBreakpoint";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import type { SlashCommandItem } from "../extensions/SlashExtension";
 import { createTapSelectHandlers } from "../lib/tapSelect";
 import { EditorMenuSurface } from "./EditorMenuSurface";
@@ -351,6 +353,7 @@ export function BlockControls({
   // indice que usan mover/borrar/insertar.
   const [hoveredBlockIndex, setHoveredBlockIndex] = useState<number | null>(null);
   const isMobile = useIsMobile();
+  const keyboardInset = useKeyboardInset();
 
   const [blockMenu, setBlockMenu] = useState<{ open: boolean; anchorRect: AnchorRect }>({
     open: false,
@@ -447,20 +450,59 @@ export function BlockControls({
 
   if (disabled) return null;
 
+  const insertButtonElement = (
+    <button
+      type="button"
+      aria-label="Insertar bloque"
+      title="Insertar bloque"
+      className={cn(
+        "pointer-events-auto flex items-center justify-center rounded border-2 border-border bg-primary text-primary-foreground shadow-hard transition hover:bg-primary/90 active:scale-95 dark:shadow-hard-float",
+        isMobile
+          ? // Anclado al viewport y no al final del editor: en un ticket
+            // largo, el boton quedaba fuera de pantalla justo cuando hacia
+            // falta -- para insertar algo en medio habia que bajar hasta el
+            // final del documento.
+            //
+            // `z-[60]` no es arbitrario: el editor suele vivir dentro de un
+            // dialogo (TicketDetail), y su overlay y su contenido son `z-50`,
+            // asi que con el `z-40` de escritorio el boton quedaba enterrado
+            // bajo el modal. Por arriba lo limita el menu que abre este mismo
+            // boton (EditorMenuSurface, `zIndex: 9999`), que debe taparlo.
+            "fixed right-4 z-[60] h-12 w-12 transition-[bottom] duration-150"
+          : "absolute bottom-2 right-1 z-40 h-10 w-10",
+      )}
+      style={
+        isMobile
+          ? {
+              // Con el teclado abierto hay que subirlo por encima de el: en
+              // iOS `fixed` se ancla al viewport de layout, que el teclado no
+              // encoge, asi que el boton quedaba tapado justo mientras se
+              // escribe. Cerrado el teclado basta con librar la barra de
+              // gestos (`safe-area-inset-bottom`), que ahi si aplica.
+              bottom: keyboardInset
+                ? `calc(1rem + ${keyboardInset}px)`
+                : "calc(1rem + env(safe-area-inset-bottom, 0px))",
+            }
+          : undefined
+      }
+      onPointerDown={(e) => e.preventDefault()}
+      onClick={openBlockMenuFromButton}
+    >
+      <Plus className={isMobile ? "h-6 w-6" : "h-5 w-5"} />
+    </button>
+  );
+
+  // En movil va por portal a `document.body`: el editor puede vivir dentro
+  // de un dialogo de Radix, y un ancestro con `transform` convierte
+  // `position: fixed` en relativo a ese ancestro, no al viewport.
+  const insertButton =
+    isMobile && typeof document !== "undefined"
+      ? createPortal(insertButtonElement, document.body)
+      : insertButtonElement;
+
   return (
     <>
-      {/* Botón "+" persistente (siempre visible), en color de marca para que
-          destaque sobre el editor. */}
-      <button
-        type="button"
-        aria-label="Insertar bloque"
-        title="Insertar bloque"
-        className="pointer-events-auto absolute bottom-2 right-1 z-40 flex h-10 w-10 items-center justify-center rounded border-2 border-border bg-primary text-primary-foreground shadow-hard transition hover:bg-primary/90 active:scale-95 dark:shadow-hard-float"
-        onPointerDown={(e) => e.preventDefault()}
-        onClick={openBlockMenuFromButton}
-      >
-        <Plus className="h-5 w-5" />
-      </button>
+      {insertButton}
 
       {/*
         `DragHandle` reemplaza el rastreo de hover que este componente hacia

@@ -12,7 +12,7 @@ import hashlib
 
 from django.core.cache import cache
 from rest_framework import status
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import Throttled, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -28,10 +28,17 @@ from apps.linkpreview.services import (
 
 
 class LinkPreviewThrottle(UserRateThrottle):
-    """Limite propio: cada peticion abre una conexion saliente.
+    """Limite de conexiones SALIENTES, no de peticiones al endpoint.
 
-    Sin esto, un cliente podria usar el endpoint para barrer hosts a
-    ritmo libre, aunque las IPs privadas ya esten bloqueadas.
+    Lo que hay que racionar es salir a internet: sin tope, el endpoint
+    sirve para barrer hosts a ritmo libre aunque las IPs privadas ya
+    esten bloqueadas.
+
+    Por eso no va en `throttle_classes`: DRF lo aplicaria en el dispatch,
+    antes de mirar la cache, y entonces una pagina con varias tarjetas
+    gastaba cuota en cada recarga aunque todas las respuestas salieran de
+    cache sin tocar la red. Con 60/hora bastaban unas pocas recargas de un
+    ticket con enlaces para quedarse sin vistas previas.
     """
 
     scope = "link_preview"
@@ -39,7 +46,15 @@ class LinkPreviewThrottle(UserRateThrottle):
 
 class LinkPreviewView(APIView):
     permission_classes = [IsAuthenticated]
-    throttle_classes = [LinkPreviewThrottle]
+    # A proposito vacio: el limite se aplica a mano, y solo cuando de
+    # verdad hay que salir a la red (ver LinkPreviewThrottle).
+    throttle_classes = []
+
+    def _throttle_outbound_request(self, request: Request) -> None:
+        """Consume una unidad de cuota, o lanza 429."""
+        throttle = LinkPreviewThrottle()
+        if not throttle.allow_request(request, self):
+            raise Throttled(throttle.wait())
 
     def get(self, request: Request) -> Response:
         url = request.query_params.get("url", "").strip()
@@ -52,6 +67,8 @@ class LinkPreviewView(APIView):
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached, status=status.HTTP_200_OK)
+
+        self._throttle_outbound_request(request)
 
         try:
             preview = build_link_preview(url)

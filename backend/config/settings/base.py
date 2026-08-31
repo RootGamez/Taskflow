@@ -156,7 +156,11 @@ REST_FRAMEWORK = {
     # saliente por peticion, asi que necesita techo aunque el resto de la
     # API no lo tenga.
     "DEFAULT_THROTTLE_RATES": {
-        "link_preview": os.getenv("LINK_PREVIEW_THROTTLE", "60/hour"),
+        # Cuenta solo las salidas a internet, no las peticiones al endpoint:
+        # lo que se sirve de cache no gasta cuota (ver LinkPreviewThrottle).
+        # Aun asi 60/hora se quedaba corto -- un ticket con varios enlaces
+        # nuevos lo agota de una sentada.
+        "link_preview": os.getenv("LINK_PREVIEW_THROTTLE", "300/hour"),
     },
 }
 
@@ -186,6 +190,23 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {"hosts": [REDIS_URL]},
+    }
+}
+
+# Redis ya estaba levantado para Channels y Celery, pero `CACHES` nunca se
+# configuro, asi que Django caia en `LocMemCache`: la cache vivia dentro de
+# cada proceso. Eso dejaba las vistas previas de enlaces sin compartir entre
+# workers y perdidas en cada reinicio, y hacia que el contador del throttle
+# tambien fuera por proceso -- el limite real acababa siendo el configurado
+# multiplicado por el numero de workers.
+#
+# DB aparte de la 0 para no mezclar las claves con la cola de Celery ni con
+# las de Channels.
+CACHE_URL = os.getenv("CACHE_URL", REDIS_URL.rsplit("/", 1)[0] + "/1")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": CACHE_URL,
     }
 }
 

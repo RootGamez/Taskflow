@@ -150,6 +150,28 @@ class LinkPreviewThrottleTests(APITestCase):
     def tearDown(self) -> None:
         cache.clear()
 
+    def test_a_cached_preview_does_not_spend_quota(self):
+        # Regresion: el throttle estaba en `throttle_classes`, asi que DRF lo
+        # aplicaba en el dispatch, ANTES de mirar la cache. Un ticket con
+        # varias tarjetas gastaba cuota en cada recarga aunque no se saliera a
+        # la red, y las vistas previas desaparecian con un 429.
+        preview = LinkPreview(url="https://ejemplo.com/", title="Ejemplo")
+
+        with patch("apps.linkpreview.views.build_link_preview", return_value=preview):
+            with patch(
+                "apps.linkpreview.views.LinkPreviewThrottle.get_rate", return_value="1/hour"
+            ):
+                primera = self.client.get(self.url, {"url": "https://ejemplo.com/"})
+                # La cuota es de 1 y ya se gasto; estas salen de cache, asi
+                # que no deben contar.
+                repetidas = [
+                    self.client.get(self.url, {"url": "https://ejemplo.com/"}).status_code
+                    for _ in range(5)
+                ]
+
+        self.assertEqual(primera.status_code, status.HTTP_200_OK)
+        self.assertEqual(repetidas, [status.HTTP_200_OK] * 5)
+
     def test_throttles_after_the_configured_rate(self):
         preview = LinkPreview(url="https://ejemplo.com/", title="Ejemplo")
 

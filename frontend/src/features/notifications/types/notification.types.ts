@@ -7,6 +7,7 @@
 export type KnownNotificationType =
   | "workspace_invitation"
   | "workspace_deleted"
+  | "workspace_member_removed"
   | "ticket_assigned"
   | "ticket_mentioned"
   | "ticket_commented";
@@ -26,6 +27,12 @@ export interface WorkspaceInvitationData {
 
 /** `data` de una notificacion `workspace_deleted`. */
 export interface WorkspaceDeletedData {
+  workspace_name?: string;
+}
+
+/** `data` de una notificacion `workspace_member_removed`. */
+export interface WorkspaceMemberRemovedData {
+  workspace_slug?: string;
   workspace_name?: string;
 }
 

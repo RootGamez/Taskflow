@@ -21,6 +21,7 @@ from apps.tickets.models import Ticket, TicketFieldLock, TicketImage, TicketVide
 from apps.tickets.serializers import TicketCreateSerializer, TicketSerializer, TicketUpdateSerializer
 from apps.tickets.storage import upload_ticket_image, upload_ticket_video
 from apps.workspaces.access import WorkspaceRoleAccessMixin
+from apps.workspaces.models import WorkspaceMember
 
 
 class TicketListCreateView(WorkspaceRoleAccessMixin, APIView):
@@ -216,10 +217,19 @@ class TicketSingleView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, ticket_id: str) -> Response:
+		# Ver el comentario del mismo patron en
+		# WorkspaceRoleAccessMixin.get_project_for_user: el `.filter()` que
+		# atraviesa `memberships` no pasa por el manager de WorkspaceMember,
+		# asi que el `.exclude()` en un `.filter()` aparte es lo que bloquea
+		# a un miembro expulsado (role=removed).
 		ticket = (
 			Ticket.objects.select_related("project__workspace", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
 			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
+			.exclude(
+				project__workspace__memberships__user=request.user,
+				project__workspace__memberships__role=WorkspaceMember.Role.REMOVED,
+			)
 			.distinct()
 			.first()
 		)

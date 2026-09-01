@@ -1,4 +1,4 @@
-import { AtSign, Bell, Building2, Mail, MessageSquare, UserPlus, type LucideIcon } from "lucide-react";
+import { AtSign, Bell, Building2, Mail, MessageSquare, UserMinus, UserPlus, type LucideIcon } from "lucide-react";
 
 import type { NotificationItem } from "@/features/notifications/types/notification.types";
 
@@ -83,6 +83,15 @@ export function notificationPresentation(notification: NotificationItem): Notifi
     case "workspace_deleted":
       return {
         icon: Building2,
+        iconBgClass: "bg-muted",
+        iconColorClass: "text-muted-foreground",
+        ...NOT_ACTIONABLE,
+      };
+
+    case "workspace_member_removed":
+      // El usuario ya no tiene acceso al espacio: no hay a donde navegar.
+      return {
+        icon: UserMinus,
         iconBgClass: "bg-muted",
         iconColorClass: "text-muted-foreground",
         ...NOT_ACTIONABLE,

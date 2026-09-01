@@ -45,12 +45,49 @@ class Workspace(models.Model):
 		return self.name
 
 
+class WorkspaceMemberManager(models.Manager):
+	"""Manager por defecto: oculta a los miembros expulsados (soft-delete).
+
+	Expulsar a alguien de un espacio (WorkspaceMemberDetailView.delete) NO
+	borra la fila -- le pone role=REMOVED para no dejar tickets huerfanos
+	(sus assignees son un M2M a User, no a WorkspaceMember, asi que sobreviven
+	intactos). Con este manager como `objects`, TODO el resto del codebase
+	(listado de workspaces del usuario, checks de acceso a proyecto/ticket,
+	menciones de comentarios, asignacion de subtareas, consumers de
+	websocket, etc.) sigue tratando a un miembro expulsado como "ya no es
+	miembro" sin tener que tocar cada uno de esos call sites uno por uno.
+	Dos excepciones que SI necesitan verlos: la pantalla de miembros (para
+	listar la seccion "Miembros eliminados") y la reactivacion al aceptar
+	una nueva invitacion -- ambas usan `all_objects` explicitamente.
+
+	Ojo: esta exclusion solo aplica cuando se consulta a traves de este
+	manager (`WorkspaceMember.objects...` o `instance.memberships.all()`).
+	No aplica a lookups que atraviesan la relacion en un `.filter()` de OTRO
+	modelo (p. ej. `Project.objects.filter(workspace__memberships__user=..)`)
+	-- Django arma esos JOIN sobre la tabla cruda, sin pasar por el manager.
+	Los 2 call sites del codebase que atraviesan `memberships` asi
+	(`WorkspaceRoleAccessMixin.get_project_for_user`,
+	`TicketSingleView.get`) filtran el rol removido a mano.
+	"""
+
+	def get_queryset(self):
+		return super().get_queryset().exclude(role=self.model.Role.REMOVED)
+
+
 class WorkspaceMember(models.Model):
 	class Role(models.TextChoices):
 		OWNER = "owner", "Owner"
 		ADMIN = "admin", "Admin"
 		MEMBER = "member", "Member"
 		VIEWER = "viewer", "Viewer"
+		# Estado, no un rol real: revoca todo permiso (queda fuera de
+		# WRITABLE_ROLES/MANAGE_MEMBER_ROLES/EDITABLE_ROLES en access.py y
+		# views.py sin tener que listarlo explicitamente en ningun lado) y
+		# hace que `objects` (ver WorkspaceMemberManager) lo trate como si
+		# no fuera miembro. La fila se conserva -- no un hard delete -- para
+		# no dejar tickets huerfanos y para poder mostrarlo en "Miembros
+		# eliminados".
+		REMOVED = "removed", "Removed"
 
 	id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 	workspace = models.ForeignKey(
@@ -66,6 +103,12 @@ class WorkspaceMember(models.Model):
 	role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
 	is_active = models.BooleanField(default=False)
 	created_at = models.DateTimeField(default=timezone.now)
+
+	objects = WorkspaceMemberManager()
+	# Ve TODO, removidos incluidos -- usar solo en la pantalla de miembros
+	# (seccion "eliminados"), la reactivacion al aceptar una invitacion, y
+	# el admin de Django.
+	all_objects = models.Manager()
 
 	class Meta:
 		ordering = ["-created_at"]

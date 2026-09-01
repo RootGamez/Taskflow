@@ -42,10 +42,20 @@ class WorkspaceRoleAccessMixin:
 		return membership.workspace
 
 	def get_project_for_user(self, request: Request, project_id: str) -> Project:
+		# `workspace__memberships__user=` atraviesa la relacion con un JOIN
+		# sobre la tabla cruda de WorkspaceMember: no pasa por su manager
+		# (`objects`), asi que NO excluye solo por si mismo a un miembro
+		# expulsado (role=removed) -- ver WorkspaceMemberManager. El
+		# `.exclude(...)` de abajo, en un `.filter()` aparte que abre su
+		# propio JOIN/subquery, es lo que efectivamente lo bloquea.
 		project = (
 			Project.objects.select_related("workspace")
 			.prefetch_related("columns")
 			.filter(id=project_id, workspace__memberships__user=request.user)
+			.exclude(
+				workspace__memberships__user=request.user,
+				workspace__memberships__role=WorkspaceMember.Role.REMOVED,
+			)
 			.distinct()
 			.first()
 		)

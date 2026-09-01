@@ -16,3 +16,8 @@ class WorkspaceMemberAdmin(admin.ModelAdmin):
 	list_filter = ("role", "is_active")
 	search_fields = ("workspace__name", "user__email")
 	readonly_fields = ("created_at",)
+
+	def get_queryset(self, request):
+		# `objects` (el manager por defecto) oculta a los miembros expulsados
+		# (role=removed) -- en el admin querable los queremos ver a todos.
+		return WorkspaceMember.all_objects.all()

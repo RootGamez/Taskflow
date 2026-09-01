@@ -130,10 +130,18 @@ class NotificationActionView(APIView):
 		with transaction.atomic():
 			workspace_name = invitation.workspace.name
 			if action == "accept":
-				membership, _ = WorkspaceMember.objects.update_or_create(
+				# `all_objects`, no `objects`: si esta persona ya habia sido
+				# expulsada del espacio (role=removed), la fila sigue
+				# existiendo pero es invisible para el manager por defecto.
+				# `update_or_create` sobre `objects` no la encontraria e
+				# intentaria un INSERT que choca con el unique_together
+				# (workspace, user) -- con `all_objects` la reactiva
+				# pisandole el rol con el de la invitacion nueva (nunca
+				# restaura el rol que tenia antes de que la expulsaran).
+				membership, _ = WorkspaceMember.all_objects.update_or_create(
 					workspace=invitation.workspace,
 					user=request.user,
-					defaults={"role": invitation.role},
+					defaults={"role": invitation.role, "is_active": False},
 				)
 				membership_payload = {
 					"id": str(membership.id),

@@ -3,6 +3,7 @@ export {
 	useCancelWorkspaceInvitation,
 	useInviteWorkspaceMember,
 	useMembers,
+	useRemoveWorkspaceMember,
 	useUpdateWorkspaceMemberRole,
 	useWorkspaceInvitations,
 	useWorkspaceMembersRealtime,

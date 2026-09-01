@@ -45,3 +45,13 @@ export async function updateWorkspaceMemberRole(
   );
   return data;
 }
+
+/**
+ * Soft-delete: el backend no borra la membresia, le pone role="removed" y
+ * devuelve esa fila actualizada (200, no 204) para que la UI pueda moverla
+ * a la seccion "Miembros eliminados" en vez de solo hacerla desaparecer.
+ */
+export async function removeWorkspaceMember(workspaceSlug: string, memberId: string): Promise<WorkspaceMember> {
+  const { data } = await apiClient.delete<WorkspaceMember>(`/workspaces/${workspaceSlug}/members/${memberId}/`);
+  return data;
+}

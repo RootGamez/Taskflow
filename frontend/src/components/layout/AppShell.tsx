@@ -27,11 +27,15 @@ export function AppShell({ children }: AppShellProps) {
   const setMobileNavOpen = useUIStore((state) => state.setMobileNavOpen);
   const { workspaceSlug = "" } = useParams();
   const accessToken = useAuthStore((state) => state.accessToken);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
   const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
   const { data: workspaces = [], refetch: refetchWorkspaces } = useWorkspaces();
 
-  const [deletedWorkspaceName, setDeletedWorkspaceName] = useState<string | null>(null);
+  // Aviso a pantalla completa cuando el usuario pierde el acceso al espacio
+  // que esta viendo: o lo eliminaron (`workspace.deleted`) o lo sacaron a el
+  // (`member.removed`). Un solo modal para ambos casos, con su propio texto.
+  const [lockoutNotice, setLockoutNotice] = useState<{ title: string; description: string } | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
@@ -52,7 +56,7 @@ export function AppShell({ children }: AppShellProps) {
   }, [activeWorkspace, setActiveWorkspace, workspaceSlug, workspaces]);
 
   const closeModal = useCallback(() => {
-    setDeletedWorkspaceName(null);
+    setLockoutNotice(null);
   }, []);
 
   const redirectToFallbackWorkspace = useCallback(async () => {
@@ -69,13 +73,13 @@ export function AppShell({ children }: AppShellProps) {
     if (nextWorkspace) {
       setActiveWorkspace(nextWorkspace);
       navigate(`/workspaces/${nextWorkspace.slug}`);
-      setDeletedWorkspaceName(null);
+      setLockoutNotice(null);
       setIsRedirecting(false);
       return;
     }
 
     navigate("/");
-    setDeletedWorkspaceName(null);
+    setLockoutNotice(null);
     setIsRedirecting(false);
   }, [isRedirecting, navigate, refetchWorkspaces, setActiveWorkspace]);
 
@@ -87,23 +91,44 @@ export function AppShell({ children }: AppShellProps) {
         payload?: {
           workspace_slug?: string;
           workspace_name?: string;
+          member?: { user_id?: string };
         };
       };
 
-      if (data.type !== "workspace.event" || data.event !== "workspace.deleted") {
+      if (data.type !== "workspace.event") {
         return;
       }
 
-      const deletedSlug = data.payload?.workspace_slug;
-      if (!deletedSlug || deletedSlug !== workspaceSlug) {
+      if (data.event === "workspace.deleted") {
+        const deletedSlug = data.payload?.workspace_slug;
+        if (!deletedSlug || deletedSlug !== workspaceSlug) {
+          return;
+        }
+
+        setLockoutNotice({
+          title: "Espacio eliminado",
+          description: `${data.payload?.workspace_name ?? "Este espacio"} fue eliminado.`,
+        });
         return;
       }
 
-      setDeletedWorkspaceName(data.payload?.workspace_name ?? "este espacio");
+      // Solo al miembro eliminado: al resto le llega el mismo evento para
+      // refrescar la lista (ver useWorkspaceMembersRealtime).
+      if (data.event === "member.removed") {
+        const removedUserId = data.payload?.member?.user_id;
+        if (!removedUserId || !currentUserId || removedUserId !== currentUserId) {
+          return;
+        }
+
+        setLockoutNotice({
+          title: "Ya no eres miembro de este espacio",
+          description: "Alguien con permisos de administracion te elimino del espacio.",
+        });
+      }
     } catch {
       return;
     }
-  }, [workspaceSlug]);
+  }, [currentUserId, workspaceSlug]);
 
   useWebSocket(
     accessToken && workspaceSlug
@@ -150,14 +175,14 @@ export function AppShell({ children }: AppShellProps) {
             `CommandPalette` arriba. */}
         <KeyboardShortcutsDialog />
 
-        {deletedWorkspaceName ? (
+        {lockoutNotice ? (
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-foreground/60 p-4">
             <div className="w-full max-w-md rounded border-2 border-border bg-card p-5 text-card-foreground shadow-hard-lg dark:shadow-hard-float">
               <h3 className="font-display text-base font-bold tracking-tight text-foreground">
-                Espacio eliminado
+                {lockoutNotice.title}
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                {deletedWorkspaceName} fue eliminado.
+                {lockoutNotice.description}
               </p>
               <div className="mt-4 flex gap-3 justify-end">
                 <Button color="default" variant="bordered" className="rounded-none" onPress={closeModal}>

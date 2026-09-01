@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
@@ -255,8 +256,11 @@ class WorkspaceMemberListInviteView(WorkspaceMembersManageMixin, APIView):
 
 	def get(self, request: Request, workspace_slug: str) -> Response:
 		_ = self.get_workspace_membership_for_user(request, workspace_slug=workspace_slug)
+		# `all_objects`, no `objects`: esta lista alimenta tanto la seccion
+		# de miembros activos como la de "Miembros eliminados" en el
+		# frontend (WorkspaceMembersPage separa por `role === "removed"`).
 		memberships = (
-			WorkspaceMember.objects.select_related("user", "workspace")
+			WorkspaceMember.all_objects.select_related("user", "workspace")
 			.filter(workspace__slug=workspace_slug)
 			.order_by("-created_at")
 		)
@@ -315,6 +319,67 @@ class WorkspaceMemberDetailView(WorkspaceMembersManageMixin, APIView):
 			{"member": WorkspaceMemberSerializer(updated_membership).data},
 		)
 		return Response(WorkspaceMemberSerializer(updated_membership).data, status=status.HTTP_200_OK)
+
+	def delete(self, request: Request, workspace_slug: str, member_id: str) -> Response:
+		requester_membership = self.assert_workspace_member_management_access(request, workspace_slug)
+		target_membership = self.get_workspace_member_or_404(workspace_slug, member_id)
+
+		if target_membership.role == WorkspaceMember.Role.OWNER:
+			raise PermissionDenied("No se puede eliminar al owner del espacio.")
+
+		if target_membership.user_id == request.user.id:
+			raise ValidationError({"detail": "No puedes eliminarte a ti mismo del espacio."})
+
+		if requester_membership.role == WorkspaceMember.Role.ADMIN and target_membership.role == WorkspaceMember.Role.ADMIN:
+			raise PermissionDenied("No tienes permisos para eliminar a este miembro.")
+
+		workspace = target_membership.workspace
+		removed_user = target_membership.user
+
+		with transaction.atomic():
+			# Soft-remove, no hard delete: le ponemos role=REMOVED en vez de
+			# borrar la fila. `assignees` de Ticket es un M2M a User (no a
+			# WorkspaceMember), asi que las tareas ya asignadas a esta
+			# persona sobreviven intactas -- ningun ticket queda huerfano.
+			# El frontend distingue al ex-miembro por su rol "removed"
+			# (tag "ya no pertenece al espacio" en el picker de
+			# responsables, seccion "Miembros eliminados" en esta pantalla).
+			# `objects` (el manager por defecto, ver WorkspaceMemberManager)
+			# lo excluye de ahi en mas de cualquier otro acceso al
+			# workspace: listado de espacios, tickets, menciones, etc.
+			target_membership.role = WorkspaceMember.Role.REMOVED
+			target_membership.is_active = False
+			target_membership.save(update_fields=["role", "is_active"])
+
+			notification = Notification.objects.create(
+				recipient=removed_user,
+				actor=request.user,
+				notification_type=Notification.Type.WORKSPACE_MEMBER_REMOVED,
+				title=f"Ya no eres miembro de {workspace.name}",
+				message=f"{request.user.full_name} te elimino del espacio {workspace.name}.",
+				data={
+					"workspace_id": str(workspace.id),
+					"workspace_slug": workspace.slug,
+					"workspace_name": workspace.name,
+				},
+			)
+
+		member_payload = WorkspaceMemberSerializer(target_membership).data
+
+		send_notification_event(
+			str(removed_user.id),
+			{
+				"type": "notification.created",
+				"notification": NotificationSerializer(notification).data,
+			},
+		)
+		send_workspace_event(
+			str(workspace.id),
+			"member.removed",
+			{"member": member_payload},
+		)
+
+		return Response(member_payload, status=status.HTTP_200_OK)
 
 
 class WorkspaceInvitationListCancelView(WorkspaceMembersManageMixin, APIView):

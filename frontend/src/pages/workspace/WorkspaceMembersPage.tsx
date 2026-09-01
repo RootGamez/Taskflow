@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useParams } from "react-router-dom";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Badge } from "@/components/ui/shadcn/badge";
@@ -14,13 +15,18 @@ import {
   useCancelWorkspaceInvitation,
   useInviteWorkspaceMember,
   useMembers,
+  useRemoveWorkspaceMember,
   useUpdateWorkspaceMemberRole,
   useWorkspaceInvitations,
   useWorkspaceMembersRealtime,
 } from "@/features/members";
-import type { WorkspaceRole } from "@/features/members";
-import { canManageWorkspaceMembers } from "@/features/workspaces/lib/permissions";
+import type { WorkspaceMember, WorkspaceRole } from "@/features/members";
+import {
+  canManageWorkspaceMembers,
+  canRemoveWorkspaceMember,
+} from "@/features/workspaces/lib/permissions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { useAuthStore } from "@/store/authStore";
 import { useWorkspaceStore } from "@/store/workspaceStore";
 
 const ROLE_OPTIONS: WorkspaceRole[] = ["admin", "member", "viewer"];
@@ -34,6 +40,7 @@ function roleLabel(role: WorkspaceRole): string {
     admin: "Admin",
     member: "Member",
     viewer: "Viewer",
+    removed: "Eliminado",
   };
   return labels[role];
 }
@@ -41,6 +48,7 @@ function roleLabel(role: WorkspaceRole): string {
 export default function WorkspaceMembersPage() {
   const { workspaceSlug = "" } = useParams();
   const activeWorkspace = useWorkspaceStore((state) => state.activeWorkspace);
+  const currentUserId = useAuthStore((state) => state.user?.id);
   const canManageMembers = canManageWorkspaceMembers(activeWorkspace?.role);
 
   useWorkspaceMembersRealtime(workspaceSlug);
@@ -50,12 +58,24 @@ export default function WorkspaceMembersPage() {
   const inviteMutation = useInviteWorkspaceMember(workspaceSlug);
   const cancelInvitationMutation = useCancelWorkspaceInvitation(workspaceSlug);
   const updateRoleMutation = useUpdateWorkspaceMemberRole(workspaceSlug);
+  const removeMemberMutation = useRemoveWorkspaceMember(workspaceSlug);
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<Exclude<WorkspaceRole, "owner">>("member");
+  const [role, setRole] = useState<Exclude<WorkspaceRole, "owner" | "removed">>("member");
+  const [memberToRemove, setMemberToRemove] = useState<WorkspaceMember | null>(null);
 
-  const sortedMembers = useMemo(
-    () => [...members].sort((a, b) => a.full_name.localeCompare(b.full_name)),
+  const activeMembers = useMemo(
+    () =>
+      members
+        .filter((member) => member.role !== "removed")
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
+    [members],
+  );
+  const removedMembers = useMemo(
+    () =>
+      members
+        .filter((member) => member.role === "removed")
+        .sort((a, b) => a.full_name.localeCompare(b.full_name)),
     [members],
   );
   const pendingInvitations = useMemo(
@@ -79,7 +99,7 @@ export default function WorkspaceMembersPage() {
     }
   };
 
-  const handleChangeRole = async (memberId: string, nextRole: Exclude<WorkspaceRole, "owner">) => {
+  const handleChangeRole = async (memberId: string, nextRole: Exclude<WorkspaceRole, "owner" | "removed">) => {
     try {
       await updateRoleMutation.mutateAsync({
         memberId,
@@ -88,6 +108,20 @@ export default function WorkspaceMembersPage() {
       toast.success("Rol actualizado");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "No se pudo actualizar el rol"));
+    }
+  };
+
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) {
+      return;
+    }
+
+    try {
+      await removeMemberMutation.mutateAsync(memberToRemove.id);
+      toast.success(`${memberToRemove.full_name} ya no pertenece a este espacio`);
+      setMemberToRemove(null);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "No se pudo eliminar al miembro"));
     }
   };
 
@@ -131,7 +165,7 @@ export default function WorkspaceMembersPage() {
             <select
               id="invite-role"
               value={role}
-              onChange={(event) => setRole(event.target.value as Exclude<WorkspaceRole, "owner">)}
+              onChange={(event) => setRole(event.target.value as Exclude<WorkspaceRole, "owner" | "removed">)}
               disabled={!canManageMembers || inviteMutation.isPending}
               className={`${SELECT_CLASS} h-10`}
             >
@@ -201,13 +235,18 @@ export default function WorkspaceMembersPage() {
 
         <div className="p-6">
           <p className="eyebrow mb-3 text-foreground">Miembros</p>
-          {sortedMembers.length === 0 ? (
+          {activeMembers.length === 0 ? (
             <p className="text-sm text-muted-foreground">No hay miembros en este workspace.</p>
           ) : (
             <ul className="divide-y-2 divide-border border-2 border-border">
-              {sortedMembers.map((member) => {
+              {activeMembers.map((member) => {
                 const isOwner = member.role === "owner";
                 const canEditRole = canManageMembers && !isOwner;
+                const canRemove = canRemoveWorkspaceMember({
+                  requesterRole: activeWorkspace?.role,
+                  targetRole: member.role,
+                  isSelf: member.user_id === currentUserId,
+                });
 
                 return (
                   <li
@@ -225,7 +264,7 @@ export default function WorkspaceMembersPage() {
                         value={member.role}
                         disabled={!canEditRole || updateRoleMutation.isPending}
                         onChange={(event) => {
-                          const nextRole = event.target.value as Exclude<WorkspaceRole, "owner">;
+                          const nextRole = event.target.value as Exclude<WorkspaceRole, "owner" | "removed">;
                           if (nextRole !== member.role) {
                             void handleChangeRole(member.id, nextRole);
                           }
@@ -242,6 +281,19 @@ export default function WorkspaceMembersPage() {
                           ))
                         )}
                       </select>
+                      {canRemove ? (
+                        <Button
+                          size="sm"
+                          color="danger"
+                          variant="flat"
+                          className="rounded-none"
+                          aria-label={`Eliminar a ${member.full_name} del espacio`}
+                          isDisabled={removeMemberMutation.isPending}
+                          onPress={() => setMemberToRemove(member)}
+                        >
+                          Eliminar
+                        </Button>
+                      ) : null}
                     </div>
                   </li>
                 );
@@ -249,7 +301,47 @@ export default function WorkspaceMembersPage() {
             </ul>
           )}
         </div>
+
+        {removedMembers.length > 0 ? (
+          <div className="space-y-3 border-t-2 border-border p-6">
+            <p className="eyebrow text-foreground">Miembros eliminados</p>
+            <p className="text-xs text-muted-foreground">
+              Ya no tienen acceso a este espacio. Sus tareas asignadas se conservan -- invitalos de
+              nuevo por email para restaurar su acceso como member.
+            </p>
+            <ul className="divide-y-2 divide-border border-2 border-dashed border-border">
+              {removedMembers.map((member) => (
+                <li
+                  key={member.id}
+                  className="flex flex-col gap-3 p-3 opacity-70 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{member.full_name}</p>
+                    <p className="font-mono text-sm text-muted-foreground">{member.email}</p>
+                  </div>
+                  <Badge variant="outline" mono className="uppercase">
+                    Ya no pertenece al espacio
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
+
+      <ConfirmDialog
+        isOpen={memberToRemove !== null}
+        title="Eliminar miembro"
+        description={
+          memberToRemove
+            ? `${memberToRemove.full_name} perdera el acceso a este espacio. Sus tareas asignadas se conservan (se marcan como de alguien que ya no pertenece al espacio) y podras restaurar su acceso invitandolo de nuevo.`
+            : ""
+        }
+        onConfirm={() => {
+          void handleRemoveMember();
+        }}
+        onClose={() => setMemberToRemove(null)}
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ class Notification(models.Model):
 	class Type(models.TextChoices):
 		WORKSPACE_INVITATION = "workspace_invitation", "Workspace invitation"
 		WORKSPACE_DELETED = "workspace_deleted", "Workspace deleted"
+		WORKSPACE_MEMBER_REMOVED = "workspace_member_removed", "Workspace member removed"
 		TICKET_ASSIGNED = "ticket_assigned", "Ticket assigned"
 		TICKET_MENTIONED = "ticket_mentioned", "Ticket mentioned"
 		TICKET_COMMENTED = "ticket_commented", "Ticket commented"

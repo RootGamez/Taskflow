@@ -6,6 +6,7 @@ import {
   getWorkspaceInvitations,
   getWorkspaceMembers,
   inviteWorkspaceMember,
+  removeWorkspaceMember,
   updateWorkspaceMemberRole,
 } from "@/features/members/api/membersApi";
 import type {
@@ -72,6 +73,23 @@ export function useUpdateWorkspaceMemberRole(workspaceSlug: string) {
   });
 }
 
+export function useRemoveWorkspaceMember(workspaceSlug: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) => removeWorkspaceMember(workspaceSlug, memberId),
+    onSuccess: (removedMember) => {
+      // Soft-delete: la API devuelve la misma fila con role="removed", asi
+      // que la actualizamos en el cache en vez de sacarla -- WorkspaceMembersPage
+      // la reubica sola en la seccion "Miembros eliminados".
+      queryClient.setQueryData<WorkspaceMember[]>(["workspace-members", workspaceSlug], (current) =>
+        (current ?? []).map((item) => (item.id === removedMember.id ? removedMember : item)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["workspace-members", workspaceSlug] });
+    },
+  });
+}
+
 export function useWorkspaceMembersRealtime(workspaceSlug: string) {
   const queryClient = useQueryClient();
   const accessToken = useAuthStore((state) => state.accessToken);
@@ -120,7 +138,14 @@ export function useWorkspaceMembersRealtime(workspaceSlug: string) {
         return;
       }
 
-      if ((data.event === "member.joined" || data.event === "member.updated") && data.payload.member) {
+      // `member.removed` trae la misma fila con role="removed" (soft-delete
+      // en el backend, ver WorkspaceMemberDetailView.delete): un upsert de
+      // mas la reubica en la seccion "Miembros eliminados" para todos los
+      // que sigan viendo esta pantalla, en vez de hacerla desaparecer.
+      if (
+        (data.event === "member.joined" || data.event === "member.updated" || data.event === "member.removed") &&
+        data.payload.member
+      ) {
         upsertMember(data.payload.member);
         return;
       }

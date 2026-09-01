@@ -34,6 +34,11 @@ function MemberAvatar({
     sm: "h-5 w-5 text-[10px]",
     md: "h-7 w-7 text-xs",
   }[size];
+  // Ex-miembro (soft-delete, role="removed"): sigue teniendo tareas
+  // asignadas aca (no se le quitan al eliminarlo del espacio), pero se
+  // desatura para distinguirlo de un responsable activo a simple vista.
+  const isRemoved = member.role === "removed";
+  const removedClass = isRemoved ? "grayscale opacity-60" : "";
 
   const initials = member.full_name
     .split(" ")
@@ -47,14 +52,14 @@ function MemberAvatar({
       <img
         src={member.avatar_url}
         alt={member.full_name}
-        className={`${sizeClass} rounded-full object-cover ring-1 ring-card`}
+        className={`${sizeClass} ${removedClass} rounded-full object-cover ring-1 ring-card`}
       />
     );
   }
 
   return (
     <div
-      className={`${sizeClass} flex items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground ring-1 ring-card`}
+      className={`${sizeClass} ${removedClass} flex items-center justify-center rounded-full bg-secondary font-semibold text-secondary-foreground ring-1 ring-card`}
     >
       {initials}
     </div>
@@ -78,6 +83,15 @@ export function TicketAssigneeSelect({
 
   // assigneeIds are User IDs (ticket.assignees[].id) — match against member.user_id
   const selectedIds = useMemo(() => new Set(assigneeIds), [assigneeIds]);
+
+  // El picker de "asignar" solo ofrece miembros activos -- alguien
+  // expulsado del espacio (role="removed") no deberia poder recibir
+  // tareas nuevas. Pero si ya estaba asignado, se lo sigue mostrando (mas
+  // abajo) para no dejar el ticket huerfano ni perder de vista quien era.
+  const assignableMembers = useMemo(
+    () => members.filter((m) => m.role !== "removed"),
+    [members],
+  );
 
   const selectedMembers = useMemo(
     () => members.filter((m) => selectedIds.has(m.user_id)),
@@ -106,12 +120,22 @@ export function TicketAssigneeSelect({
       {selectedMembers.map((member) => (
         <div
           key={member.user_id}
-          className="flex items-center gap-1 rounded-full border-[1.5px] border-border bg-muted py-0.5 pl-0.5 pr-1.5 text-xs text-foreground"
+          title={member.role === "removed" ? `${member.full_name} ya no pertenece al espacio` : undefined}
+          className={`flex items-center gap-1 rounded-full border-[1.5px] py-0.5 pl-0.5 pr-1.5 text-xs ${
+            member.role === "removed"
+              ? "border-dashed border-border bg-muted/50 text-muted-foreground"
+              : "border-border bg-muted text-foreground"
+          }`}
         >
           <MemberAvatar member={member} size="xs" />
           <span className="max-w-[80px] truncate font-medium">
             {member.full_name.split(" ")[0]}
           </span>
+          {member.role === "removed" && (
+            <span className="rounded-full bg-secondary px-1 py-px text-[9px] uppercase tracking-wide text-secondary-foreground">
+              Ex
+            </span>
+          )}
           {!disabled && (
             <button
               type="button"
@@ -166,7 +190,7 @@ export function TicketAssigneeSelect({
                   No se encontraron miembros.
                 </CommandEmpty>
                 <CommandGroup className="pb-1">
-                  {members.map((member) => {
+                  {assignableMembers.map((member) => {
                     const isSelected = selectedIds.has(member.user_id);
                     return (
                       <CommandItem

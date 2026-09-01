@@ -95,6 +95,19 @@ describe("notificationPresentation", () => {
     expect(result.icon).toBeDefined();
   });
 
+  it("workspace_member_removed: no navegable, icono definido", () => {
+    const notification = buildNotification({
+      notification_type: "workspace_member_removed",
+      data: { workspace_name: "Acme", workspace_slug: "acme" },
+    });
+
+    const result = notificationPresentation(notification);
+
+    expect(result.href).toBeNull();
+    expect(result.isActionable).toBe(false);
+    expect(result.icon).toBeDefined();
+  });
+
   it("tipo desconocido: cae a un fallback seguro (Bell, no navegable)", () => {
     const notification = buildNotification({
       notification_type: "some_future_type" as NotificationType,

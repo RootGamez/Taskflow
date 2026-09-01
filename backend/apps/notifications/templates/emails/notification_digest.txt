@@ -1,0 +1,26 @@
+RESUMEN — TASKFLOW
+
+Hola {{ recipient_name }},
+
+Tienes {{ total }} novedades. Esto es lo que paso en tus tickets desde el
+ultimo aviso.
+{% for item in items %}
+--------------------------------------------------
+{{ item.eyebrow|upper }}
+{{ item.ticket_title }}
+{{ item.lead }}
+{% if item.comment_excerpt %}
+"{{ item.comment_excerpt }}"
+{% endif %}
+{{ item.ticket_url }}
+{% endfor %}{% if hidden_count %}
++ {{ hidden_count }} novedad{{ hidden_count|pluralize:"es" }} mas en la app.
+{% endif %}
+ABRIR TASKFLOW
+{{ inbox_url }}
+
+--
+Juntamos las novedades en un solo correo para no llenarte la bandeja.
+Elegir que correos recibir: {{ preferences_url }}
+
+TaskFlow — correo automatico, no hace falta responder.

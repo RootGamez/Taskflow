@@ -35,11 +35,27 @@ class Notification(models.Model):
 	data = models.JSONField(default=dict, blank=True)
 	is_read = models.BooleanField(default=False)
 	read_at = models.DateTimeField(null=True, blank=True)
+	# Sello del envio por correo. NULL = todavia no salio. Es lo que le
+	# permite al resumen (`apps.notifications.delivery`) saber que queda
+	# pendiente y no mandar dos veces lo mismo -- la reserva en cache solo
+	# agrupa, la verdad de que falta mandar esta aca. Las notificaciones
+	# que no viajan por correo lo dejan en NULL para siempre; la consulta
+	# del resumen las excluye por tipo.
+	email_sent_at = models.DateTimeField(null=True, blank=True)
 	created_at = models.DateTimeField(default=timezone.now)
 
 	class Meta:
 		ordering = ["-created_at"]
-		indexes = [models.Index(fields=["recipient", "-created_at"])]
+		indexes = [
+			models.Index(fields=["recipient", "-created_at"]),
+			# Indice parcial: la consulta del resumen solo mira las que
+			# siguen sin mandarse, que son un punado frente al historico.
+			models.Index(
+				fields=["recipient"],
+				condition=models.Q(email_sent_at__isnull=True),
+				name="notif_pending_email_idx",
+			),
+		]
 
 	def mark_as_read(self) -> None:
 		if self.is_read:

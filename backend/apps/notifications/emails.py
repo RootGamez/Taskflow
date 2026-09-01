@@ -1,39 +1,30 @@
-"""Correo de las notificaciones de ticket.
+"""Composicion de los correos de notificacion.
 
-Tres piezas separadas a proposito:
+Este modulo solo decide *que dice* un correo y como se ve. A quien se le
+manda y cuando sale es problema de `apps.notifications.delivery`.
 
-1. `recipients_wanting_email` decide *a quien* se le manda, leyendo
-   `UserPreferences` en una sola consulta.
-2. `build_notification_email` decide *que* se manda: arma el asunto, el
-   contexto y renderiza las dos variantes (texto y HTML) del mismo mensaje.
-3. `enqueue_notification_emails` es el unico punto de entrada que usa
-   `apps.notifications.services`: filtra por preferencia y encola una tarea
-   Celery por destinatario, ya despues del commit.
+Hay dos formas del mismo mensaje:
 
-El envio nunca es sincrono dentro del request: un SMTP lento o caido
-bloquearia el POST del comentario o el PATCH del ticket.
+- `build_notification_email`: una sola novedad, con su ficha y su boton.
+- `build_digest_email`: varias novedades juntas en un resumen, que es lo
+  que evita el reguero de correos cuando alguien comenta cinco veces
+  seguidas en el mismo ticket.
 """
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterable, Sequence
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
-from django.db import transaction
-from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils.text import Truncator
 
 from apps.notifications.models import Notification
-from apps.users.models import UserPreferences
 
 if TYPE_CHECKING:
-    from uuid import UUID
-
-logger = logging.getLogger(__name__)
+    from apps.users.models import User
 
 # Tipos de notificacion que viajan por correo, y el campo de `UserPreferences`
 # que los gobierna. Un tipo que no este en este mapa jamas genera un correo
@@ -44,13 +35,20 @@ EMAIL_PREFERENCE_FIELD: dict[str, str] = {
     Notification.Type.TICKET_COMMENTED: "email_ticket_commented",
 }
 
-#: Cuanto del comentario se cita en el correo. Muy por encima de los 140
-#: caracteres del `comment_preview` que usa la campana: en el correo el
-#: usuario no tiene la conversacion al lado, asi que el extracto tiene que
-#: bastar para decidir si vale la pena abrir el ticket.
+#: Cuanto del comentario se cita en un correo de una sola novedad. Muy por
+#: encima de los 140 caracteres del `comment_preview` que usa la campana: en
+#: el correo el usuario no tiene la conversacion al lado, asi que el extracto
+#: tiene que bastar para decidir si vale la pena abrir el ticket.
 COMMENT_EXCERPT_CHARS = 600
+#: En el resumen se cita mucho menos: son varias novedades en una pantalla,
+#: y la idea es que se escaneen, no que se lean enteras.
+DIGEST_EXCERPT_CHARS = 180
 #: El asunto se corta antes de que lo corte el cliente de correo.
 SUBJECT_TITLE_CHARS = 80
+#: Cuantas novedades se listan en el resumen antes de resumirlas en un
+#: "y N mas". El resto igual queda marcado como enviado: el correo avisa
+#: que hay mas y el detalle esta en la app.
+DIGEST_MAX_ITEMS = 10
 
 
 @dataclass(frozen=True)
@@ -64,54 +62,72 @@ class NotificationEmailCopy:
     cta_label: str
 
 
+@dataclass(frozen=True)
+class DigestItem:
+    """Una novedad dentro del resumen."""
+
+    eyebrow: str
+    headline: str
+    lead: str
+    ticket_title: str
+    ticket_url: str
+    comment_excerpt: str
+
+
 def is_emailable(notification_type: str) -> bool:
     return notification_type in EMAIL_PREFERENCE_FIELD
 
 
-def recipients_wanting_email(
-    notification_type: str,
-    recipient_ids: Iterable["UUID"],
-) -> set["UUID"]:
-    """Subconjunto de `recipient_ids` que acepta correo para este tipo.
+def _comment_excerpts(
+    notifications: Sequence[Notification],
+    max_chars: int,
+) -> dict[str, str]:
+    """Extractos de los comentarios citados, indexados por `comment_id`.
 
-    La ausencia de fila en `UserPreferences` significa "quiere todo": los
-    defaults del modelo son `True` y no hay ninguna garantia de que la fila
-    exista (solo se crea en el primer PATCH de preferencias). Por eso la
-    consulta busca a los que *optaron por salir*, no a los que aceptan.
+    Relee el `body` del comentario (texto plano, ver
+    `apps.comments.models.Comment`) en vez del `comment_preview` guardado en
+    `data`, que esta recortado a 140 caracteres para la campana. Una sola
+    consulta para todas las notificaciones: el resumen puede traer diez.
     """
-    wanted_ids = set(recipient_ids)
-    if not wanted_ids or not is_emailable(notification_type):
-        return set()
-
-    preference_field = EMAIL_PREFERENCE_FIELD[notification_type]
-    opted_out = set(
-        UserPreferences.objects.filter(user_id__in=wanted_ids)
-        .filter(Q(email_notifications=False) | Q(**{preference_field: False}))
-        .values_list("user_id", flat=True)
-    )
-
-    return wanted_ids - opted_out
-
-
-def _comment_excerpt(notification: Notification) -> str:
-    """Extracto del comentario citado, o "" si la notificacion no cita uno.
-
-    Prefiere releer el `body` del comentario (texto plano, ver
-    `apps.comments.models.Comment`) antes que el `comment_preview` guardado
-    en `data`, que esta recortado a 140 caracteres para la campana.
-    """
-    comment_id = notification.data.get("comment_id")
-    if not comment_id:
-        return ""
+    comment_ids = {
+        notification.data.get("comment_id")
+        for notification in notifications
+        if notification.data.get("comment_id")
+    }
+    if not comment_ids:
+        return {}
 
     from apps.comments.models import Comment
 
-    body = (
-        Comment.objects.filter(id=comment_id).values_list("body", flat=True).first()
-        or notification.data.get("comment_preview")
-        or ""
-    )
-    return Truncator(body).chars(COMMENT_EXCERPT_CHARS)
+    # Las claves se pasan a str: en `data` los ids viajan serializados y
+    # `values_list` los devuelve como UUID, que no casan entre si.
+    bodies = {
+        str(comment_id): body
+        for comment_id, body in Comment.objects.filter(id__in=comment_ids).values_list(
+            "id", "body"
+        )
+    }
+    # Si el comentario ya no esta, queda el preview de `data` como respaldo.
+    fallbacks = {
+        notification.data["comment_id"]: notification.data.get("comment_preview") or ""
+        for notification in notifications
+        if notification.data.get("comment_id")
+    }
+
+    return {
+        comment_id: Truncator(
+            bodies.get(comment_id) or fallbacks.get(comment_id, "")
+        ).chars(max_chars)
+        for comment_id in comment_ids
+    }
+
+
+def _excerpt_for(
+    notification: Notification,
+    excerpts: dict[str, str],
+) -> str:
+    comment_id = notification.data.get("comment_id")
+    return excerpts.get(comment_id, "") if comment_id else ""
 
 
 def _copy_for(
@@ -153,123 +169,132 @@ def _copy_for(
     )
 
 
+def _frontend_url() -> str:
+    return settings.FRONTEND_URL.rstrip("/")
+
+
+def _ticket_url(notification: Notification, frontend_url: str) -> str:
+    ticket_id = notification.data.get("ticket_id")
+    return f"{frontend_url}/tickets/{ticket_id}" if ticket_id else frontend_url
+
+
+def _can_email(recipient: "User") -> bool:
+    return bool(recipient.email) and recipient.is_active
+
+
+def _render(
+    subject: str,
+    recipient_email: str,
+    template_stem: str,
+    context: dict,
+) -> EmailMultiAlternatives:
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=render_to_string(f"emails/{template_stem}.txt", context),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[recipient_email],
+    )
+    message.attach_alternative(
+        render_to_string(f"emails/{template_stem}.html", context), "text/html"
+    )
+    return message
+
+
 def build_notification_email(notification: Notification) -> EmailMultiAlternatives | None:
-    """Mensaje listo para enviar, o `None` si esta notificacion no lleva correo."""
+    """Correo de una sola novedad, o `None` si esta no lleva correo."""
     if not is_emailable(notification.notification_type):
         return None
 
     recipient = notification.recipient
-    if not recipient.email or not recipient.is_active:
+    if not _can_email(recipient):
         return None
 
-    frontend_url = settings.FRONTEND_URL.rstrip("/")
-    ticket_id = notification.data.get("ticket_id")
+    frontend_url = _frontend_url()
     ticket_title = notification.data.get("ticket_title") or "un ticket"
     actor_name = notification.actor.full_name if notification.actor else ""
-
     copy = _copy_for(notification, actor_name, ticket_title)
+    excerpts = _comment_excerpts([notification], COMMENT_EXCERPT_CHARS)
 
     context = {
         "copy": copy,
         "recipient_name": recipient.full_name or recipient.email,
         "actor_name": actor_name,
         "ticket_title": ticket_title,
-        "comment_excerpt": _comment_excerpt(notification),
-        "ticket_url": f"{frontend_url}/tickets/{ticket_id}" if ticket_id else frontend_url,
+        "comment_excerpt": _excerpt_for(notification, excerpts),
+        "ticket_url": _ticket_url(notification, frontend_url),
         "preferences_url": f"{frontend_url}/settings/account",
     }
 
-    message = EmailMultiAlternatives(
-        subject=copy.subject,
-        body=render_to_string("emails/notification.txt", context),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[recipient.email],
-    )
-    message.attach_alternative(render_to_string("emails/notification.html", context), "text/html")
-    return message
+    return _render(copy.subject, recipient.email, "notification", context)
 
 
-def send_notification_email(notification_id: str) -> bool:
-    """Envia el correo de una notificacion. `True` si salio algo.
+def _digest_subject(notifications: Sequence[Notification], total: int) -> str:
+    ticket_ids = {notification.data.get("ticket_id") for notification in notifications}
+    if len(ticket_ids) == 1 and next(iter(ticket_ids)):
+        ticket_title = Truncator(
+            notifications[0].data.get("ticket_title") or "un ticket"
+        ).chars(SUBJECT_TITLE_CHARS)
+        return f"{total} novedades en “{ticket_title}”"
+    return f"{total} novedades en TaskFlow"
 
-    Se relee la notificacion (y su preferencia) desde la base a proposito:
-    entre el encolado y la ejecucion de la tarea pudo pasar cualquier cosa
-    -- que borren la notificacion, o que el usuario apague el switch.
+
+def build_digest_email(
+    recipient: "User",
+    notifications: Sequence[Notification],
+) -> EmailMultiAlternatives | None:
+    """Resumen con varias novedades del mismo usuario en un solo correo.
+
+    Con una sola novedad no tiene sentido el formato de lista: se delega en
+    `build_notification_email`, que la presenta con su ficha y su boton.
     """
-    notification = (
-        Notification.objects.filter(id=notification_id)
-        .select_related("recipient", "actor")
-        .first()
-    )
-    if notification is None:
-        return False
+    emailable = [item for item in notifications if is_emailable(item.notification_type)]
+    if not emailable or not _can_email(recipient):
+        return None
+    if len(emailable) == 1:
+        return build_notification_email(emailable[0])
 
-    if notification.recipient_id not in recipients_wanting_email(
-        notification.notification_type, [notification.recipient_id]
-    ):
-        return False
+    frontend_url = _frontend_url()
+    # Mas nuevas primero, igual que la campana.
+    ordered = sorted(emailable, key=lambda item: item.created_at, reverse=True)
+    shown = ordered[:DIGEST_MAX_ITEMS]
+    excerpts = _comment_excerpts(shown, DIGEST_EXCERPT_CHARS)
 
-    message = build_notification_email(notification)
-    if message is None:
-        return False
-
-    message.send(fail_silently=False)
-    return True
-
-
-def enqueue_notification_emails(notifications: Sequence[Notification]) -> None:
-    """Encola un correo por notificacion, para quien lo haya dejado activado.
-
-    Blindado entero: el correo es un efecto secundario del comentario o de
-    la asignacion, asi que ni un broker caido ni una preferencia ilegible
-    pueden tumbar la operacion que lo disparo.
-    """
-    if not notifications or not getattr(settings, "NOTIFICATION_EMAILS_ENABLED", True):
-        return
-
-    try:
-        emailable = [item for item in notifications if is_emailable(item.notification_type)]
-        if not emailable:
-            return
-
-        # Una consulta de preferencias por tipo presente, no una por
-        # notificacion: un comentario con diez menciones son dos consultas.
-        allowed_by_type = {
-            notification_type: recipients_wanting_email(
-                notification_type,
-                [
-                    item.recipient_id
-                    for item in emailable
-                    if item.notification_type == notification_type
-                ],
+    items = []
+    for notification in shown:
+        ticket_title = notification.data.get("ticket_title") or "un ticket"
+        actor_name = notification.actor.full_name if notification.actor else ""
+        copy = _copy_for(notification, actor_name, ticket_title)
+        items.append(
+            DigestItem(
+                eyebrow=copy.eyebrow,
+                headline=copy.headline,
+                lead=copy.lead,
+                ticket_title=ticket_title,
+                ticket_url=_ticket_url(notification, frontend_url),
+                comment_excerpt=_excerpt_for(notification, excerpts),
             )
-            for notification_type in {item.notification_type for item in emailable}
-        }
+        )
 
-        pending_ids = [
-            str(item.id)
-            for item in emailable
-            if item.recipient_id in allowed_by_type[item.notification_type]
-        ]
-    except Exception:
-        logger.exception("No se pudieron resolver los destinatarios de correo de notificaciones")
-        return
+    subject = _digest_subject(ordered, len(ordered))
+    context = {
+        "recipient_name": recipient.full_name or recipient.email,
+        "items": items,
+        "total": len(ordered),
+        "hidden_count": max(len(ordered) - len(shown), 0),
+        "inbox_url": f"{frontend_url}/dashboard",
+        "preferences_url": f"{frontend_url}/settings/account",
+    }
 
-    if not pending_ids:
-        return
+    return _render(subject, recipient.email, "notification_digest", context)
 
-    def _dispatch() -> None:
-        from apps.notifications.tasks import send_notification_email_task
 
-        for notification_id in pending_ids:
-            try:
-                send_notification_email_task.delay(notification_id)
-            except Exception:
-                logger.exception(
-                    "No se pudo encolar el correo de la notificacion %s", notification_id
-                )
+def build_email_for(
+    recipient: "User",
+    notifications: Iterable[Notification],
+) -> EmailMultiAlternatives | None:
+    """Un correo para todo lo que este pendiente de este usuario.
 
-    # `on_commit` para no encolar una tarea que corra antes de que la
-    # notificacion exista para el worker (otra conexion, otra transaccion).
-    # Fuera de una transaccion Django lo ejecuta en el acto.
-    transaction.on_commit(_dispatch)
+    Punto de entrada unico de la capa de composicion: decide sola si toca
+    una novedad suelta o un resumen.
+    """
+    return build_digest_email(recipient, list(notifications))

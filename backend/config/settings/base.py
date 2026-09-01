@@ -263,6 +263,13 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 # comentarios). Apagarlo corta el envio de raiz sin tocar las preferencias
 # de cada usuario -- util en entornos de prueba con datos reales.
 NOTIFICATION_EMAILS_ENABLED = env_bool("NOTIFICATION_EMAILS_ENABLED", True)
+
+# Ventana de agrupacion del correo de notificaciones, en segundos. Todo lo
+# que le llegue a una persona dentro de la ventana sale en un solo correo,
+# en vez de uno por evento. 0 desactiva la agrupacion (envio inmediato).
+NOTIFICATION_EMAIL_DIGEST_SECONDS = int(
+    os.getenv("NOTIFICATION_EMAIL_DIGEST_SECONDS", "300")
+)
 PASSWORD_RESET_TOKEN_TTL_MINUTES = int(
     os.getenv("PASSWORD_RESET_TOKEN_TTL_MINUTES", "30")
 )

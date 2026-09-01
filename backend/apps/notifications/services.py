@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apps.notifications.emails import enqueue_notification_emails
+from apps.notifications.delivery import enqueue_notification_emails
 from apps.notifications.models import Notification
 from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationSerializer
@@ -32,7 +32,7 @@ def _create_and_fan_out(pending_notifications: list[Notification]) -> list[Notif
 
     La campana (WebSocket) sale en el acto; el correo se encola y se manda
     despues del commit, y solo a quien lo tenga activado -- ver
-    `apps.notifications.emails`.
+    `apps.notifications.delivery`.
     """
     created_notifications = Notification.objects.bulk_create(pending_notifications)
 

@@ -1,39 +1,25 @@
-"""Cubre `apps.notifications.emails`: a quien se le manda, que dice y que
-pasa cuando el usuario apaga el switch.
+"""Cubre `apps.notifications.emails`: que dice cada correo y como se arma.
 
-Las pruebas de integracion usan `captureOnCommitCallbacks`: el encolado del
-correo cuelga de `transaction.on_commit`, que dentro de un `TestCase` (todo
-envuelto en una transaccion que se revierte) no correria nunca solo.
+A quien se le manda y cuando sale se prueba aparte, en `test_delivery.py`.
 """
 
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
-from django.core import mail
 from django.test import TestCase, override_settings
 
 from apps.comments.models import Comment
 from apps.notifications.emails import (
+    DIGEST_MAX_ITEMS,
+    build_digest_email,
     build_notification_email,
-    recipients_wanting_email,
 )
 from apps.notifications.models import Notification
-from apps.notifications.services import notify_comment_created, notify_ticket_assigned
 from apps.projects.models import Project, ProjectColumn
 from apps.tickets.models import Ticket
-from apps.users.models import UserPreferences
 from apps.workspaces.models import Workspace, WorkspaceMember
 
 User = get_user_model()
-
-EMAIL_TEST_SETTINGS = {
-    "EMAIL_BACKEND": "django.core.mail.backends.locmem.EmailBackend",
-    # Sin worker en las pruebas: la tarea corre en el mismo proceso.
-    "CELERY_TASK_ALWAYS_EAGER": True,
-    "CELERY_TASK_EAGER_PROPAGATES": True,
-    "NOTIFICATION_EMAILS_ENABLED": True,
-    "FRONTEND_URL": "https://app.taskflow.test",
-}
 
 
 class TicketScenarioMixin:
@@ -70,72 +56,14 @@ class TicketScenarioMixin:
         )
         self.ticket.assignees.set([self.assignee])
 
-
-class RecipientsWantingEmailTests(TicketScenarioMixin, TestCase):
-    def setUp(self) -> None:
-        self.build_scenario()
-
-    def test_user_without_preferences_row_receives_everything(self) -> None:
-        """La fila de preferencias solo se crea en el primer PATCH: que no
-        exista significa "quiere todo", no "no quiere nada"."""
-        self.assertFalse(UserPreferences.objects.filter(user=self.assignee).exists())
-
-        allowed = recipients_wanting_email(
-            Notification.Type.TICKET_ASSIGNED, [self.assignee.id]
-        )
-
-        self.assertEqual(allowed, {self.assignee.id})
-
-    def test_master_switch_off_silences_every_type(self) -> None:
-        UserPreferences.objects.create(user=self.assignee, email_notifications=False)
-
-        for notification_type in (
-            Notification.Type.TICKET_ASSIGNED,
-            Notification.Type.TICKET_MENTIONED,
-            Notification.Type.TICKET_COMMENTED,
-        ):
-            with self.subTest(notification_type=notification_type):
-                self.assertEqual(
-                    recipients_wanting_email(notification_type, [self.assignee.id]), set()
-                )
-
-    def test_per_type_switch_only_silences_its_own_type(self) -> None:
-        UserPreferences.objects.create(user=self.assignee, email_ticket_commented=False)
-
-        self.assertEqual(
-            recipients_wanting_email(Notification.Type.TICKET_COMMENTED, [self.assignee.id]),
-            set(),
-        )
-        self.assertEqual(
-            recipients_wanting_email(Notification.Type.TICKET_ASSIGNED, [self.assignee.id]),
-            {self.assignee.id},
-        )
-
-    def test_filters_only_the_users_who_opted_out(self) -> None:
-        UserPreferences.objects.create(user=self.owner, email_ticket_mentioned=False)
-
-        allowed = recipients_wanting_email(
-            Notification.Type.TICKET_MENTIONED, [self.owner.id, self.mentioned.id]
-        )
-
-        self.assertEqual(allowed, {self.mentioned.id})
-
-    def test_type_that_does_not_travel_by_email_yields_nobody(self) -> None:
-        allowed = recipients_wanting_email(
-            Notification.Type.WORKSPACE_DELETED, [self.owner.id, self.assignee.id]
-        )
-
-        self.assertEqual(allowed, set())
-
-
-@override_settings(**EMAIL_TEST_SETTINGS)
-class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
-    def setUp(self) -> None:
-        self.build_scenario()
-
-    def _build(self, notification_type: str, data_extra: dict | None = None) -> object:
-        notification = Notification.objects.create(
-            recipient=self.assignee,
+    def build_notification(
+        self,
+        notification_type: str,
+        data_extra: dict | None = None,
+        recipient=None,
+    ) -> Notification:
+        return Notification.objects.create(
+            recipient=recipient or self.assignee,
             actor=self.owner,
             notification_type=notification_type,
             title="Titulo",
@@ -148,10 +76,17 @@ class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
                 **(data_extra or {}),
             },
         )
-        return build_notification_email(notification)
+
+
+@override_settings(FRONTEND_URL="https://app.taskflow.test")
+class SingleNotificationEmailTests(TicketScenarioMixin, TestCase):
+    def setUp(self) -> None:
+        self.build_scenario()
 
     def test_assignment_email_names_the_actor_and_links_the_ticket(self) -> None:
-        message = self._build(Notification.Type.TICKET_ASSIGNED)
+        message = build_notification_email(
+            self.build_notification(Notification.Type.TICKET_ASSIGNED)
+        )
 
         self.assertIn(self.ticket.title, message.subject)
         self.assertEqual(message.to, [self.assignee.email])
@@ -161,12 +96,16 @@ class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
         self.assertIn(self.ticket.title, message.body)
 
     def test_mention_email_subject_leads_with_the_actor(self) -> None:
-        message = self._build(Notification.Type.TICKET_MENTIONED)
+        message = build_notification_email(
+            self.build_notification(Notification.Type.TICKET_MENTIONED)
+        )
 
         self.assertTrue(message.subject.startswith("Olivia Owner te menciono"))
 
     def test_email_carries_both_a_text_and_an_html_body(self) -> None:
-        message = self._build(Notification.Type.TICKET_COMMENTED)
+        message = build_notification_email(
+            self.build_notification(Notification.Type.TICKET_COMMENTED)
+        )
 
         self.assertEqual(len(message.alternatives), 1)
         self.assertEqual(message.alternatives[0][1], "text/html")
@@ -178,16 +117,19 @@ class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
         body = "Detalle importante. " * 15  # 300 caracteres
         comment = Comment.objects.create(ticket=self.ticket, author=self.owner, body=body)
 
-        message = self._build(
-            Notification.Type.TICKET_COMMENTED,
-            {"comment_id": str(comment.id), "comment_preview": body[:140]},
+        message = build_notification_email(
+            self.build_notification(
+                Notification.Type.TICKET_COMMENTED,
+                {"comment_id": str(comment.id), "comment_preview": body[:140]},
+            )
         )
 
-        html = message.alternatives[0][0]
-        self.assertIn(body[:280], html)
+        self.assertIn(body[:280], message.alternatives[0][0])
 
     def test_footer_links_to_the_preferences_page(self) -> None:
-        message = self._build(Notification.Type.TICKET_ASSIGNED)
+        message = build_notification_email(
+            self.build_notification(Notification.Type.TICKET_ASSIGNED)
+        )
 
         self.assertIn("https://app.taskflow.test/settings/account", message.alternatives[0][0])
 
@@ -195,7 +137,9 @@ class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
         self.assignee.is_active = False
         self.assignee.save(update_fields=["is_active"])
 
-        self.assertIsNone(self._build(Notification.Type.TICKET_ASSIGNED))
+        self.assertIsNone(
+            build_notification_email(self.build_notification(Notification.Type.TICKET_ASSIGNED))
+        )
 
     def test_type_that_does_not_travel_by_email_builds_nothing(self) -> None:
         notification = Notification.objects.create(
@@ -208,77 +152,106 @@ class NotificationEmailContentTests(TicketScenarioMixin, TestCase):
         self.assertIsNone(build_notification_email(notification))
 
 
-@override_settings(**EMAIL_TEST_SETTINGS)
-class NotificationEmailDeliveryTests(TicketScenarioMixin, TestCase):
-    """Integra desde el disparador de dominio hasta la bandeja de salida."""
-
+@override_settings(FRONTEND_URL="https://app.taskflow.test")
+class DigestEmailTests(TicketScenarioMixin, TestCase):
     def setUp(self) -> None:
         self.build_scenario()
-        mail.outbox.clear()
 
-    def _comment_with_mention(self) -> Comment:
-        comment = Comment.objects.create(
-            ticket=self.ticket, author=self.owner, body="Subamos hoy el avance"
+    def test_a_single_novelty_uses_the_single_notification_format(self) -> None:
+        """Con una sola novedad el formato de lista sobra: se manda la
+        ficha con su boton, que es mas util."""
+        notification = self.build_notification(Notification.Type.TICKET_ASSIGNED)
+
+        message = build_digest_email(self.assignee, [notification])
+
+        self.assertIn(self.ticket.title, message.subject)
+        self.assertNotIn("novedades", message.subject)
+
+    def test_several_novelties_travel_in_one_email(self) -> None:
+        notifications = [
+            self.build_notification(Notification.Type.TICKET_ASSIGNED),
+            self.build_notification(Notification.Type.TICKET_MENTIONED),
+            self.build_notification(Notification.Type.TICKET_COMMENTED),
+        ]
+
+        message = build_digest_email(self.assignee, notifications)
+
+        self.assertIn("3 novedades", message.subject)
+        html = message.alternatives[0][0]
+        for eyebrow in ("Asignacion", "Mencion", "Comentario"):
+            self.assertIn(eyebrow, html)
+
+    def test_subject_names_the_ticket_when_all_the_novelties_share_one(self) -> None:
+        notifications = [
+            self.build_notification(Notification.Type.TICKET_COMMENTED),
+            self.build_notification(Notification.Type.TICKET_MENTIONED),
+        ]
+
+        message = build_digest_email(self.assignee, notifications)
+
+        self.assertIn(self.ticket.title, message.subject)
+
+    def test_subject_stays_generic_when_the_novelties_span_tickets(self) -> None:
+        notifications = [
+            self.build_notification(Notification.Type.TICKET_COMMENTED),
+            self.build_notification(
+                Notification.Type.TICKET_MENTIONED,
+                {"ticket_id": "00000000-0000-0000-0000-0000000000ff", "ticket_title": "Otro"},
+            ),
+        ]
+
+        message = build_digest_email(self.assignee, notifications)
+
+        self.assertEqual(message.subject, "2 novedades en TaskFlow")
+
+    def test_long_digests_are_capped_and_say_how_many_are_missing(self) -> None:
+        extra = 4
+        notifications = [
+            self.build_notification(Notification.Type.TICKET_COMMENTED)
+            for _ in range(DIGEST_MAX_ITEMS + extra)
+        ]
+
+        message = build_digest_email(self.assignee, notifications)
+
+        self.assertIn(f"{DIGEST_MAX_ITEMS + extra} novedades", message.subject)
+        self.assertIn(f"+ {extra} novedades mas", message.alternatives[0][0])
+
+    def test_digest_quotes_every_comment_it_lists(self) -> None:
+        first = Comment.objects.create(
+            ticket=self.ticket, author=self.owner, body="Subamos el avance hoy"
         )
-        comment.mentions.set([self.mentioned])
-        return comment
-
-    def test_comment_emails_the_mentioned_user_and_the_assignee(self) -> None:
-        comment = self._comment_with_mention()
-
-        with self.captureOnCommitCallbacks(execute=True):
-            notify_comment_created(comment)
-
-        recipients = {address for message in mail.outbox for address in message.to}
-        self.assertEqual(recipients, {self.mentioned.email, self.assignee.email})
-
-    def test_assignment_emails_the_new_assignee(self) -> None:
-        with self.captureOnCommitCallbacks(execute=True):
-            notify_ticket_assigned(self.ticket, self.owner, [self.mentioned.id])
-
-        self.assertEqual([message.to for message in mail.outbox], [[self.mentioned.email]])
-
-    def test_opting_out_removes_the_email_but_keeps_the_in_app_notification(self) -> None:
-        UserPreferences.objects.create(user=self.assignee, email_ticket_commented=False)
-        comment = self._comment_with_mention()
-
-        with self.captureOnCommitCallbacks(execute=True):
-            notify_comment_created(comment)
-
-        self.assertTrue(
-            Notification.objects.filter(
-                recipient=self.assignee, notification_type=Notification.Type.TICKET_COMMENTED
-            ).exists()
+        second = Comment.objects.create(
+            ticket=self.ticket, author=self.owner, body="Y revisemos el contraste"
         )
-        recipients = {address for message in mail.outbox for address in message.to}
-        self.assertEqual(recipients, {self.mentioned.email})
+        notifications = [
+            self.build_notification(
+                Notification.Type.TICKET_COMMENTED, {"comment_id": str(first.id)}
+            ),
+            self.build_notification(
+                Notification.Type.TICKET_COMMENTED, {"comment_id": str(second.id)}
+            ),
+        ]
 
-    @override_settings(NOTIFICATION_EMAILS_ENABLED=False)
-    def test_global_kill_switch_stops_every_email(self) -> None:
-        comment = self._comment_with_mention()
+        html = build_digest_email(self.assignee, notifications).alternatives[0][0]
 
-        with self.captureOnCommitCallbacks(execute=True):
-            notify_comment_created(comment)
+        self.assertIn("Subamos el avance hoy", html)
+        self.assertIn("Y revisemos el contraste", html)
 
-        self.assertEqual(mail.outbox, [])
-        self.assertTrue(Notification.objects.filter(recipient=self.mentioned).exists())
+    def test_types_without_email_never_reach_the_digest(self) -> None:
+        emailable = self.build_notification(Notification.Type.TICKET_COMMENTED)
+        Notification.objects.create(
+            recipient=self.assignee,
+            notification_type=Notification.Type.WORKSPACE_DELETED,
+            title="Workspace borrado",
+            data={"workspace_name": "Producto"},
+        )
+        silent = Notification.objects.get(notification_type=Notification.Type.WORKSPACE_DELETED)
 
-    def test_a_broken_email_pipeline_does_not_break_the_notification(self) -> None:
-        """El correo es un efecto secundario: si el broker o el SMTP fallan,
-        la notificacion en la app tiene que quedar igual."""
-        with override_settings(EMAIL_BACKEND="apps.notifications.test_emails.ExplodingBackend"):
-            comment = self._comment_with_mention()
-            with self.captureOnCommitCallbacks(execute=True):
-                notify_comment_created(comment)
+        message = build_digest_email(self.assignee, [emailable, silent])
 
-        self.assertTrue(Notification.objects.filter(recipient=self.mentioned).exists())
+        # Queda una sola novedad enviable, asi que vuelve al formato simple.
+        self.assertIn(self.ticket.title, message.subject)
+        self.assertNotIn("novedades", message.subject)
 
-
-class ExplodingBackend:
-    """Backend de correo que siempre revienta, para probar el blindaje."""
-
-    def __init__(self, *args, **kwargs) -> None:
-        pass
-
-    def send_messages(self, email_messages):  # noqa: ARG002
-        raise RuntimeError("SMTP caido")
+    def test_nothing_to_send_builds_nothing(self) -> None:
+        self.assertIsNone(build_digest_email(self.assignee, []))

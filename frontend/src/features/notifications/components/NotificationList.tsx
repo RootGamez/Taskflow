@@ -5,6 +5,7 @@ import { Bell } from "lucide-react";
 
 import { Badge } from "@/components/ui/shadcn/badge";
 import { groupNotificationsByRecency } from "@/features/notifications/lib/groupNotificationsByRecency";
+import { notificationContent } from "@/features/notifications/lib/notificationContent";
 import { notificationPresentation } from "@/features/notifications/lib/notificationPresentation";
 import {
   useMarkAllNotificationsRead,
@@ -42,8 +43,10 @@ function NotificationListItem({
   const isNavigable = !isInvitation && presentation.isActionable && presentation.href !== null;
   const isClickable = isPendingInvitation || isNavigable;
   const workspaceName = notification.data.workspace_name;
-  const ticketReference = notification.data.ticket_title;
-  const commentPreview = notification.data.comment_preview;
+  // El backend manda el ticket dentro del titulo Y aparte en `data`, y el
+  // extracto del comentario en `message` Y en `data.comment_preview`.
+  // Pintarlo crudo mostraba las dos cosas duplicadas en la campana.
+  const content = notificationContent(notification);
   const Icon = presentation.icon;
 
   const handleClick = () => {
@@ -96,7 +99,7 @@ function NotificationListItem({
                 notification.is_read ? "font-normal text-muted-foreground" : "font-medium text-foreground"
               }`}
             >
-              {notification.title}
+              {content.title}
             </p>
             {isInvitation ? (
               <Badge variant="primary" className="mt-0.5 text-[10px]">
@@ -107,13 +110,21 @@ function NotificationListItem({
         </div>
       </div>
 
-      <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{notification.message}</p>
+      <div className="space-y-1">
+        {content.body ? (
+          <p className="line-clamp-2 text-xs leading-5 text-muted-foreground">{content.body}</p>
+        ) : null}
 
-      {ticketReference ? <p className="mt-1 truncate text-xs text-muted-foreground">{ticketReference}</p> : null}
+        {content.context ? (
+          <p className="truncate text-xs text-muted-foreground">{content.context}</p>
+        ) : null}
 
-      {commentPreview ? (
-        <p className="mt-1 line-clamp-2 text-xs italic text-muted-foreground">&ldquo;{commentPreview}&rdquo;</p>
-      ) : null}
+        {content.quote ? (
+          <p className="line-clamp-2 text-xs italic leading-5 text-muted-foreground">
+            &ldquo;{content.quote}&rdquo;
+          </p>
+        ) : null}
+      </div>
 
       {isInvitation ? (
         <div className="mt-2 flex items-center gap-2">

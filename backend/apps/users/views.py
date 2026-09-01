@@ -330,6 +330,18 @@ class UserSessionRevokeOthersView(APIView):
 class UserPreferencesView(APIView):
 	permission_classes = [IsAuthenticated]
 
+	def get(self, request: Request) -> Response:
+		from apps.users.models import UserPreferences
+
+		# Sin `get_or_create`: un GET no debe escribir. Si el usuario nunca
+		# toco sus preferencias devolvemos una instancia en memoria, que el
+		# serializer rinde con los `default` del modelo (todo activado).
+		preferences = (
+			UserPreferences.objects.filter(user=request.user).first()
+			or UserPreferences(user=request.user)
+		)
+		return Response(UserPreferencesSerializer(preferences).data, status=status.HTTP_200_OK)
+
 	def patch(self, request: Request) -> Response:
 		from apps.users.models import UserPreferences
 		

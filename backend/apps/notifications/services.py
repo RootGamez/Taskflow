@@ -1,17 +1,19 @@
 """Disparadores de notificaciones para tickets.
 
 Firmas estables consumidas por `apps.comments` (menciones/comentarios) y
-`apps.activities` (asignaciones, vía `apps.tickets.serializers`). La
-implementación real la completa cada dueño (ver docs/DESIGN_SYSTEM.md y el
-plan de la tanda "Comentarios + Actividad + Notificaciones"); estos stubs
-existen para que el resto de la tanda pueda desarrollarse en paralelo sin
-esperar la implementación final.
+`apps.activities` (asignaciones, vía `apps.tickets.serializers`).
+
+Cada disparador decide *a quién* le corresponde la notificación y arma su
+contenido; el reparto por los dos canales de salida (campana por WebSocket
+y correo) está centralizado en `_create_and_fan_out`, para que agregar un
+tipo nuevo no obligue a acordarse de los dos.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from apps.notifications.emails import enqueue_notification_emails
 from apps.notifications.models import Notification
 from apps.notifications.realtime import send_notification_event
 from apps.notifications.serializers import NotificationSerializer
@@ -23,6 +25,29 @@ if TYPE_CHECKING:
     from apps.comments.models import Comment
     from apps.tickets.models import Ticket
     from apps.users.models import User
+
+
+def _create_and_fan_out(pending_notifications: list[Notification]) -> list[Notification]:
+    """Guarda las notificaciones y dispara sus dos canales de salida.
+
+    La campana (WebSocket) sale en el acto; el correo se encola y se manda
+    despues del commit, y solo a quien lo tenga activado -- ver
+    `apps.notifications.emails`.
+    """
+    created_notifications = Notification.objects.bulk_create(pending_notifications)
+
+    for notification in created_notifications:
+        send_notification_event(
+            str(notification.recipient_id),
+            {
+                "type": "notification.created",
+                "notification": NotificationSerializer(notification).data,
+            },
+        )
+
+    enqueue_notification_emails(created_notifications)
+
+    return created_notifications
 
 
 def notify_ticket_assigned(
@@ -68,18 +93,7 @@ def notify_ticket_assigned(
         for user_id in recipient_ids
     ]
 
-    created_notifications = Notification.objects.bulk_create(pending_notifications)
-
-    for notification in created_notifications:
-        send_notification_event(
-            str(notification.recipient_id),
-            {
-                "type": "notification.created",
-                "notification": NotificationSerializer(notification).data,
-            },
-        )
-
-    return created_notifications
+    return _create_and_fan_out(pending_notifications)
 
 
 def notify_comment_created(comment: "Comment") -> list[Notification]:
@@ -171,15 +185,4 @@ def notify_comment_created(comment: "Comment") -> list[Notification]:
         for user_id in follower_ids
     ]
 
-    created_notifications = Notification.objects.bulk_create(pending_notifications)
-
-    for notification in created_notifications:
-        send_notification_event(
-            str(notification.recipient_id),
-            {
-                "type": "notification.created",
-                "notification": NotificationSerializer(notification).data,
-            },
-        )
-
-    return created_notifications
+    return _create_and_fan_out(pending_notifications)

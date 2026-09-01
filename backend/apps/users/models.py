@@ -73,13 +73,29 @@ class UserSession(models.Model):
 
 
 class UserPreferences(models.Model):
+	"""Preferencias de la cuenta. La fila es opcional: si no existe, valen
+	los `default` de abajo (todo activado). Por eso el codigo que lee estas
+	preferencias nunca debe asumir que la fila esta creada -- ver
+	`apps.notifications.emails.recipients_wanting_email`, que trata la
+	ausencia de fila como "quiere recibir todo".
+	"""
+
 	user = models.OneToOneField(
 		User,
 		on_delete=models.CASCADE,
 		related_name="preferences",
 	)
+	# Interruptor maestro: si esta en False no sale ningun correo de
+	# notificacion, sin importar los switches por tipo de mas abajo.
 	email_notifications = models.BooleanField(default=True)
 	push_notifications = models.BooleanField(default=True)
+	# Un switch por tipo de notificacion que puede viajar por correo. El
+	# nombre del campo lo mapea `apps.notifications.emails.EMAIL_PREFERENCE_FIELD`
+	# contra `Notification.Type`; si agregas un tipo emailable nuevo, agrega
+	# aca su campo (default=True: el usuario opta por salir, no por entrar).
+	email_ticket_assigned = models.BooleanField(default=True)
+	email_ticket_mentioned = models.BooleanField(default=True)
+	email_ticket_commented = models.BooleanField(default=True)
 	created_at = models.DateTimeField(default=timezone.now)
 	updated_at = models.DateTimeField(auto_now=True)
 

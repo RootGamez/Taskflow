@@ -1,28 +1,13 @@
-import { Button, Switch } from "@heroui/react";
+import { Button } from "@heroui/react";
 import { Settings } from "lucide-react";
-import { useState } from "react";
 import { toast } from "react-hot-toast";
 
+import { EmailNotificationPreferences } from "@/features/notifications/components/EmailNotificationPreferences";
 import { apiClient } from "@/lib/axios";
 import { useAuthStore } from "@/store/authStore";
 
 export function UserAccountPage() {
   const user = useAuthStore((state) => state.user);
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-
-  const handleSaveNotifications = async () => {
-    try {
-      await apiClient.patch("/users/me/preferences/", {
-        email_notifications: emailNotifications,
-        push_notifications: pushNotifications,
-      });
-
-      toast.success("Preferencias guardadas");
-    } catch (error) {
-      toast.error("Error al guardar preferencias");
-    }
-  };
 
   const handleDeactivateAccount = async () => {
     if (!confirm("¿Estás seguro? Esta acción no se puede deshacer.")) {
@@ -74,27 +59,8 @@ export function UserAccountPage() {
         </dl>
       </section>
 
-      {/* Preferencias de notificaciones */}
-      <section className="space-y-4 border-t-2 border-border pt-6">
-        <p className="eyebrow text-foreground">Notificaciones</p>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-medium text-foreground">Notificaciones por email</p>
-            <p className="text-sm text-muted-foreground">Recibe actualizaciones por email</p>
-          </div>
-          <Switch isSelected={emailNotifications} onValueChange={setEmailNotifications} />
-        </div>
-        <div className="flex items-center justify-between border-t-2 border-border pt-4">
-          <div>
-            <p className="font-medium text-foreground">Notificaciones push</p>
-            <p className="text-sm text-muted-foreground">Recibe notificaciones del navegador</p>
-          </div>
-          <Switch isSelected={pushNotifications} onValueChange={setPushNotifications} />
-        </div>
-        <Button color="primary" className="rounded-none" onPress={handleSaveNotifications}>
-          Guardar preferencias
-        </Button>
-      </section>
+      {/* Preferencias de correo. Cada switch se guarda solo, sin botón. */}
+      <EmailNotificationPreferences email={user?.email} />
 
       {/* Zona de peligro */}
       <section className="space-y-3 border-2 border-destructive bg-destructive/5 p-4">

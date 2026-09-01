@@ -260,5 +260,11 @@ class UserSessionSerializer(serializers.Serializer):
 class UserPreferencesSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserPreferences
-        fields = ("email_notifications", "push_notifications")
+        fields = (
+            "email_notifications",
+            "push_notifications",
+            "email_ticket_assigned",
+            "email_ticket_mentioned",
+            "email_ticket_commented",
+        )
 

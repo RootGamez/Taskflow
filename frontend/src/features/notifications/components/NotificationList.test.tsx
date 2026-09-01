@@ -240,4 +240,29 @@ describe("NotificationList", () => {
     expect(onOpenInvitation).not.toHaveBeenCalled();
     expect(onNavigate).not.toHaveBeenCalled();
   });
+  it("no repite el comentario ni el ticket cuando el backend los manda duplicados", () => {
+    // Caso real reportado: el backend copia el extracto del comentario en
+    // `message` Y en `data.comment_preview`, y nombra el ticket en el
+    // titulo Y en `data.ticket_title`. La campana lo mostraba dos veces.
+    const preview = "En base a lo conversado subir hoy el avance";
+    mockNotificationsData([
+      buildNotification({
+        id: "notif-dup",
+        notification_type: "ticket_commented",
+        title: 'Nuevo comentario en "Diseno y Maquetacion de Landing"',
+        message: preview,
+        data: {
+          ticket_id: "ticket-7",
+          ticket_title: "Diseno y Maquetacion de Landing",
+          comment_id: "comment-3",
+          comment_preview: preview,
+        },
+      }),
+    ]);
+
+    render(<NotificationList />);
+
+    expect(screen.getAllByText(new RegExp(preview))).toHaveLength(1);
+    expect(screen.getAllByText(/Diseno y Maquetacion de Landing/)).toHaveLength(1);
+  });
 });

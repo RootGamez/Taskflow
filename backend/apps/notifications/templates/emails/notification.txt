@@ -1,0 +1,22 @@
+{{ copy.eyebrow|upper }} — TASKFLOW
+
+Hola {{ recipient_name }},
+
+{{ copy.headline }}
+{{ copy.lead }}
+
+TICKET
+{{ ticket_title }}
+{% if comment_excerpt %}
+{% if actor_name %}{{ actor_name }} escribio:{% else %}Comentario:{% endif %}
+"{{ comment_excerpt }}"
+{% endif %}
+{{ copy.cta_label|upper }}
+{{ ticket_url }}
+
+--
+Recibes este correo porque tienes activadas las notificaciones de
+"{{ copy.eyebrow|lower }}" en TaskFlow.
+Elegir que correos recibir: {{ preferences_url }}
+
+TaskFlow — correo automatico, no hace falta responder.

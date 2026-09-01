@@ -258,6 +258,11 @@ EMAIL_VERIFICATION_MAX_ATTEMPTS = int(
 )
 
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+# Interruptor global del correo de notificaciones (menciones, asignaciones,
+# comentarios). Apagarlo corta el envio de raiz sin tocar las preferencias
+# de cada usuario -- util en entornos de prueba con datos reales.
+NOTIFICATION_EMAILS_ENABLED = env_bool("NOTIFICATION_EMAILS_ENABLED", True)
 PASSWORD_RESET_TOKEN_TTL_MINUTES = int(
     os.getenv("PASSWORD_RESET_TOKEN_TTL_MINUTES", "30")
 )

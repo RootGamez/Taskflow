@@ -1,0 +1,195 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>{{ copy.subject }}</title>
+    <!--
+      Correo "Brutalismo Corporativo" (docs/BRUTALIST_DESIGN_CONTRACT.md):
+      papel hueso + tinta + carmesi, esquinas rectas, bordes de 2px y sombra
+      dura. Reglas de correo que condicionan el markup:
+        - Maquetacion con <table>, no con flex/grid (Outlook usa Word).
+        - Estilos criticos en linea; el <style> de aca solo agrega lo que no
+          se puede inline (media queries y modo oscuro).
+        - La "sombra dura" no es box-shadow (Outlook la ignora): es el padding
+          derecho/inferior de la celda contenedora, con la celda pintada de
+          tinta y la tarjeta encima. Eso se ve igual en todos los clientes.
+    -->
+    <style type="text/css">
+        body { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+        table { border-collapse: collapse; }
+        img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: bicubic; }
+        a { text-decoration: none; }
+        /* Outlook / Windows Mail: fuerza la altura de linea declarada. */
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+
+        @media only screen and (max-width: 620px) {
+            .tf-card { width: 100% !important; }
+            .tf-pad { padding-left: 20px !important; padding-right: 20px !important; }
+            .tf-headline { font-size: 21px !important; line-height: 27px !important; }
+            .tf-cta a { display: block !important; }
+        }
+
+        /* Modo oscuro: el contrato invierte los bordes (claros sobre oscuro)
+           en vez de oscurecerlos, y sube el carmesi para que siga leyendose. */
+        @media (prefers-color-scheme: dark) {
+            .tf-body { background-color: #171310 !important; }
+            .tf-shadow { background-color: #F7F4EC !important; }
+            .tf-card { background-color: #221C18 !important; border-color: #F7F4EC !important; }
+            .tf-surface { background-color: #2C2420 !important; border-color: #6B5F57 !important; }
+            .tf-footer { background-color: #1D1815 !important; border-color: #F7F4EC !important; }
+            .tf-ink, .tf-headline { color: #F7F4EC !important; }
+            .tf-muted { color: #B8ABA1 !important; }
+            .tf-accent { color: #EE6274 !important; }
+            .tf-quote { border-color: #EE6274 !important; }
+        }
+    </style>
+</head>
+<body class="tf-body" style="margin:0; padding:0; background-color:#F7F4EC; -webkit-font-smoothing:antialiased;">
+
+    <!-- Linea de vista previa: la que muestra la bandeja debajo del asunto.
+         Oculta en el cuerpo del mensaje. -->
+    <div style="display:none; font-size:1px; color:#F7F4EC; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">
+        {{ copy.lead }}&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;
+    </div>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tf-body" style="background-color:#F7F4EC;">
+        <tr>
+            <td align="center" style="padding:32px 16px 40px 16px;">
+
+                <!-- Celda-sombra: pintada de tinta, con 4px de padding a la
+                     derecha y abajo. La tarjeta blanca se apoya arriba a la
+                     izquierda, asi que lo unico que asoma es la sombra dura. -->
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" class="tf-card" style="width:600px; max-width:600px;">
+                    <tr>
+                        <td class="tf-shadow" style="background-color:#1A1512; padding:0 4px 4px 0;">
+
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tf-card" style="background-color:#ffffff; border:2px solid #1A1512;">
+
+                                <!-- Cabecera: barra de tinta con el sello del producto. -->
+                                <tr>
+                                    <td style="background-color:#1A1512; padding:18px 28px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td align="left" style="font-family:'Space Grotesk','Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:15px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#F7F4EC;">
+                                                    Task<span style="color:#C9A227;">flow</span>
+                                                </td>
+                                                <td align="right" style="font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#F7F4EC;">
+                                                    <span style="display:inline-block; border:1px solid #C9A227; color:#C9A227; padding:4px 8px;">{{ copy.eyebrow }}</span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Filete mostaza: el sello decorativo del sistema. -->
+                                <tr>
+                                    <td style="background-color:#C9A227; font-size:0; line-height:0; height:3px;">&nbsp;</td>
+                                </tr>
+
+                                <!-- Cuerpo -->
+                                <tr>
+                                    <td class="tf-pad" style="padding:32px 32px 8px 32px;">
+                                        <p class="tf-muted" style="margin:0 0 6px 0; font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#5A5049;">
+                                            Hola {{ recipient_name }}
+                                        </p>
+                                        <h1 class="tf-headline" style="margin:0 0 12px 0; font-family:'Space Grotesk','Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:25px; line-height:31px; font-weight:700; letter-spacing:-0.02em; color:#1A1512;">
+                                            {{ copy.headline }}
+                                        </h1>
+                                        <p class="tf-muted" style="margin:0; font-family:Inter,'Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:15px; line-height:24px; color:#5A5049;">
+                                            {{ copy.lead }}
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- Ficha del ticket -->
+                                <tr>
+                                    <td class="tf-pad" style="padding:20px 32px 0 32px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="tf-surface" style="background-color:#EBE7E0; border:2px solid #1A1512;">
+                                            <tr>
+                                                <td style="padding:16px 18px;">
+                                                    <p class="tf-muted" style="margin:0 0 4px 0; font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#5A5049;">
+                                                        Ticket
+                                                    </p>
+                                                    <p class="tf-ink" style="margin:0; font-family:'Space Grotesk','Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:16px; line-height:23px; font-weight:700; color:#1A1512;">
+                                                        {{ ticket_title }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                {% if comment_excerpt %}
+                                <!-- Cita del comentario: barra carmesi a la izquierda, como en la app. -->
+                                <tr>
+                                    <td class="tf-pad" style="padding:16px 32px 0 32px;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                                            <tr>
+                                                <td class="tf-quote" style="border-left:4px solid #8C1D2B; padding:2px 0 2px 16px;">
+                                                    {% if actor_name %}
+                                                    <p class="tf-muted" style="margin:0 0 6px 0; font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:#5A5049;">
+                                                        {{ actor_name }}
+                                                    </p>
+                                                    {% endif %}
+                                                    <p class="tf-ink" style="margin:0; font-family:Inter,'Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:15px; line-height:24px; color:#1A1512;">
+                                                        {{ comment_excerpt|linebreaksbr }}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endif %}
+
+                                <!-- Llamada a la accion -->
+                                <tr>
+                                    <td class="tf-pad" style="padding:26px 32px 32px 32px;">
+                                        <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="tf-cta">
+                                            <tr>
+                                                <td bgcolor="#8C1D2B" style="background-color:#8C1D2B; border:2px solid #1A1512;">
+                                                    <a href="{{ ticket_url }}" target="_blank" rel="noopener" style="display:inline-block; padding:13px 26px; font-family:'Space Grotesk','Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:14px; font-weight:700; letter-spacing:0.04em; color:#F7F4EC; text-decoration:none;">
+                                                        {{ copy.cta_label }} &rarr;
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                        <p class="tf-muted" style="margin:14px 0 0 0; font-family:Inter,'Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:12px; line-height:19px; color:#5A5049;">
+                                            Si el boton no funciona, copia esta direccion en tu navegador:<br />
+                                            <span class="tf-accent" style="font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:12px; word-break:break-all; color:#8C1D2B;">{{ ticket_url }}</span>
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- Pie -->
+                                <tr>
+                                    <td class="tf-footer tf-pad" style="background-color:#F7F4EC; border-top:2px solid #1A1512; padding:20px 32px;">
+                                        <p class="tf-muted" style="margin:0 0 8px 0; font-family:Inter,'Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:12px; line-height:19px; color:#5A5049;">
+                                            Recibes este correo porque tienes activadas las notificaciones de
+                                            &ldquo;{{ copy.eyebrow|lower }}&rdquo; en TaskFlow.
+                                        </p>
+                                        <p style="margin:0; font-family:Inter,'Segoe UI',Tahoma,Helvetica,Arial,sans-serif; font-size:12px; line-height:19px;">
+                                            <a class="tf-accent" href="{{ preferences_url }}" target="_blank" rel="noopener" style="color:#8C1D2B; font-weight:700; text-decoration:underline;">Elegir que correos recibir</a>
+                                        </p>
+                                    </td>
+                                </tr>
+
+                            </table>
+
+                        </td>
+                    </tr>
+                </table>
+
+                <p class="tf-muted" style="margin:18px 0 0 0; font-family:ui-monospace,'SFMono-Regular',Menlo,Consolas,'Courier New',monospace; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:#5A5049;">
+                    TaskFlow &middot; Correo automatico, no hace falta responder
+                </p>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

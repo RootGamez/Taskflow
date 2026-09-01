@@ -98,6 +98,18 @@ export function TicketAssigneeSelect({
     [members, selectedIds],
   );
 
+  // "Quitar todos" solo debe tocar a los responsables activos -- a un
+  // ex-miembro no se lo puede volver a desasignar desde aca (ver el chip
+  // mas abajo), asi que tampoco se lo lleva puesto un "quitar todos".
+  const removedSelectedIds = useMemo(
+    () =>
+      new Set(
+        selectedMembers.filter((m) => m.role === "removed").map((m) => m.user_id),
+      ),
+    [selectedMembers],
+  );
+  const hasActiveSelectedMembers = selectedMembers.some((m) => m.role !== "removed");
+
   const toggleAssignee = (userId: string) => {
     const next = new Set(selectedIds);
     if (next.has(userId)) {
@@ -131,20 +143,25 @@ export function TicketAssigneeSelect({
           <span className="max-w-[80px] truncate font-medium">
             {member.full_name.split(" ")[0]}
           </span>
-          {member.role === "removed" && (
+          {member.role === "removed" ? (
             <span className="rounded-full bg-secondary px-1 py-px text-[9px] uppercase tracking-wide text-secondary-foreground">
               Ex
             </span>
-          )}
-          {!disabled && (
-            <button
-              type="button"
-              onClick={(e) => removeAssignee(member.user_id, e)}
-              className="ml-0.5 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label={`Quitar a ${member.full_name}`}
-            >
-              <X className="h-2.5 w-2.5" />
-            </button>
+          ) : (
+            // A un ex-miembro no se lo puede volver a tocar desde aca: ni
+            // reasignar (ya esta fuera de `assignableMembers`) ni quitar --
+            // ver nota en member.types.ts / WorkspaceMemberDetailView.delete
+            // sobre por que se conserva la asignacion en vez de limpiarla.
+            !disabled && (
+              <button
+                type="button"
+                onClick={(e) => removeAssignee(member.user_id, e)}
+                className="ml-0.5 rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={`Quitar a ${member.full_name}`}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )
           )}
         </div>
       ))}
@@ -224,11 +241,11 @@ export function TicketAssigneeSelect({
                   })}
                 </CommandGroup>
 
-                {selectedMembers.length > 0 && (
+                {hasActiveSelectedMembers && (
                   <div className="border-t-2 border-border px-2.5 py-2">
                     <button
                       type="button"
-                      onClick={() => onChange([])}
+                      onClick={() => onChange(assigneeIds.filter((id) => removedSelectedIds.has(id)))}
                       className="w-full rounded px-2 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       Quitar todos los responsables

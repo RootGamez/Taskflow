@@ -3,7 +3,7 @@ from __future__ import annotations
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.db import transaction
-from django.db.models import F
+from django.db.models import Exists, F, OuterRef
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound, ValidationError
@@ -217,20 +217,23 @@ class TicketSingleView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	def get(self, request: Request, ticket_id: str) -> Response:
-		# Ver el comentario del mismo patron en
-		# WorkspaceRoleAccessMixin.get_project_for_user: el `.filter()` que
-		# atraviesa `memberships` no pasa por el manager de WorkspaceMember,
-		# asi que el `.exclude()` en un `.filter()` aparte es lo que bloquea
-		# a un miembro expulsado (role=removed).
+		# Ver el comentario en WorkspaceRoleAccessMixin.get_project_for_user:
+		# un `.filter(...).exclude(...)` separado sobre la misma relacion
+		# (`memberships`) NO queda scopeado a "un solo row" en Django -- se
+		# parte en dos EXISTS independientes y terminaba bloqueando a TODO
+		# el workspace apenas alguien quedaba con role=removed, sin importar
+		# quien pedia el ticket. `Exists(OuterRef(...))` arma una unica
+		# subquery correlacionada; `WorkspaceMember.objects` (el manager por
+		# defecto) ya excluye role=removed por su cuenta.
+		has_active_membership = WorkspaceMember.objects.filter(
+			workspace_id=OuterRef("project__workspace_id"),
+			user=request.user,
+		)
 		ticket = (
 			Ticket.objects.select_related("project__workspace", "column__workspace_status", "created_by")
 			.prefetch_related("assignees", "labels", "subtasks", "sprints")
-			.filter(id=ticket_id, project__workspace__memberships__user=request.user)
-			.exclude(
-				project__workspace__memberships__user=request.user,
-				project__workspace__memberships__role=WorkspaceMember.Role.REMOVED,
-			)
-			.distinct()
+			.filter(id=ticket_id)
+			.filter(Exists(has_active_membership))
 			.first()
 		)
 		if ticket is None:

@@ -30,6 +30,7 @@ import { TicketCalendarPicker } from "./TicketCalendarPicker";
 import { TicketDeleteDialog } from "./TicketDeleteDialog";
 import { useCollaborativeField } from "../hooks/useCollaborativeField";
 import { useDebounce } from "@/hooks/useDebounce";
+import { getApiErrorMessage } from "@/lib/errors";
 import type { Column } from "@/features/projects/types/project.types";
 import type { Priority, Ticket } from "@/features/tickets/types/ticket.types";
 
@@ -554,6 +555,7 @@ export function TicketDetail({
     flushInFlightRef.current = true;
 
     let hasSaveError = false;
+    let saveErrorMessage = "No se pudo guardar el ticket. Reintenta.";
 
     try {
       while (queuedDraftRef.current) {
@@ -580,15 +582,21 @@ export function TicketDetail({
             ...baseline,
             ...payload,
           };
-        } catch {
+        } catch (error) {
           hasSaveError = true;
+          // p. ej. si el ticket/proyecto ya no existe o el acceso al
+          // espacio se revoco entre que se abrio el detalle y se guardo
+          // (backend responde 404 en vez de 500) -- mostrar el detalle
+          // real en vez de un generico ayuda a distinguir "reintenta" de
+          // "esto ya no es reintentable".
+          saveErrorMessage = getApiErrorMessage(error, saveErrorMessage);
           queuedDraftRef.current = candidate;
           break;
         }
       }
 
       if (hasSaveError) {
-        toast.error("No se pudo guardar el ticket. Reintenta.");
+        toast.error(saveErrorMessage);
         setHasLocalChanges(true);
       } else if (!queuedDraftRef.current) {
         setHasLocalChanges(false);

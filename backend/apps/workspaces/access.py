@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.db.models import Exists, OuterRef
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.request import Request
 
@@ -42,21 +43,26 @@ class WorkspaceRoleAccessMixin:
 		return membership.workspace
 
 	def get_project_for_user(self, request: Request, project_id: str) -> Project:
-		# `workspace__memberships__user=` atraviesa la relacion con un JOIN
-		# sobre la tabla cruda de WorkspaceMember: no pasa por su manager
-		# (`objects`), asi que NO excluye solo por si mismo a un miembro
-		# expulsado (role=removed) -- ver WorkspaceMemberManager. El
-		# `.exclude(...)` de abajo, en un `.filter()` aparte que abre su
-		# propio JOIN/subquery, es lo que efectivamente lo bloquea.
+		# BUG que hubo aca: `.filter(workspace__memberships__user=X).exclude(
+		# workspace__memberships__user=X, workspace__memberships__role=REMOVED)`
+		# se ve razonable pero Django NO lo arma como "un solo row cumple
+		# ambas condiciones" -- lo parte en dos EXISTS independientes
+		# (uno "hay un member con role=removed", otro "hay un member con
+		# user=X", sin correlacionar), asi que bloqueaba a TODO el workspace
+		# apenas alguien quedaba removido, sin importar quien pedia el
+		# proyecto. `Exists(OuterRef(...))` arma una subquery unica y
+		# correlacionada, sin esa ambiguedad -- y usa `WorkspaceMember.objects`
+		# (el manager por defecto, que ya excluye role=removed) para no
+		# repetir esa condicion a mano.
+		has_active_membership = WorkspaceMember.objects.filter(
+			workspace_id=OuterRef("workspace_id"),
+			user=request.user,
+		)
 		project = (
 			Project.objects.select_related("workspace")
 			.prefetch_related("columns")
-			.filter(id=project_id, workspace__memberships__user=request.user)
-			.exclude(
-				workspace__memberships__user=request.user,
-				workspace__memberships__role=WorkspaceMember.Role.REMOVED,
-			)
-			.distinct()
+			.filter(id=project_id)
+			.filter(Exists(has_active_membership))
 			.first()
 		)
 		if project is None:

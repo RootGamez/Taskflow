@@ -77,11 +77,23 @@ describe("TicketAssigneeSelect: miembros eliminados del espacio", () => {
     expect(screen.getByTitle("Bob Removido ya no pertenece al espacio")).toBeInTheDocument();
   });
 
-  it("un miembro activo ya asignado no lleva el tag", async () => {
+  it("un ex-miembro no tiene boton para quitarlo del ticket (solo el tag 'Ex')", async () => {
+    renderSelect(["user-active", "user-removed"]);
+
+    await screen.findByText("Ex");
+
+    // El activo si tiene su boton de quitar...
+    expect(screen.getByRole("button", { name: "Quitar a Ada Activa" })).toBeInTheDocument();
+    // ...el ex-miembro no tiene ningun control para tocar la asignacion.
+    expect(screen.queryByRole("button", { name: "Quitar a Bob Removido" })).not.toBeInTheDocument();
+  });
+
+  it("un miembro activo ya asignado no lleva el tag y si tiene boton de quitar", async () => {
     renderSelect(["user-active"]);
 
     expect(await screen.findByText("Ada")).toBeInTheDocument();
     expect(screen.queryByText("Ex")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quitar a Ada Activa" })).toBeInTheDocument();
   });
 
   it("el picker de nuevas asignaciones no ofrece a un ex-miembro", async () => {
@@ -92,5 +104,29 @@ describe("TicketAssigneeSelect: miembros eliminados del espacio", () => {
 
     expect(await screen.findByText("Ada Activa")).toBeInTheDocument();
     expect(screen.queryByText("Bob Removido")).not.toBeInTheDocument();
+  });
+
+  it("'Quitar todos los responsables' solo saca a los activos, preserva al ex-miembro", async () => {
+    const user = userEvent.setup();
+    const onChange = renderSelect(["user-active", "user-removed"]);
+
+    await screen.findByText("Ex");
+    await user.click(screen.getByRole("button", { name: "+" }));
+    await user.click(await screen.findByRole("button", { name: "Quitar todos los responsables" }));
+
+    expect(onChange).toHaveBeenCalledWith(["user-removed"]);
+  });
+
+  it("sin responsables activos (solo un ex-miembro), no ofrece 'Quitar todos'", async () => {
+    const user = userEvent.setup();
+    renderSelect(["user-removed"]);
+
+    // El trigger ya no dice "Asignar" con un ex-miembro puesto (cuenta como
+    // "hay algo seleccionado" para el boton "+"), pero igual no debe
+    // ofrecer "Quitar todos" porque no hay nada activo que quitar.
+    await screen.findByText("Ex");
+    await user.click(screen.getByRole("button", { name: "+" }));
+
+    expect(screen.queryByRole("button", { name: "Quitar todos los responsables" })).not.toBeInTheDocument();
   });
 });
